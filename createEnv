@@ -1,0 +1,93 @@
+#!/bin/bash
+
+script_dir="$(dirname "$(readlink -f "$0")")"
+package_archive="/home/gbt7/newt_package_archive"
+tmp_dir="/tmp/proof"
+
+# Echos a string wrapped in a way to indicate that it is from this script
+# TODO: Color would be nicer
+script_msg()
+{
+    echo -e "---${1}---"
+}
+
+fatal_error() {
+    if [ -n "$2" ]; then
+        script_msg "\tFATAL ERROR (line ${2}): ${1}"
+    else
+        script_msg "\tFATAL ERROR: ${1}"
+    fi
+
+    exit 1
+}
+
+handle_error() {
+    if [ $? -ne 0 ]; then
+        fatal_error "$1" "$2"
+    fi
+}
+
+# Given a command, execute it then check it for errors. Assumes that 0
+# is "success" and that any quotes are properly escaped
+#   Arg 1: command
+#   Arg 2: line number (optional)
+safe_cmd() {
+    script_msg "Executing: \"${1}\""
+    # If user has requested a dry run, don't actually execute any commands
+    if [ -z "$dryrun" ]; then
+        eval ${1}
+        handle_error "${1} failed!" "$2"
+    fi
+}
+
+
+
+# Initial error checking
+if [ -n "$1" ]; then
+    venv_name=$1
+else
+    venv_name="${USER}_lassi_env"
+fi
+
+if [ -f "$venv_name" ]; then
+    fatal_error "${venv_name} already exists; exiting" $LINENO
+fi
+
+if [ -n "$VIRTUAL_ENV" ]; then
+    fatal_error "You are already in a virtualenv (${VIRTUAL_ENV}); deactivate \
+it and try again." $LINENO
+fi
+
+# Done with initial checks, can begin script
+
+# Create the venv
+safe_cmd "virtualenv -p python2.7 $venv_name"
+# Enter the venv
+safe_cmd "source $venv_name/bin/activate"
+
+if [ -n "$VIRTUAL_ENV" ]; then
+    script_msg "SUCCESSFULLY ENTERED ENVIRONMENT: $venv_name"
+else
+    fatal_error "Sourcing ${venv_name}/bin/activate failed; exiting." $LINENO
+fi
+
+script_msg "Upgrading pip..."
+# The version of pip that is installed by virtualenv is ancient and bad
+# at its job, so we first need to upgrade it
+safe_cmd "pip install -U pip"
+# Might as well do setuptools, too
+safe_cmd "pip install -U setuptools"
+
+
+safe_cmd "pip install cffi"
+safe_cmd "pip install numpy"
+
+safe_cmd "pip install -r $script_dir/requirements.txt"
+
+# execute manual steps
+
+#safe_cmd "cp \"$script_dir/oof.bash.do_not_source\" \"$VIRTUAL_ENV/oof.bash\""
+#safe_cmd "rm -f \"$script_dir/oof.bash\""
+#safe_cmd "ln -s \"$VIRTUAL_ENV/oof.bash\" \"$script_dir/oof.bash\""
+
+echo "Virtual Env created!"
