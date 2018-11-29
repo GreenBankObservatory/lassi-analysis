@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 import opticspy
 
-def process(fn, n, outputName):
+def process(fn, n, outputName, noise=False):
 
     # 10: seconds
     # 50: 2.5 mins
@@ -27,11 +27,18 @@ def process(fn, n, outputName):
     print "Converting to spherical coords ..."
     r, az, el = cart2sph(x, y, z)
 
+
+    # print "min/max r", r.min(), r.max()
+
     # print "unwrapping az values ..."
     # az = unwrap(az)
 
     print "smoothing data ..."
     azLoc, elLoc, rSmooth = smooth(az, el, r, n)
+
+    if noise:
+        print "adding noise to radial values ..."
+        rSmooth = rSmooth + 1*np.random.randn(n,n)
 
     #print rSmooth
     # fig = plt.figure()
@@ -54,28 +61,33 @@ def process(fn, n, outputName):
     print "converting back to cartesian ..."
     xs, ys, zs = sph2cart(azLoc, elLoc, rSmooth)
 
-    print "plotting ..."
+    print "plotting x y z ..."
     fig = plt.figure()
     ax = Axes3D(fig)
     ax.plot_surface(xs, ys, zs)
     plt.show()
 
-    xss, yss, zss = smooth(x, y, z, n, sigEl=0.1, sigAz=0.1)
 
-    fig = plt.figure()
-    ax = Axes3D(fig)
-    ax.plot_surface(xss, yss, zss)
-    plt.show()
+    # print "smoothing x y z"
+    # xss, yss, zss = smooth(xs, ys, zs, n, sigEl=0.1, sigAz=0.1)
+
+    # print "plotting final smoothed x y z"
+    # fig = plt.figure()
+    # ax = Axes3D(fig)
+    # ax.plot_surface(xss, yss, zss)
+    # plt.show()
 
     
     # find the zernike fit to this!
     # first convert NaN's to zeros
-    zss[np.isnan(zss)] = 0.
+    # zss[np.isnan(zs)] = 0.
+    zs[np.isnan(zs)] = 0.
 
-    zernikeFit(zss)
+    zernikeFit(zs)
 
     # save processing results
-    np.savez(outputName, x=xss, y=yss, z=zss)
+    # np.savez(outputName, x=xss, y=yss, z=zss)
+    np.savez(outputName, x=xs, y=ys, z=zs)
 
 def zernikeFit(z):
 
@@ -98,7 +110,6 @@ def smooth(az, el, r, n, sigEl=None, sigAz=None):
     # dEl=(max(el)-min(el))/(n-1)
     # azRange=range(min(az), max(az), dAz)
     # elRange=range(min(el), max(el), dEl)
-
     azRange = np.linspace(min(az), max(az), n)
     elRange = np.linspace(min(el), max(el), n)
 
@@ -192,6 +203,42 @@ def importCsv(filename):
 
     return np.array(xs), np.array(ys), np.array(zs)
 
+def processDiff(fn1, fn2):
+    "Find diff between two evenly-spaced surfaces and fit"
+
+    r = np.load(fn1)
+    x1 = r['x']
+    y1 = r['y']
+    z1 = r['z']
+
+    r = np.load(fn2)
+    x2 = r['x']
+    y2 = r['y']
+    z2 = r['z']
+
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.plot_surface(x1, y1, z1)
+    plt.show()
+
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.plot_surface(x2, y2, z2)
+    plt.show()
+
+    # Here we are assuming the x, y dims are the same
+    zDiff = z1 - z2
+
+    print zDiff
+
+    print "plotting surface diff ..."
+    plt.imshow(zDiff, interpolation="nearest", origin="upper")
+    plt.colorbar()
+    plt.show()
+
+    print "Zernikie's for surface diffs:"
+    fits, c = zernikeFit(zDiff)
+
 def testTransforms():
 
     x = y = z = [1.]
@@ -213,11 +260,14 @@ def identityTest(x, y, z):
     print xs, ys, zs
 
 def main():
-    n = 10
+    n = 50
     fn = "data/randomSampleSta10.csv"
+    print "processing img1"
     process(fn, n, "img1")
-    # process(fn, n, "img2")
-    # processDiff("img1", "img2")
+    print ""
+    print "processing img2"
+    process(fn, n, "img2", noise=True)
+    processDiff("img1.npz", "img2.npz")
 
 if __name__ == "__main__":
     main()
