@@ -8,6 +8,13 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 import opticspy
 
+from dask import delayed
+from dask import config
+from dask.diagnostics import ProgressBar, Profiler, ResourceProfiler, CacheProfiler
+from dask.diagnostics import visualize
+
+# config.set(scheduler='distributed')  # overwrite default with multiprocessing scheduler
+
 def process(fn, n, outputName, noise=False):
 
     # 10: seconds
@@ -36,6 +43,8 @@ def process(fn, n, outputName, noise=False):
     print "smoothing data ..."
     azLoc, elLoc, rSmooth = smooth(az, el, r, n)
 
+    print "azLoc", azLoc
+    print "elLoc", elLoc
     if noise:
         print "adding noise to radial values ..."
         rSmooth = rSmooth + 1*np.random.randn(n,n)
@@ -67,27 +76,37 @@ def process(fn, n, outputName, noise=False):
     ax.plot_surface(xs, ys, zs)
     plt.show()
 
+    print "plotting x y z as scatter to see spacing"
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.scatter(xs, ys, zs)
+    plt.show()
 
-    # print "smoothing x y z"
-    # xss, yss, zss = smooth(xs, ys, zs, n, sigEl=0.1, sigAz=0.1)
+    print "smoothing x y z"
+    xss, yss, zss = smoothXYZ(xs, ys, zs, n, sigX=0.5, sigY=0.5)
 
-    # print "plotting final smoothed x y z"
-    # fig = plt.figure()
-    # ax = Axes3D(fig)
-    # ax.plot_surface(xss, yss, zss)
-    # plt.show()
+    print "plotting final smoothed x y z"
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.plot_surface(xss, yss, zss)
+    plt.show()
 
-    
+    print "plotting final smoothed x y z as scatter"
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.scatter(xss, yss, zss)
+    plt.show()
+
     # find the zernike fit to this!
     # first convert NaN's to zeros
-    # zss[np.isnan(zs)] = 0.
-    zs[np.isnan(zs)] = 0.
+    zss[np.isnan(zs)] = 0.
+    # zs[np.isnan(zs)] = 0.
 
-    zernikeFit(zs)
+    zernikeFit(zss)
 
     # save processing results
     # np.savez(outputName, x=xss, y=yss, z=zss)
-    np.savez(outputName, x=xs, y=ys, z=zs)
+    # np.savez(outputName, x=xs, y=ys, z=zs)
 
 def zernikeFit(z):
 
@@ -102,7 +121,21 @@ def zernikeFit(z):
     # C1.zernikesurface()
 
     return fitlist, C1
-       
+
+def getWeight(az, el, azLoc, elLoc, sigAz, sigEl, j, k):
+    return 2*np.pi*np.exp((-(az-azLoc[j,k])**2/(2.*sigAz**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 )))
+
+def assignWeight(w, r):
+
+    norm=sum(w)
+    if norm==0:
+        norm=1
+        v=np.nan #0 #min( r )
+    else:
+        w = w / norm
+        v = sum(r * w)   
+    return v
+
 def smooth(az, el, r, n, sigEl=None, sigAz=None):
     "smooth our data"
 
@@ -122,21 +155,85 @@ def smooth(az, el, r, n, sigEl=None, sigAz=None):
 
     # init our smoothing result
     rSm = np.ndarray(shape=(n,n))
+    rSms = []
+    for j in range(n):
+        print "J:", j
+        for k in range(n):
+            w=delayed(getWeight)(az, el, azLoc, elLoc, sigAz, sigEl, j, k)
+            # w=2*np.pi*np.exp( (- (az - azLoc[j,k])**2 /( 2.*sigAz**2 )-(el-elLoc[j,k])**2 /(2.*sigEl**2 )))
+            # norm=sum(w)
+            # if norm==0:
+            #     norm=1
+            #     rSm[j,k]=np.nan #0 #min( r )
+            # else:
+            #     w = w / norm
+            #     rSm[j,k] = sum(r * w)
+            v = delayed(assignWeight)(w, r)
+            rSms.append((j, k, v))
+
+    rSms = delayed(identity)(rSms)
+
+    with ProgressBar(), Profiler() as prof, ResourceProfiler() as rprof, CacheProfiler() as cprof:    
+        rSms = rSms.compute(scheduler="processes")
+
+    for j, k, v in rSms:
+        rSm[j][k] = v
+
+    return (azLoc, elLoc, rSm)
+
+def smoothXYZ(x, y, z, n, sigX=None, sigY=None):
+    "smooth our data"
+
+    x = x.flatten()
+    y = y.flatten()
+    z = z.flatten()
+
+    # dAz=(max(az)-min(az))/(n-1)
+    # dEl=(max(el)-min(el))/(n-1)
+    # azRange=range(min(az), max(az), dAz)
+    # elRange=range(min(el), max(el), dEl)
+    # xNoNan = x[[not b for b in np.isnan(x)]]
+    # yNoNan = y[[not b for b in np.isnan(y)]]
+    # xRange = np.linspace(xNoNan.min(), xNoNan.max(), n)
+    # yRange = np.linspace(yNoNan.min(), yNoNan.max(), n)
+    x2 = x[[not b for b in np.isnan(x)]]
+    y2 = y[[not b for b in np.isnan(y)]]
+    z2 = y[[not b for b in np.isnan(z)]]
+
+    x = x2
+    y = y2
+    z = z2
+
+    xRange = np.linspace(x.min(), x.max(), n)
+    yRange = np.linspace(y.min(), y.max(), n)
+
+    xLoc, yLoc = np.meshgrid(xRange, yRange)
+
+    if sigX is None:
+        sigX=0.001
+    if sigY is None:    
+        sigY=0.001;
+
+    # init our smoothing result
+    zSm = np.ndarray(shape=(n,n))
 
     for j in range(n):
         print "J:", j
         for k in range(n):
-            w=2*np.pi*np.exp( (- (az - azLoc[j,k])**2 /( 2.*sigAz**2 )-(el-elLoc[j,k])**2 /(2.*sigEl**2 )))
+            w=2*np.pi*np.exp( (- (x - xLoc[j,k])**2 /( 2.*sigX**2 )-(y-yLoc[j,k])**2 /(2.*sigY**2 )))
             norm=sum(w)
             if norm==0:
                 norm=1
-                rSm[j,k]=np.nan #0 #min( r )
+                zSm[j,k]=np.nan #0 #min( r )
             else:
                 w = w / norm
-                rSm[j,k] = sum(r * w)
+                zSm[j,k] = sum(z * w)
 
+    print "xLoc", xLoc
+    print "yLoc", yLoc
+    print "zSm", zSm
+    return (xLoc, yLoc, zSm)
 
-    return (azLoc, elLoc, rSm)
 
 def unwrap(azs):
     "make sure all az values are between 0 and 2pi"
@@ -259,15 +356,50 @@ def identityTest(x, y, z):
 
     print xs, ys, zs
 
+def multi(i, j):
+    return i*j
+
+def assign(k):
+    return k if k <= 2 else 0
+
+def identity(k):
+    return k
+
+def testDask():
+
+    n = 3
+    ks = np.ndarray((n, n))
+    kss = []
+    for i in range(n):
+        for j in range(n):
+            k = delayed(multi)(i, j)
+            v = delayed(assign)(k)
+            # ks[i][j] = v
+            # v = k if k <= 2 else 0
+            # ks[i][j] = v
+            kss.append((i, j, v))
+    kss = delayed(identity)(kss)
+    print kss
+
+    kss = kss.compute(scheduler='processes')
+            
+    print kss
+
+    for i, j, v in kss:
+        ks[i][j] = v
+
+    print ks
+
 def main():
-    n = 50
+    # testDask()
+    n = 30
     fn = "data/randomSampleSta10.csv"
     print "processing img1"
     process(fn, n, "img1")
-    print ""
-    print "processing img2"
-    process(fn, n, "img2", noise=True)
-    processDiff("img1.npz", "img2.npz")
+    # print ""
+    # print "processing img2"
+    # process(fn, n, "img2", noise=True)
+    # processDiff("img1.npz", "img2.npz")
 
 if __name__ == "__main__":
     main()
