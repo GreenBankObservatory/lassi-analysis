@@ -1,5 +1,6 @@
 
 import csv
+from copy import copy
 
 import numpy as np
 from astropy.coordinates import cartesian_to_spherical
@@ -7,6 +8,7 @@ from astropy.coordinates import spherical_to_cartesian
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 import opticspy
+from scipy import interpolate
 
 from dask import delayed
 from dask import config
@@ -70,6 +72,9 @@ def process(fn, n, outputName, noise=False):
     print "converting back to cartesian ..."
     xs, ys, zs = sph2cart(azLoc, elLoc, rSmooth)
 
+    # save for later analysis
+    np.savez("smoothXYZ%d" % n, x=xs, y=ys, z=zs)
+
     print "plotting x y z ..."
     fig = plt.figure()
     ax = Axes3D(fig)
@@ -82,8 +87,16 @@ def process(fn, n, outputName, noise=False):
     ax.scatter(xs, ys, zs)
     plt.show()
 
+    # sxs, sys, szs = interpXYZ(xs, ys, zs, n)
+
+    # print "zernikes of xyz surface"
+    # zs2 = copy(zs)
+    # zs2[np.isnan(zs2)] = 0.
+    # zernikeFit(zs2)
+
+    
     print "smoothing x y z"
-    xss, yss, zss = smoothXYZ(xs, ys, zs, n, sigX=0.5, sigY=0.5)
+    xss, yss, zss = smoothXYZ(xs, ys, zs, n, sigX=0.25, sigY=0.25)
 
     print "plotting final smoothed x y z"
     fig = plt.figure()
@@ -102,11 +115,58 @@ def process(fn, n, outputName, noise=False):
     zss[np.isnan(zs)] = 0.
     # zs[np.isnan(zs)] = 0.
 
+    print "zernikes of smoothed xyz"
     zernikeFit(zss)
 
     # save processing results
     # np.savez(outputName, x=xss, y=yss, z=zss)
     # np.savez(outputName, x=xs, y=ys, z=zs)
+
+def interpXYZ(x, y, z, n):
+
+    x2 = copy(x)
+    y2 = copy(y)
+    z2 = copy(z)
+
+    xmin = np.nanmin(x2)
+    xmax = np.nanmax(x2)
+    ymin = np.nanmin(y2)
+    ymax = np.nanmax(y2)
+    zmin = np.nanmin(z2)
+    zmax = np.nanmax(z2)
+
+    x2[np.isnan(x2)] = 0.
+    y2[np.isnan(y2)] = 0.
+    z2[np.isnan(z2)] = 0.
+
+    f = interpolate.interp2d(x2.flatten(),
+                             y2.flatten(),
+                             z2.flatten(),
+                             kind='linear')
+
+    xnew = np.linspace(xmin, xmax, n)
+    ynew = np.linspace(ymin, ymax, n)
+
+    znew = f(xnew, ynew)
+
+    # now strip out any values that are way out of range
+    tol = 10.
+    znew[znew > zmax + tol] = 0.
+    znew[znew < zmin - tol] = 0.
+
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    mx, my = np.meshgrid(xnew, ynew)
+    ax.scatter(mx, my, znew)
+    plt.show()
+
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    mx, my = np.meshgrid(xnew, ynew)
+    ax.scatter(mx, my, znew)
+    plt.plot_surface(mx, my, znew)
+
+    return mx, my, znew
 
 def zernikeFit(z):
 
@@ -136,6 +196,36 @@ def assignWeight(w, r):
         v = sum(r * w)   
     return v
 
+def smoothSlow(az, el, r, n, sigEl=None, sigAz=None):
+    "smooth our data"
+
+    azRange = np.linspace(min(az), max(az), n)
+    elRange = np.linspace(min(el), max(el), n)
+
+    azLoc, elLoc = np.meshgrid(azRange, elRange)
+
+    if sigEl is None:
+        sigEl=0.001
+    if sigAz is None:    
+        sigAz=0.001;
+
+    # init our smoothing result
+    rSm = np.ndarray(shape=(n,n))
+    rSms = []
+    for j in range(n):
+        # print "J:", j
+        for k in range(n):
+            w=2*np.pi*np.exp( (- (az - azLoc[j,k])**2 /( 2.*sigAz**2 )-(el-elLoc[j,k])**2 /(2.*sigEl**2 )))
+            norm=sum(w)
+            if norm==0:
+                norm=1
+                rSm[j,k]=np.nan #0 #min( r )
+            else:
+                w = w / norm
+                rSm[j,k] = sum(r * w)
+
+    return (azLoc, elLoc, rSm)    
+
 def smooth(az, el, r, n, sigEl=None, sigAz=None):
     "smooth our data"
 
@@ -157,7 +247,7 @@ def smooth(az, el, r, n, sigEl=None, sigAz=None):
     rSm = np.ndarray(shape=(n,n))
     rSms = []
     for j in range(n):
-        print "J:", j
+        # print "J:", j
         for k in range(n):
             w=delayed(getWeight)(az, el, azLoc, elLoc, sigAz, sigEl, j, k)
             # w=2*np.pi*np.exp( (- (az - azLoc[j,k])**2 /( 2.*sigAz**2 )-(el-elLoc[j,k])**2 /(2.*sigEl**2 )))
@@ -210,15 +300,15 @@ def smoothXYZ(x, y, z, n, sigX=None, sigY=None):
     xLoc, yLoc = np.meshgrid(xRange, yRange)
 
     if sigX is None:
-        sigX=0.001
+        sigX=0.1
     if sigY is None:    
-        sigY=0.001;
+        sigY=0.1;
 
     # init our smoothing result
     zSm = np.ndarray(shape=(n,n))
 
     for j in range(n):
-        print "J:", j
+        # print "J:", j
         for k in range(n):
             w=2*np.pi*np.exp( (- (x - xLoc[j,k])**2 /( 2.*sigX**2 )-(y-yLoc[j,k])**2 /(2.*sigY**2 )))
             norm=sum(w)
@@ -390,9 +480,77 @@ def testDask():
 
     print ks
 
+def plotXYZ(x, y, z):
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.plot_surface(x, y, z)
+    plt.show()
+
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.scatter(x, y, z)
+    plt.show()
+
+def testInterp():
+
+    fn = "smoothXYZ10.npz"
+    r = np.load(fn)
+    x = r['x']
+    y = r['y']
+    z = r['z']
+
+    # plotXYZ(x, y, z)
+
+
+    # look at inner part to avoid zeros and nans    
+    n = z.shape[0]
+    start = n / 3
+    end = (2*n) / 3
+
+    x = x[start:end, start:end]
+    y = y[start:end, start:end]
+    z = z[start:end, start:end]
+
+    plotXYZ(x, y, z)
+
+    # now take a rectangular slice of THAT
+    xw = (x.max() - x.min())
+    xcntr = x.min() + (xw/2)
+    yw = (y.max() - y.min())
+    ycntr = y.min() + (yw/2)
+
+
+    xmask = np.logical_and(x < xcntr + (xw/4), x > xcntr - (xw/4))
+
+    x = x[xmask]
+    y = y[xmask]
+    z = z[xmask]
+
+    print x
+    print y
+    print z
+
+    plotXYZ(x, y, z)
+
+    f = interpolate.interp2d(x.flatten(),
+                             y.flatten(),
+                             z.flatten(),
+                             kind='cubic')
+
+    xnew = np.linspace(x.min(), x.max(), n)
+    ynew = np.linspace(y.min(), y.max(), n)
+
+    znew = f(xnew, ynew)       
+
+    mx, my = np.meshgrid(xnew, ynew)
+
+    plotXYZ(mx, my, znew)
+
+
 def main():
+    # testInterp()
     # testDask()
-    n = 30
+    n = 50
     fn = "data/randomSampleSta10.csv"
     print "processing img1"
     process(fn, n, "img1")
