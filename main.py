@@ -87,7 +87,8 @@ def process(fn, n, outputName, noise=False):
     ax.scatter(xs, ys, zs)
     plt.show()
 
-    # sxs, sys, szs = interpXYZ(xs, ys, zs, n)
+    print "smoothing x y z"
+    sxs, sys, szs = interpXYZ(xs, ys, zs, n)
 
     # print "zernikes of xyz surface"
     # zs2 = copy(zs)
@@ -95,25 +96,25 @@ def process(fn, n, outputName, noise=False):
     # zernikeFit(zs2)
 
     
-    print "smoothing x y z"
-    xss, yss, zss = smoothXYZ(xs, ys, zs, n, sigX=0.25, sigY=0.25)
+    # print "smoothing x y z"
+    # xss, yss, zss = smoothXYZ(xs, ys, zs, n, sigX=0.25, sigY=0.25)
 
-    print "plotting final smoothed x y z"
-    fig = plt.figure()
-    ax = Axes3D(fig)
-    ax.plot_surface(xss, yss, zss)
-    plt.show()
+    # print "plotting final smoothed x y z"
+    # fig = plt.figure()
+    # ax = Axes3D(fig)
+    # ax.plot_surface(xss, yss, zss)
+    # plt.show()
 
-    print "plotting final smoothed x y z as scatter"
-    fig = plt.figure()
-    ax = Axes3D(fig)
-    ax.scatter(xss, yss, zss)
-    plt.show()
+    # print "plotting final smoothed x y z as scatter"
+    # fig = plt.figure()
+    # ax = Axes3D(fig)
+    # ax.scatter(xss, yss, zss)
+    # plt.show()
 
     # find the zernike fit to this!
     # first convert NaN's to zeros
-    zss[np.isnan(zs)] = 0.
-    # zs[np.isnan(zs)] = 0.
+    # zss[np.isnan(zs)] = 0.
+    zs[np.isnan(zs)] = 0.
 
     print "zernikes of smoothed xyz"
     zernikeFit(zss)
@@ -128,13 +129,15 @@ def interpXYZ(x, y, z, n):
     y2 = copy(y)
     z2 = copy(z)
 
-    xmin = np.nanmin(x2)
-    xmax = np.nanmax(x2)
-    ymin = np.nanmin(y2)
-    ymax = np.nanmax(y2)
-    zmin = np.nanmin(z2)
-    zmax = np.nanmax(z2)
+    xMin = np.nanmin(x2)
+    xMax = np.nanmax(x2)
+    yMin = np.nanmin(y2)
+    yMax = np.nanmax(y2)
+    # zmin = np.nanmin(z2)
+    # zmax = np.nanmax(z2)
 
+    # We'll replace the NaN's with zero's and flatten our coordinate 
+    # matrices to fit an interpolation function to all our data
     x2[np.isnan(x2)] = 0.
     y2[np.isnan(y2)] = 0.
     z2[np.isnan(z2)] = 0.
@@ -142,29 +145,28 @@ def interpXYZ(x, y, z, n):
     f = interpolate.interp2d(x2.flatten(),
                              y2.flatten(),
                              z2.flatten(),
-                             kind='linear')
+                             kind='cubic')
 
-    xnew = np.linspace(xmin, xmax, n)
-    ynew = np.linspace(ymin, ymax, n)
+    # TBD: just use the center region to avoid edge cases and 0's and Nans!
 
+    d = 3.
+
+    xD = xMax - xMin
+    xStart = xMin + ((1/d)*xD)
+    xEnd = xMin + (((d-1)/d)*xD)
+        
+    yD = yMax - yMin
+    yStart = yMin + ((1/d)*yD)
+    yEnd = yMin + (((d-1)/d)*yD)
+
+    xnew = np.linspace(xStart, xEnd, n)
+    ynew = np.linspace(yStart, yEnd, n)
+
+    # use the intropolation function to get our new surface
     znew = f(xnew, ynew)
 
-    # now strip out any values that are way out of range
-    tol = 10.
-    znew[znew > zmax + tol] = 0.
-    znew[znew < zmin - tol] = 0.
-
-    fig = plt.figure()
-    ax = Axes3D(fig)
+    # we'll need the evenly spaced meshgrid too
     mx, my = np.meshgrid(xnew, ynew)
-    ax.scatter(mx, my, znew)
-    plt.show()
-
-    fig = plt.figure()
-    ax = Axes3D(fig)
-    mx, my = np.meshgrid(xnew, ynew)
-    ax.scatter(mx, my, znew)
-    plt.plot_surface(mx, my, znew)
 
     return mx, my, znew
 
@@ -247,9 +249,15 @@ def smooth(az, el, r, n, sigEl=None, sigAz=None):
     rSm = np.ndarray(shape=(n,n))
     rSms = []
     for j in range(n):
-        # print "J:", j
+        print "J:", j
         for k in range(n):
             w=delayed(getWeight)(az, el, azLoc, elLoc, sigAz, sigEl, j, k)
+            
+            # w=delayed(getWeight)(copy(az),
+            #                      copy(el), 
+            #                      copy(azLoc),
+            #                      copy(elLoc),
+            #                      sigAz, sigEl, j, k)
             # w=2*np.pi*np.exp( (- (az - azLoc[j,k])**2 /( 2.*sigAz**2 )-(el-elLoc[j,k])**2 /(2.*sigEl**2 )))
             # norm=sum(w)
             # if norm==0:
@@ -258,7 +266,7 @@ def smooth(az, el, r, n, sigEl=None, sigAz=None):
             # else:
             #     w = w / norm
             #     rSm[j,k] = sum(r * w)
-            v = delayed(assignWeight)(w, r)
+            v = delayed(assignWeight)(w, copy(r))
             rSms.append((j, k, v))
 
     rSms = delayed(identity)(rSms)
@@ -390,7 +398,7 @@ def importCsv(filename):
 
     return np.array(xs), np.array(ys), np.array(zs)
 
-def processDiff(fn1, fn2):
+def processDiffSimple(fn1, fn2):
     "Find diff between two evenly-spaced surfaces and fit"
 
     r = np.load(fn1)
@@ -546,12 +554,19 @@ def testInterp():
 
     plotXYZ(mx, my, znew)
 
+def processDiff(fn1, fn2):
+    """
+    Taking in two raw Leica data files, smooth both in 
+    the same spherical space, diff the two cartesians
+    """
+    pass
 
 def main():
     # testInterp()
     # testDask()
     n = 50
     fn = "data/randomSampleSta10.csv"
+    # fn = "data/randomSampleScan10.csv"
     print "processing img1"
     process(fn, n, "img1")
     # print ""
