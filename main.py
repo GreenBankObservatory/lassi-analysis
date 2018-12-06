@@ -123,23 +123,41 @@ def process(fn, n, outputName, noise=False):
     # np.savez(outputName, x=xss, y=yss, z=zss)
     # np.savez(outputName, x=xs, y=ys, z=zs)
 
-def interpXYZ(x, y, z, n):
+def interpXYZ(x, y, z, n, xrange=None, yrange=None, checkLevels=False):
 
     x2 = copy(x)
     y2 = copy(y)
     z2 = copy(z)
 
-    xMin = np.nanmin(x2)
-    xMax = np.nanmax(x2)
-    yMin = np.nanmin(y2)
-    yMax = np.nanmax(y2)
+    if xrange is None:
+        xMin = np.nanmin(x2)
+        xMax = np.nanmax(x2)
+    else:
+        xMin = xrange[0]    
+        xMax = xrange[1]
+
+    if yrange is None:        
+        yMin = np.nanmin(y2)
+        yMax = np.nanmax(y2)
+    else:
+        yMin = yrange[0]
+        yMax = yrange[1]
+
     # zmin = np.nanmin(z2)
     # zmax = np.nanmax(z2)
 
     # We'll replace the NaN's with zero's and flatten our coordinate 
     # matrices to fit an interpolation function to all our data
     x2[np.isnan(x2)] = 0.
+    y2[np.isnan(x2)] = 0.
+    z2[np.isnan(x2)] = 0.
+
+    x2[np.isnan(y2)] = 0.
     y2[np.isnan(y2)] = 0.
+    z2[np.isnan(y2)] = 0.
+
+    x2[np.isnan(z2)] = 0.
+    y2[np.isnan(z2)] = 0.
     z2[np.isnan(z2)] = 0.
 
     f = interpolate.interp2d(x2.flatten(),
@@ -149,7 +167,7 @@ def interpXYZ(x, y, z, n):
 
     # TBD: just use the center region to avoid edge cases and 0's and Nans!
 
-    d = 3.
+    d = 4.
 
     xD = xMax - xMin
     xStart = xMin + ((1/d)*xD)
@@ -167,6 +185,18 @@ def interpXYZ(x, y, z, n):
 
     # we'll need the evenly spaced meshgrid too
     mx, my = np.meshgrid(xnew, ynew)
+
+    # Here, we simply define bad points as being ones that are outside
+    # the original range of the original data
+    if checkLevels:
+        lgtMax = znew > np.nanmax(z)
+        if lgtMax.any():
+            print "Replacing values greater then original with NaNs"
+            znew[lgtMax] = np.nan
+        lstMin = znew < np.nanmin(z)
+        if lstMin.any():
+            print "Replacing values less then original with NaNs"
+            znew[lstMin] = np.nan    
 
     return mx, my, znew
 
@@ -249,7 +279,7 @@ def smooth(az, el, r, n, sigEl=None, sigAz=None):
     rSm = np.ndarray(shape=(n,n))
     rSms = []
     for j in range(n):
-        print "J:", j
+        # print "J:", j
         for k in range(n):
             w=delayed(getWeight)(az, el, azLoc, elLoc, sigAz, sigEl, j, k)
             
@@ -276,6 +306,67 @@ def smooth(az, el, r, n, sigEl=None, sigAz=None):
 
     for j, k, v in rSms:
         rSm[j][k] = v
+
+    return (azLoc, elLoc, rSm)
+
+def daskWeight(n, az, el, r, azLoc, elLoc, sigAz, sigEl, j):
+    rSms = []
+    for k in range(n):
+        w=getWeight(az, el, azLoc, elLoc, sigAz, sigEl, j, k)
+        
+        v = assignWeight(w, r)
+        rSms.append((j, k, v))
+    return rSms
+
+def smoothDask(az, el, r, n, sigEl=None, sigAz=None):
+    "smooth our data with Dask"
+
+    azRange = np.linspace(min(az), max(az), n)
+    elRange = np.linspace(min(el), max(el), n)
+
+    azLoc, elLoc = np.meshgrid(azRange, elRange)
+
+    if sigEl is None:
+        sigEl=0.001
+    if sigAz is None:    
+        sigAz=0.001;
+
+    # init our smoothing result
+    rSm = np.ndarray(shape=(n,n))
+    rSms = []
+    for j in range(n):
+        rr =delayed(daskWeight)(n, az, el, r, azLoc, elLoc, sigAz, sigEl, j)
+        # for rrr in rr:
+            # rSms.append(rrr)
+        rSms.append(rr)    
+        # print "J:", j
+        # for k in range(n):
+            # w=delayed(getWeight)(az, el, azLoc, elLoc, sigAz, sigEl, j, k)
+            
+            # w=delayed(getWeight)(copy(az),
+            #                      copy(el), 
+            #                      copy(azLoc),
+            #                      copy(elLoc),
+            #                      sigAz, sigEl, j, k)
+            # w=2*np.pi*np.exp( (- (az - azLoc[j,k])**2 /( 2.*sigAz**2 )-(el-elLoc[j,k])**2 /(2.*sigEl**2 )))
+            # norm=sum(w)
+            # if norm==0:
+            #     norm=1
+            #     rSm[j,k]=np.nan #0 #min( r )
+            # else:
+            #     w = w / norm
+            #     rSm[j,k] = sum(r * w)
+            # v = delayed(assignWeight)(w, copy(r))
+            # rSms.append((j, k, v))
+
+    rSms = delayed(identity)(rSms)
+
+    with ProgressBar(), Profiler() as prof, ResourceProfiler() as rprof, CacheProfiler() as cprof:    
+        rSms = rSms.compute(scheduler="processes")
+
+    for rSmss in rSms:
+        for j, k, v in rSmss:
+            rSm[j][k] = v
 
     return (azLoc, elLoc, rSm)
 
@@ -554,21 +645,85 @@ def testInterp():
 
     plotXYZ(mx, my, znew)
 
+def smoothSpherical(fn, n):
+
+    # 10: seconds
+    # 50: 2.5 mins
+    # 100: 8 mins
+    # n = 20
+
+    print "importing CSV data ..."
+    x, y, z = importCsv(fn)
+
+    print "Converting to spherical coords ..."
+    r, az, el = cart2sph(x, y, z)
+
+
+
+    print "smoothing data ..."
+    azLoc, elLoc, rSmooth = smoothDask(az, el, r, n)
+
+
+    # back to x, y, z
+    print "converting back to cartesian ..."
+    xs, ys, zs = sph2cart(azLoc, elLoc, rSmooth)
+
+    return xs, ys, zs
+
 def processDiff(fn1, fn2):
     """
     Taking in two raw Leica data files, smooth both in 
     the same spherical space, diff the two cartesians
     """
-    pass
+    n = 30
+    x1, y1, z1 = smoothSpherical(fn1, n)
+    x2, y2, z2 = smoothSpherical(fn2, n)
+
+
+    # fn2 = "data/randomSampleScan10.csv" has some bad data.
+    z2org = copy(z2)
+    z2[z2 < -65] = np.nan
+
+    # interpolate both surfaces using the same xyz grid
+    x1max = np.nanmax(x1)
+    x1min = np.nanmin(x1)
+    x2max = np.nanmax(x2)
+    x2min = np.nanmin(x2)
+    xrange = (min(x1min, x2min), max(x1max, x2max))
+    y1max = np.nanmax(y1)
+    y1min = np.nanmin(y1)
+    y2max = np.nanmax(y2)
+    y2min = np.nanmin(y2)
+    yrange = (min(y1min, y2min), max(y1max, y2max))
+
+    sx1, sy1, sz1 = interpXYZ(x1, y1, z1, n, xrange=xrange, yrange=yrange)
+    sx2, sy2, sz2 = interpXYZ(x2, y2, z2, n, xrange=xrange, yrange=yrange)
+
+    plotXYZ(sx1, sy1, sz1)
+    plotXYZ(sx2, sy2, sz2)
+
+    assert sx1 == sx2
+    assert sy1 == sy2
+
+    zdiff = sz1 - sz2
+
+    plotXYZ(sx2, sy2, zdiff)
+
+    zernikeFit(zdiff)
 
 def main():
+    fn1 = "data/randomSampleSta10.csv"
+    # fn2 = "data/randomSampleScan10.csv"
+    n = 30
+    x1, y1, z1 = smoothSpherical(fn1, n)    
     # testInterp()
     # testDask()
-    n = 50
-    fn = "data/randomSampleSta10.csv"
-    # fn = "data/randomSampleScan10.csv"
-    print "processing img1"
-    process(fn, n, "img1")
+    # n = 50
+    # fn = "data/randomSampleSta10.csv"
+    # fn2 = "data/randomSampleScan10.csv"
+    # processDiff(fn, fn2)
+    # print "processing img1"
+    # process(fn, n, "img1")
     # print ""
     # print "processing img2"
     # process(fn, n, "img2", noise=True)
