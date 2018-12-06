@@ -86,6 +86,8 @@ safe_cmd "pip install -r $script_dir/requirements.txt"
 
 safe_cmd "pip install dask distributed"
 
+safe_cmd "pip install jupyter"
+
 # execute manual steps
 
 #safe_cmd "cp \"$script_dir/oof.bash.do_not_source\" \"$VIRTUAL_ENV/oof.bash\""
