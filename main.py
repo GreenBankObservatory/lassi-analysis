@@ -5,10 +5,10 @@ from copy import copy
 import numpy as np
 from astropy.coordinates import cartesian_to_spherical
 from astropy.coordinates import spherical_to_cartesian
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import axes3d, Axes3D
-import opticspy
-from scipy import interpolate
+#import matplotlib.pyplot as plt
+#from mpl_toolkits.mplot3d import axes3d, Axes3D
+#import opticspy
+#from scipy import interpolate
 
 from dask import delayed
 from dask import config
@@ -123,7 +123,7 @@ def process(fn, n, outputName, noise=False):
     # np.savez(outputName, x=xss, y=yss, z=zss)
     # np.savez(outputName, x=xs, y=ys, z=zs)
 
-def interpXYZ(x, y, z, n, xrange=None, yrange=None, checkLevels=False):
+def interpXYZ(x, y, z, n, xrange=None, yrange=None, checkLevels=False, center=False):
 
     x2 = copy(x)
     y2 = copy(y)
@@ -148,22 +148,41 @@ def interpXYZ(x, y, z, n, xrange=None, yrange=None, checkLevels=False):
 
     # We'll replace the NaN's with zero's and flatten our coordinate 
     # matrices to fit an interpolation function to all our data
-    x2[np.isnan(x2)] = 0.
-    y2[np.isnan(x2)] = 0.
-    z2[np.isnan(x2)] = 0.
+    #x2[np.isnan(x2)] = 0.
+    #y2[np.isnan(x2)] = 0.
+    #z2[np.isnan(x2)] = 0.
 
-    x2[np.isnan(y2)] = 0.
-    y2[np.isnan(y2)] = 0.
-    z2[np.isnan(y2)] = 0.
+    #x2[np.isnan(y2)] = 0.
+    #y2[np.isnan(y2)] = 0.
+    #z2[np.isnan(y2)] = 0.
 
-    x2[np.isnan(z2)] = 0.
-    y2[np.isnan(z2)] = 0.
-    z2[np.isnan(z2)] = 0.
+    #x2[np.isnan(z2)] = 0.
+    #y2[np.isnan(z2)] = 0.
+    #z2[np.isnan(z2)] = 0.
 
-    f = interpolate.interp2d(x2.flatten(),
-                             y2.flatten(),
-                             z2.flatten(),
-                             kind='cubic')
+    x2f = x2.flatten()
+    y2f = y2.flatten()
+    z2f = z2.flatten()
+
+    cond = [not b for b in np.isnan(x2f)]
+    x3 = np.extract(cond, x2f)
+
+    cond = [not b for b in np.isnan(y2f)]
+    y3 = np.extract(cond, y2f)
+
+    cond = [not b for b in np.isnan(z2f)]
+    z3 = np.extract(cond, z2f)
+
+    print "Removed %d NaNs from %d data points" % (len(x2f) - len(x3), len(x2f))
+
+    assert len(x3) == len(y3)
+    assert len(y3) == len(z3)
+
+    f = interpolate.interp2d(x3, y3, z3, kind='linear')
+    #f = interpolate.interp2d(x2.flatten(),
+    #                         y2.flatten(),
+    #                         z2.flatten(),
+    #                         kind='cubic')
 
     # TBD: just use the center region to avoid edge cases and 0's and Nans!
 
@@ -177,8 +196,12 @@ def interpXYZ(x, y, z, n, xrange=None, yrange=None, checkLevels=False):
     yStart = yMin + ((1/d)*yD)
     yEnd = yMin + (((d-1)/d)*yD)
 
-    xnew = np.linspace(xStart, xEnd, n)
-    ynew = np.linspace(yStart, yEnd, n)
+    if center:
+        xnew = np.linspace(xStart, xEnd, n)
+        ynew = np.linspace(yStart, yEnd, n)
+    else:    
+        xnew = np.linspace(xMin, xMax, n)
+        ynew = np.linspace(yMin, yMax, n)
 
     # use the intropolation function to get our new surface
     znew = f(xnew, ynew)
@@ -215,7 +238,7 @@ def zernikeFit(z):
     return fitlist, C1
 
 def getWeight(az, el, azLoc, elLoc, sigAz, sigEl, j, k):
-    return 2*np.pi*np.exp((-(az-azLoc[j,k])**2/(2.*sigAz**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 )))
+    return 2*np.pi*np.exp((-(np.cos(elLoc[j,k])**2)*(az-azLoc[j,k])**2/(2.*sigAz**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 )))
 
 def assignWeight(w, r):
 
@@ -223,6 +246,7 @@ def assignWeight(w, r):
     if norm==0:
         norm=1
         v=np.nan #0 #min( r )
+        #v=0 #0 #min( r )
     else:
         w = w / norm
         v = sum(r * w)   
@@ -645,7 +669,7 @@ def testInterp():
 
     plotXYZ(mx, my, znew)
 
-def smoothSpherical(fn, n):
+def smoothSpherical(fn, n, sigAz=None, sigEl=None, addBump=False):
 
     # 10: seconds
     # 50: 2.5 mins
@@ -655,18 +679,52 @@ def smoothSpherical(fn, n):
     print "importing CSV data ..."
     x, y, z = importCsv(fn)
 
+    if addBump:
+        # add a bump to the center bit
+        xMin = np.nanmin(x)
+        xMax = np.nanmax(x)
+        yMin = np.nanmin(y)
+        yMax = np.nanmax(y)
+
+        d = 10
+
+        xW = xMax - xMin
+        xStep = xW / d
+        xStart = xMin + (d/2 - 1)*xStep
+        xEnd = xMax - (d/2 -1)*xStep
+        assert xStart < xEnd
+
+        yW = yMax - yMin
+        yStep = yW / d
+        yStart = yMin + (d/2 - 1)*yStep
+        yEnd = yMax - (d/2 -1)*yStep
+        assert yStart < yEnd
+
+        cnt = 0
+        for i in range(len(x)):
+            xi = x[i]
+            yi = y[i]
+            zi = z[i]
+            if xi > xStart and xi < xEnd and yi > yStart and yi < yEnd:
+                cnt +=1 
+                z[i] = zi + (0.25*zi)
+        print "Added bump to %d pnts" % cnt
+
     print "Converting to spherical coords ..."
     r, az, el = cart2sph(x, y, z)
 
 
 
     print "smoothing data ..."
-    azLoc, elLoc, rSmooth = smoothDask(az, el, r, n)
+    azLoc, elLoc, rSmooth = smoothDask(az, el, r, n, sigAz=sigAz, sigEl=sigEl)
 
 
     # back to x, y, z
     print "converting back to cartesian ..."
     xs, ys, zs = sph2cart(azLoc, elLoc, rSmooth)
+
+    fns = fn + ".smoothed"
+    np.savez(fns, x=xs, y=ys, z=zs)
 
     return xs, ys, zs
 
@@ -710,6 +768,16 @@ def processDiff(fn1, fn2):
     plotXYZ(sx2, sy2, zdiff)
 
     zernikeFit(zdiff)
+
+def findTheDamnBumps():
+
+    fn1 = "data/randomSampleBumpScan14pnts2m.csv"
+    #fn2 = "data/randomSampleBumpScan14pnts6m.csv"
+    
+    n = 30
+    x1, y1, z1 = smoothSpherical(fn1, n, sigAz=1.0, sigEl=1.0)    
+    x2, y2, z2 = smoothSpherical(fn1, n)    
+
 
 def main():
     fn1 = "data/randomSampleSta10.csv"
