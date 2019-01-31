@@ -1,4 +1,4 @@
-function [] = test_python()
+function [] = test_python_lsqcurvefit()
 disp("test_python")
 % Generate data points with noise
 num_points = 5
