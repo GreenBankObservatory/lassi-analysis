@@ -7,8 +7,8 @@ from astropy.coordinates import cartesian_to_spherical
 from astropy.coordinates import spherical_to_cartesian
 #import matplotlib.pyplot as plt
 #from mpl_toolkits.mplot3d import axes3d, Axes3D
-#import opticspy
-#from scipy import interpolate
+import opticspy
+from scipy import interpolate
 
 from dask import delayed
 from dask import config
