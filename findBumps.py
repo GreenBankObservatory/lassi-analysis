@@ -62,6 +62,35 @@ def FuncZ(b, x):
     return b[3] - 0.25/b[3] * ((PrimeX(b[:3], x) - b[4])**2 + (PrimeY(b[:3], x) - b[5])**2)
 
 
+def parabola(xdata, ydata, focus, v1x, v1y, v2):
+    return (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 + (2*v2)
+
+def testRot():
+
+    pry = [np.pi/4, -np.pi/2., np.pi/2.]
+
+    n = 100
+    x = np.linspace(-n, n)
+    y = np.linspace(-n, n)
+    x2, y2 = np.meshgrid(x, y)
+    z2 = parabola(x2, y2, 1., 10., 80., 100.)
+
+    L = np.array([x2.flatten(), y2.flatten(), z2.flatten()])
+    xr = PrimeX(pry, L)
+    yr = PrimeY(pry, L)
+    zr = PrimeZ(pry, L)
+
+    #N = 50
+    #xr.shape = (N,N)
+    #yr.shape = (N,N)
+    #zr.shape = (N,N)
+    xr.shape = x2.shape
+    yr.shape = y2.shape
+    zr.shape = z2.shape
+
+    return xr, yr, zr
+
+
 def fitScan(fn):
 
     data = np.load(fn)
@@ -99,6 +128,10 @@ def fitScan(fn):
 
     #print "fit: ", fit, success
     print lsq
+
+    #fittedData = Func(lsq.x, xyPrime)
+    fittedData = None
+    return xx, yy, zz, xyPrime, lsq, fittedData
 
 def test1():
 
