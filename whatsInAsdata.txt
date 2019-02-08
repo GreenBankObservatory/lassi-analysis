@@ -1,0 +1,28 @@
+
+Setup manager:
+
+   * turn off everything but zernikes: that would be the correctionSelect param. subfields.
+   * change zernike_coeff params to your liking
+   * Manager > Prepare
+   * new /tmp/asdata.txt appears!
+   * example: moving from no zernike_coeff's to one coefficient (N1=100) will change the file from having all zeros in the third column to having numbers (-131 to -100).
+   
+
+File written:
+
+   * in cmdPositionDep, which must be called in the Prepare (part of a scan as well presumably)
+   * cmdPosition is array of hoop, rib, (int) position for each actuator
+   * position is set here by:
+      * adding up the corrections from each one selected in correctionSelect
+      * for zernikes, that is 0 - ZernkikeModel->displacement(elevation, *loc)
+
+ZernikeModel->displacement:
+   * elevation is passed in but NOT USED!
+   * phi, rho and theta for each actuaotr is in the ZernikeNode via the passed actuatorLocation 
+   * displacement = phi * (zernike_coeff[z_index] * compute_zernike(z_index, rho, theta)) 
+  
+ZernikeNode 
+
+   * etc/config/AsZernike.conf read by ZernikeIO
+   * "act[45][-70] 103.2276438124404 12.67476091855193 1.01666 1.8228 1.32331 1.01666 1.8228 1.32331"
+   * # actuator[rib][hoop] x y rho theta phi rho_y theta_y phi_y
