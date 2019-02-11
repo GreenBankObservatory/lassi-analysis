@@ -236,6 +236,7 @@ def test2():
         print i, fit[i], matlabFit[i], fit[i] - matlabFit[i]
 
 def fitScan(fn):
+    "Load Leica scanner data, and fit it."
 
     # the NxN size of the Leica scanner data
     N = 512
@@ -303,18 +304,34 @@ def fitScan(fn):
 
 
 def findTheBumps():
-
+    "Fit ref and bump scan, and the difference shows us the bumps!"
    
     fn = "data/Baseline_STA10_HIGH_METERS.csv.smoothed.sig.001.all.npz"
     fit1 = fitScan(fn)
     fn = "data/BumpScan.csv.smoothed.sig.001.all.npz"
     fit2 = fitScan(fn)
     diff = fit2[0] - fit1[0]
+
     return diff, fit1, fit2
+
+def exportBumps(diff, fit1, fit2):
+
+    d = ','
+    np.savetxt("lassiDiffZ.csv", diff, delimiter=d)
+    
+    # also save the x and y
+    diff1, newXYZ, rotXYZ = fit1
+
+    x, y, z = rotXYZ
+    
+    np.savetxt("lassiX.csv", x, delimiter=d)
+    np.savetxt("lassiY.csv", y, delimiter=d)
 
 def main():
 
-    findTheBumps()
+    d, f1, f2 = findTheBumps()
+    exportBumps(d, f1, f2)
+
     #fn = "data/Baseline_STA10_HIGH_METERS.csv.smoothed.sig.001.all.npz"
     #fitScan(fn)
     #test2()
