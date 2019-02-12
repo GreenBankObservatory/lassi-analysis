@@ -241,6 +241,30 @@ def analyzeActiveSurfaceScans(scanLogPath, scanNums):
         path = os.path.join(scanLogPath, device)
         analyzeActiveSurfaceScan(path, f, scanNum)
 
+    plotTxtFilesOnePlot(scanLogPath, scanNums)
+
+def plotTxtFilesOnePlot(path, scanNums):
+
+    path = os.path.join(path, "ActiveSurfaceMgr")
+
+    fig = plt.figure()
+    n = len(scanNums)
+    for i, scanNum in enumerate(scanNums):
+        plt.subplot(n, 3, i+1)
+        fn = "asdata.%s.txt" % scanNum
+        fn = os.path.join(path, fn)
+        x, y, z = readActSrfTxt(fn)
+        # now regrid the data
+        N = 100
+        sigX = sigY = .1
+        xLoc, yLoc, zSmooth = smoothSlow(x, y, z, N, sigEl=sigX, sigAz=sigY)
+        plt.title(str(scanNum))
+        plt.imshow(zSmooth)
+
+        #ax = Axes3D(fig)
+        #ax.scatter(x, y, z)
+        #plt.title("Act Srf Txt")
+        
 def parseAsZernikeConf(fn):
 
     f = open(fn, 'r')
