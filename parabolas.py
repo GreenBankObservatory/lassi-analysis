@@ -1,6 +1,9 @@
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.optimize import leastsq
+import matplotlib.pylab as plt
+from mpl_toolkits.mplot3d import axes3d, Axes3D
+
 from findBumps import PrimeX, PrimeY, PrimeZ
 
 def parabola(xdata, ydata, focus, v1x, v1y, v2):
@@ -77,6 +80,118 @@ def fun(coeffs, xdata, ydata):
 
 def errfun(coeffs, xdata, ydata, zdata):
     return fun(coeffs, xdata, ydata) - zdata
+
+def findTheBumps():
+
+    fn = "data/BumpScan.csv.smoothed.sig.001.all.npz"
+    bumpScan = fitLeicaScan(fn)
+    fn = "data/Baseline_STA10_HIGH_METERS.csv.smoothed.sig.001.all.npz"
+    refScan = fitLeicaScan(fn)
+
+    bumps = bumpScan - refScan
+
+    bumpDiff = np.log(np.abs(bumps))
+    imagePlot(bumpDiff, "Bumps!")
+
+    return bumps
+
+def fitLeicaScan(fn):
+
+    N = 512
+
+    orgData, cleanData = loadLeicaData(fn)
+    x0, y0, z0 = orgData
+    x, y, z = cleanData
+    scatter3dPlot(x, y, z, "Leica Data")
+
+    f = 60.
+    v1x = v1y = v2 = 0
+    xTheta = 0. #-np.pi / 2.
+    yTheta = 0.
+    guess = [f, v1x, v1y, v2, 0., 0.]
+    r = fitLeicaData(x, y, z, guess)
+
+    # plot fitted data
+    c = r.x
+    print "cleaned data fitted with coefficients: ", c
+    newX, newY, newZ = newParabola(x0, y0, z0, c[0], c[1], c[2], c[3], c[4], c[5])
+    newX.shape = newY.shape = newZ.shape = (N, N)
+    surface3dPlot(newX, newY, newZ, "Fitted Data")
+
+    # rotate original rotations for fitted coefficients
+    xThetaFit = r.x[4]
+    yThetaFit = r.x[5]
+    xrr, yrr, zrr = rotateData(x0, y0, z0, xThetaFit, yThetaFit)
+    xrr.shape = yrr.shape = zrr.shape = (N, N)
+    surface3dPlot(xrr, yrr, zrr, "Original Data (Rotated)")
+
+    # return difference between fitted data and rotated original data
+    diff = zrr - newZ
+    diff2 = np.log(np.abs(np.diff(diff)))
+    imagePlot(diff2, "Fit - Org (Rotated)")
+
+    return diff
+
+def imagePlot(z, title):
+    fig = plt.figure()
+    ax = fig.gca()
+    #cax = ax.imshow(np.log(np.abs(np.diff(zrr - newZ))))
+    cax = ax.imshow(z)
+    fig.colorbar(cax)
+    plt.title(title)
+
+
+
+def fitLeicaData(x, y, z, guess):
+
+    #guess = [f, v1x, v1y, v2, 0., 0.]
+    inf = np.inf
+    pi2 = 2*np.pi
+    b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
+    b2 = [inf, inf, inf, inf, pi2, pi2]
+    bounds = (b1, b2)
+    r = least_squares(fitParabola, guess, args=(x .flatten(), y.flatten(), z.flatten()),
+                      #bounds=bounds,
+                      method='lm',
+                      max_nfev=1000000,
+                  
+                      ftol=1e-15,
+                      xtol=1e-15)
+    return r
+
+def loadLeicaData(fn):
+
+    data = np.load(fn)
+
+    x = data['x']
+    y = data['y']
+    z = data['z']
+
+    xx = x.flatten()
+    yy = y.flatten()
+    zz = z.flatten()
+    
+    xxn = xx[np.logical_not(np.isnan(xx))];
+    yyn = yy[np.logical_not(np.isnan(yy))];
+    zzn = zz[np.logical_not(np.isnan(zz))];
+
+    return (x, y, z), (xxn, yyn, zzn)
+
+def surface3dPlot(x, y, z, title):
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.plot_surface(x, y, z)
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title(title)
+
+def scatter3dPlot(x, y, z, title):
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.scatter(x, y, z)
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title(title)
 
 def fitNoRot():
 
