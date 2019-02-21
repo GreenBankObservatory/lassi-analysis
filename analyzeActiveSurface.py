@@ -229,17 +229,18 @@ def analyzeActiveSurfaceScan(path, fn, scanNum):
     else:
         print "no asdata.*.txt: ", txtPath
 
-def analyzeActiveSurfaceScans(scanLogPath, scanNums):
+def analyzeActiveSurfaceScans(scanLogPath, scanNums, details=False):
 
     device = "ActiveSurfaceMgr"
     p = ProjectScanLog(scanLogPath)
     p.open()
     
-    for scanNum in scanNums:
-        print ""
-        f = p.getDeviceFilename(device, scanNum)
-        path = os.path.join(scanLogPath, device)
-        analyzeActiveSurfaceScan(path, f, scanNum)
+    if details:
+        for scanNum in scanNums:
+            print ""
+            f = p.getDeviceFilename(device, scanNum)
+            path = os.path.join(scanLogPath, device)
+            analyzeActiveSurfaceScan(path, f, scanNum)
 
     plotTxtFilesOnePlot(scanLogPath, scanNums)
 
@@ -265,15 +266,44 @@ def plotTxtFilesOnePlot(path, scanNums):
         #ax.scatter(x, y, z)
         #plt.title("Act Srf Txt")
         
+def parseAct(actStr):
+
+    assert "act" in actStr
+
+    i1_1 = actStr.index('[')
+    i1_2 = actStr.index(']')
+
+    rib = int(actStr[i1_1+1:i1_2])
+
+    i2_1 = actStr.index('[', i1_2+1)
+    i2_2 = actStr.index(']', i1_2+1)
+
+    hoop = int(actStr[i2_1+1:i2_2])
+ 
+    return rib, hoop
+
 def parseAsZernikeConf(fn):
 
     f = open(fn, 'r')
 
+    data = []
+
     # skipp comments
     ls = f.readlines()
     for l in ls[7:]:
+        print l
         ps = l.split(' ')
-        # actuator[rib][hoop] x y rho theta phi rho_y theta_y phi_y
+        # act[rib][hoop] x y rho theta phi rho_y theta_y phi_y
+        actuatorStr = ps[0]
+        rib, hoop = parseAct(actuatorStr)
+        x = float(ps[1])
+        y = float(ps[2])
+        rho = float(ps[3])
+        theta = float(ps[4])
+        phi = float(ps[5])
+        data.append((actuatorStr, rib, hoop, x, y, rho, theta, phi))
+
+    return data    
 
 def main():
     #fn  = 'data/ActiveSurfaceMgr/2019_02_07_17:33:29.fits'
