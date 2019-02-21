@@ -17,6 +17,18 @@ ansiZs = [   0,
 
 assert ansiZs == range(36)  
 
+# active surface reveres how it traverses the pyramid!
+asAnsiZs = [  0,
+            2, 1,
+           5, 4, 3,
+          9, 8, 7, 6,
+        14, 13, 12, 11, 10,
+      20, 19, 18, 17, 16, 15,
+    27, 26, 25, 24, 23, 22, 21,
+  35, 34, 33, 32, 31, 30, 29, 28]
+
+
+
 # here is how the noll indicies layout on the same pyramid
 nollZs = [  1,   # n = 0 
            3, 2, # n = 1
@@ -43,6 +55,22 @@ def printZs(zs):
        rowLen += 1
        start = end
        end += rowLen
+
+def ansi2activeAnsi(zs):
+    "Converts ANSI ordering to Active Surface ANSI ordering"
+
+    # we need to support zs of generic type
+    num = len(zs)
+    activeAnsi = copy(zs)
+
+    for i, z in enumerate(zs):
+        activeAnsiI = asAnsiZs[i]
+        # make sure we don't gag on inputs less then 36
+        if activeAnsiI  < num:
+            activeAnsi[i] = copy(zs[activeAnsiI])
+
+    return activeAnsi
+
 
 def noll2ansi(zs):
     "Converts NOLL ordering to ANSI ordering"
@@ -75,6 +103,19 @@ def ansi2noll(zs):
 
     return noll
 
+def noll2asAnsi(zs):
+    "Converts from NOLL to Active Surface ANSI"
+    return ansi2activeAnsi(noll2ansi(zs))
+
+def testAnsi2ActiveAnsi():
+    zs = range(0,36)
+    zs2 = ansi2activeAnsi(zs)
+    print "ansi: "
+    printZs(zs)
+    print "active ansi: "
+    printZs(zs2)
+    assert zs2 == asAnsiZs 
+
 def testNoll2ansi():
     #ansi = range(1, 37)
     #noll = ansi2noll(ansi)
@@ -87,7 +128,8 @@ def testNoll2ansi():
     assert ansi == nollZs
 
 def main():
-    testNoll2ansi()
+    #testNoll2ansi()
+    testAnsi2ActiveAnsi()
 
 if __name__=='__main__':
     main()
