@@ -10,16 +10,19 @@ from mpl_toolkits.mplot3d import axes3d, Axes3D
 
 from rotate import *
 
-def parabola(xdata, ydata, focus, v1x, v1y, v2):
-    return parabolaOld(xdata, ydata, focus, v1x, v1y, v2)
+def parabola(xdata, ydata, focus, v1x, v1y, v2, heavy=False):
+    if heavy:
+        return parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2)
+    else:
+        return parabolaSimple(xdata, ydata, focus, v1x, v1y, v2)
 
-def parabolaOld(xdata, ydata, focus, v1x, v1y, v2):
+def parabolaSimple(xdata, ydata, focus, v1x, v1y, v2):
     return (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 + v2
 
-def parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2):
+def parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2, hr=104.):
     #return (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 + v2
     r2 = (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 
-    return (r2 * (104**2 > r2)) + v2
+    return (r2 * (hr**2 > r2)) + v2
 
 def rotate(x, y, z, aroundXrads, aroundYrads):
     # first, around x
@@ -151,8 +154,6 @@ def imagePlot(z, title):
     cax = ax.imshow(z)
     fig.colorbar(cax)
     plt.title(title)
-
-
 
 def fitLeicaData(x, y, z, guess):
 
@@ -327,39 +328,37 @@ def fitRot():
 
 
 def funFinal(coeffs, xdata, ydata):
+    "function for forming a parabola - no rotations"
     f = coeffs[0]
     v1x = coeffs[1]
     v1y = coeffs[2]
     v2 = coeffs[3]
-    #aroundX = coeffs[4]
-    #aroundY = coeffs[5]
-    #return  (1 / (4.*f))*(xdata - v1x)**2 + (1 / (4.*f))*(ydata - v1y)**2 + v2
+    # optional Heavy Side
     hr = 30.
-    #r2 = (xdata - v1x)**2 + (ydata - v1y)**2
-    #return ( 1 / (4.*f) ) * r2 * ( hr**2 > r2 )  + v2
-    return parabolaOld(xdata, ydata, f, v1x, v1y, v2) 
+    return parabola(xdata, ydata, f, v1x, v1y, v2) 
     
 def errfunFinal(coeffs, xdata, ydata, zdata):
+    "Error function handles rotation properly"
     
     # rotate the original data first!
     xr, yr, zr = rotateXY(xdata, ydata, zdata, coeffs[4], coeffs[5])
-    #xr = xdata
-    #yr = ydata
-    #zr = zdata
     z = funFinal(coeffs, xr, yr)
-    # now what we are trying to minimize is the difference between the rotated 
-    # input data and a parabola in the same frame
     return zr - z
-
     
 def simData(xs2d, ys2d, f, v1x, v1y, v2, xRot, yRot):
+    "Returns a rotated parabola based off inputs"
 
-    #zs2d = (1 / (4.*f))*(xs2d  - v1x)**2 +  (1 / (4.*f))*(ys2d - v1y)**2 + v2
-    zs2d = parabolaOld(xs2d, ys2d, f, v1x, v1y, v2)
+    zs2d = parabola(xs2d, ys2d, f, v1x, v1y, v2)
     xdata, ydata, zdata = rotateXY(xs2d, ys2d, zs2d, xRot, yRot)
     return xdata, ydata, zdata
 
-def fitRot2():
+def tryFit(answer, guess=None):
+    "simulate a parabola, and see if we can try and fit it."
+
+    f, v1x, v1y, v2, xRot, yRot = answer
+
+    # angles!
+    expAnswer = [f, v1x, v1y, v2, -xRot, -yRot]
 
     ##########################
     #     Create  Data       #
@@ -369,30 +368,27 @@ def fitRot2():
     
     xs2d, ys2d = np.meshgrid(xs, ys)
     
-    f = 5.0
-    v1x = 0.0
-    v1y = 0.0
-    v2 = 10.0
-    xRot = np.pi/2
-    #xRot = 0.
-    #yRot = 0.1
-    yRot = 0 #np.pi/10
-    
-    answer = [f, v1x, v1y, v2, -xRot, -yRot]
+    #answer = [f, v1x, v1y, v2, -xRot, -yRot]
 
-    #zs2d = (1 / (4.*f))*(xs2d  - v1x)**2 +  (1 / (4.*f))*(ys2d - v1y)**2 + v2
-    #xdata, ydata, zdata = rotateXY(xs2d, ys2d, zs2d, xRot, yRot)
     xdata, ydata, zdata = simData(xs2d, ys2d, f, v1x, v1y, v2, xRot, yRot)
+
+    # did we supply a guess?
+    if guess is None:
+        # then cheat!
+        coeffs = [f, v1x, v1y, v2, -xRot, -yRot]
+    else:
+        coeffs = guess
 
     ##########################
     #     Create  Fit        #
     ##########################
-    coeffs = [f, v1x, v1y, v2, -xRot, -yRot]
+    # bound the fitting
     inf = np.inf
     pi2 = 2*np.pi
     b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
     b2 = [inf, inf, inf, inf, pi2, pi2]
     bounds = (b1, b2)
+
     r = least_squares(errfunFinal, coeffs, args=(xdata.flatten(), ydata.flatten(), zdata.flatten()),
                           bounds=bounds,
                           method='trf',
@@ -400,44 +396,10 @@ def fitRot2():
                           gtol=1e-15,
                           ftol=1e-15,
                           xtol=1e-15)
-    # Look into robust method (loss='soft_l1', f_scale=0.1)
-    print "fit:", r.x
-    print r.success, r.message, r.nfev
+    return expAnswer, coeffs, r.x, np.abs(expAnswer - r.x)
 
-    print "compare: "
-    print answer - r.x
-
-    return r
-
-def testFit(f, v1x, v1y, v2, xRot, yRot):
-    ##########################
-    #     Create  Data       #
-    ##########################
-    xs = np.linspace(-20, 20)
-    ys = np.linspace(-20, 20)
-    
-    xs2d, ys2d = np.meshgrid(xs, ys)
-    
-    answer = [f, v1x, v1y, v2, -xRot, -yRot]
-
-    xdata, ydata, zdata = simData(xs2d, ys2d, f, v1x, v1y, v2, xRot, yRot)
-
-    coeffs = [f, v1x, v1y, v2, -xRot, -yRot]
-    inf = np.inf
-    pi2 = 2*np.pi
-    b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
-    b2 = [inf, inf, inf, inf, pi2, pi2]
-    bounds = (b1, b2)
-    r = least_squares(errfunFinal, coeffs, args=(xdata.flatten(), ydata.flatten(), zdata.flatten()),
-                          bounds=bounds,
-                          method='trf',
-                          max_nfev=100000,
-                          gtol=1e-15,
-                          ftol=1e-15,
-                          xtol=1e-15)
-    return answer, coeffs, r.x, answer - r.x
-
-def testFits():
+def tryFits():
+    "A sequence of manual tests"
 
     f = 5.0
     v1x = 0.0
@@ -445,25 +407,45 @@ def testFits():
     v2 = 10.0
     xRot = np.pi/2
     yRot = 0. 
-   
+    data = [f, v1x, v1y, v2, xRot, yRot]
+
     # pass
-    answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, yRot)
+    answer, guess, fit, diff = tryFit(data)
     checkFit(answer, guess, fit, diff)
 
     # pass
-    answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, 0.1)
+    data[5] = 0.1
+    #answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, 0.1)
+    answer, guess, fit, diff = tryFit(data)
     checkFit(answer, guess, fit, diff)
 
     # pass
-    answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, np.pi/10)
+    data[5] = np.pi/10 
+    #answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, np.pi/10)
+    answer, guess, fit, diff = tryFit(data)
     checkFit(answer, guess, fit, diff)
 
     # fail!
-    answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, np.pi/2)
+    data[5] = np.pi/2 
+    #answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, np.pi/2)
+    answer, guess, fit, diff = tryFit(data)
     checkFit(answer, guess, fit, diff)
 
     # pass!
-    answer, guess, fit, diff = testFit(f, v1x, v1y, v2, np.pi/10, np.pi/10)
+    data[4] = np.pi/10 
+    data[5] = np.pi/10 
+    #answer, guess, fit, diff = testFit(f, v1x, v1y, v2, np.pi/10, np.pi/10)
+    answer, guess, fit, diff = tryFit(data)
+    checkFit(answer, guess, fit, diff)
+
+    # now see how far off the guesses can be
+    # pass!
+    guess = data
+    answer, guess, fit, diff = tryFit(data, guess)
+    checkFit(answer, guess, fit, diff)
+
+    guess = [1., 0., 0., 0., 0., 0.]
+    answer, guess, fit, diff = tryFit(data, guess)
     checkFit(answer, guess, fit, diff)
 
 def checkFit(answer, guess, fit, diff):
@@ -479,7 +461,7 @@ def checkFit(answer, guess, fit, diff):
 
 
 def main():
-    testFits()
+    tryFits()
 
 if __name__=='__main__':
     main()
