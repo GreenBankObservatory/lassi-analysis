@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.optimize import leastsq
+# Do this if you run into the dreaded Tkinter import error
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pylab as plt
@@ -352,6 +353,27 @@ def simData(xs2d, ys2d, f, v1x, v1y, v2, xRot, yRot):
     xdata, ydata, zdata = rotateXY(xs2d, ys2d, zs2d, xRot, yRot)
     return xdata, ydata, zdata
 
+def lsqFit(xdata, ydata, zdata, coeffs):
+    "least squares fit"
+
+    # bound the fit
+    inf = np.inf
+    pi2 = 2*np.pi
+    b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
+    b2 = [inf, inf, inf, inf, pi2, pi2]
+    bounds = (b1, b2)
+
+    r = least_squares(errfunFinal, coeffs, args=(xdata.flatten(), ydata.flatten(), zdata.flatten()),
+                          bounds=bounds,
+                          method='trf',
+                          max_nfev=100000,
+                          gtol=1e-15,
+                          ftol=1e-15,
+                          xtol=1e-15)
+    return r 
+
+
+
 def tryFit(answer, guess=None):
     "simulate a parabola, and see if we can try and fit it."
 
@@ -383,19 +405,20 @@ def tryFit(answer, guess=None):
     #     Create  Fit        #
     ##########################
     # bound the fitting
-    inf = np.inf
-    pi2 = 2*np.pi
-    b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
-    b2 = [inf, inf, inf, inf, pi2, pi2]
-    bounds = (b1, b2)
+    #inf = np.inf
+    #pi2 = 2*np.pi
+    #b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
+    #b2 = [inf, inf, inf, inf, pi2, pi2]
+    #bounds = (b1, b2)
 
-    r = least_squares(errfunFinal, coeffs, args=(xdata.flatten(), ydata.flatten(), zdata.flatten()),
-                          bounds=bounds,
-                          method='trf',
-                          max_nfev=100000,
-                          gtol=1e-15,
-                          ftol=1e-15,
-                          xtol=1e-15)
+    #r = least_squares(errfunFinal, coeffs, args=(xdata.flatten(), ydata.flatten(), zdata.flatten()),
+    #                      bounds=bounds,
+    #                      method='trf',
+    #                      max_nfev=100000,
+    #                      gtol=1e-15,
+    #                      ftol=1e-15,
+    #                      xtol=1e-15)
+    r = lsqFit(xdata, ydata, zdata, coeffs)
     return expAnswer, coeffs, r.x, np.abs(expAnswer - r.x)
 
 def tryFits():
