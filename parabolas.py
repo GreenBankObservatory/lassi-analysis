@@ -1,13 +1,25 @@
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.optimize import leastsq
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 
-from findBumps import PrimeX, PrimeY, PrimeZ
+#from findBumps import PrimeX, PrimeY, PrimeZ
+
+from rotate import *
 
 def parabola(xdata, ydata, focus, v1x, v1y, v2):
+    return parabolaOld(xdata, ydata, focus, v1x, v1y, v2)
+
+def parabolaOld(xdata, ydata, focus, v1x, v1y, v2):
     return (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 + v2
+
+def parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2):
+    #return (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 + v2
+    r2 = (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 
+    return (r2 * (104**2 > r2)) + v2
 
 def rotate(x, y, z, aroundXrads, aroundYrads):
     # first, around x
@@ -313,8 +325,161 @@ def fitRot():
 
     return x2d, y2d, xrot, yrot, fakedata, fittedData, actuals, coeffs, c, z4
 
+
+def funFinal(coeffs, xdata, ydata):
+    f = coeffs[0]
+    v1x = coeffs[1]
+    v1y = coeffs[2]
+    v2 = coeffs[3]
+    #aroundX = coeffs[4]
+    #aroundY = coeffs[5]
+    #return  (1 / (4.*f))*(xdata - v1x)**2 + (1 / (4.*f))*(ydata - v1y)**2 + v2
+    hr = 30.
+    #r2 = (xdata - v1x)**2 + (ydata - v1y)**2
+    #return ( 1 / (4.*f) ) * r2 * ( hr**2 > r2 )  + v2
+    return parabolaOld(xdata, ydata, f, v1x, v1y, v2) 
+    
+def errfunFinal(coeffs, xdata, ydata, zdata):
+    
+    # rotate the original data first!
+    xr, yr, zr = rotateXY(xdata, ydata, zdata, coeffs[4], coeffs[5])
+    #xr = xdata
+    #yr = ydata
+    #zr = zdata
+    z = funFinal(coeffs, xr, yr)
+    # now what we are trying to minimize is the difference between the rotated 
+    # input data and a parabola in the same frame
+    return zr - z
+
+    
+def simData(xs2d, ys2d, f, v1x, v1y, v2, xRot, yRot):
+
+    #zs2d = (1 / (4.*f))*(xs2d  - v1x)**2 +  (1 / (4.*f))*(ys2d - v1y)**2 + v2
+    zs2d = parabolaOld(xs2d, ys2d, f, v1x, v1y, v2)
+    xdata, ydata, zdata = rotateXY(xs2d, ys2d, zs2d, xRot, yRot)
+    return xdata, ydata, zdata
+
+def fitRot2():
+
+    ##########################
+    #     Create  Data       #
+    ##########################
+    xs = np.linspace(-20, 20)
+    ys = np.linspace(-20, 20)
+    
+    xs2d, ys2d = np.meshgrid(xs, ys)
+    
+    f = 5.0
+    v1x = 0.0
+    v1y = 0.0
+    v2 = 10.0
+    xRot = np.pi/2
+    #xRot = 0.
+    #yRot = 0.1
+    yRot = 0 #np.pi/10
+    
+    answer = [f, v1x, v1y, v2, -xRot, -yRot]
+
+    #zs2d = (1 / (4.*f))*(xs2d  - v1x)**2 +  (1 / (4.*f))*(ys2d - v1y)**2 + v2
+    #xdata, ydata, zdata = rotateXY(xs2d, ys2d, zs2d, xRot, yRot)
+    xdata, ydata, zdata = simData(xs2d, ys2d, f, v1x, v1y, v2, xRot, yRot)
+
+    ##########################
+    #     Create  Fit        #
+    ##########################
+    coeffs = [f, v1x, v1y, v2, -xRot, -yRot]
+    inf = np.inf
+    pi2 = 2*np.pi
+    b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
+    b2 = [inf, inf, inf, inf, pi2, pi2]
+    bounds = (b1, b2)
+    r = least_squares(errfunFinal, coeffs, args=(xdata.flatten(), ydata.flatten(), zdata.flatten()),
+                          bounds=bounds,
+                          method='trf',
+                          max_nfev=100000,
+                          gtol=1e-15,
+                          ftol=1e-15,
+                          xtol=1e-15)
+    # Look into robust method (loss='soft_l1', f_scale=0.1)
+    print "fit:", r.x
+    print r.success, r.message, r.nfev
+
+    print "compare: "
+    print answer - r.x
+
+    return r
+
+def testFit(f, v1x, v1y, v2, xRot, yRot):
+    ##########################
+    #     Create  Data       #
+    ##########################
+    xs = np.linspace(-20, 20)
+    ys = np.linspace(-20, 20)
+    
+    xs2d, ys2d = np.meshgrid(xs, ys)
+    
+    answer = [f, v1x, v1y, v2, -xRot, -yRot]
+
+    xdata, ydata, zdata = simData(xs2d, ys2d, f, v1x, v1y, v2, xRot, yRot)
+
+    coeffs = [f, v1x, v1y, v2, -xRot, -yRot]
+    inf = np.inf
+    pi2 = 2*np.pi
+    b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
+    b2 = [inf, inf, inf, inf, pi2, pi2]
+    bounds = (b1, b2)
+    r = least_squares(errfunFinal, coeffs, args=(xdata.flatten(), ydata.flatten(), zdata.flatten()),
+                          bounds=bounds,
+                          method='trf',
+                          max_nfev=100000,
+                          gtol=1e-15,
+                          ftol=1e-15,
+                          xtol=1e-15)
+    return answer, coeffs, r.x, answer - r.x
+
+def testFits():
+
+    f = 5.0
+    v1x = 0.0
+    v1y = 0.0
+    v2 = 10.0
+    xRot = np.pi/2
+    yRot = 0. 
+   
+    # pass
+    answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, yRot)
+    checkFit(answer, guess, fit, diff)
+
+    # pass
+    answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, 0.1)
+    checkFit(answer, guess, fit, diff)
+
+    # pass
+    answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, np.pi/10)
+    checkFit(answer, guess, fit, diff)
+
+    # fail!
+    answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, np.pi/2)
+    checkFit(answer, guess, fit, diff)
+
+    # pass!
+    answer, guess, fit, diff = testFit(f, v1x, v1y, v2, np.pi/10, np.pi/10)
+    checkFit(answer, guess, fit, diff)
+
+def checkFit(answer, guess, fit, diff):
+    tol = 1e-1
+    for i, d in enumerate(diff):
+        #print i, answer[i], fit[i]
+        #assert d < tol
+        if d > tol:
+            print "fit failed with diff: ", answer, diff
+            return False
+    print "fit passed with diff: ", answer, diff
+    return True
+
+
 def main():
-    fitRot()
+    testFits()
 
 if __name__=='__main__':
     main()
