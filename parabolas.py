@@ -2,8 +2,8 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.optimize import leastsq
 # Do this if you run into the dreaded Tkinter import error
-import matplotlib
-matplotlib.use('agg')
+#import matplotlib
+#matplotlib.use('agg')
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 
@@ -146,7 +146,7 @@ def fitLeicaScan(fn):
     diff2 = np.log(np.abs(np.diff(diff)))
     imagePlot(diff2, "Fit - Org (Rotated)")
 
-    return diff
+    return diff, newX, newY
 
 def imagePlot(z, title):
     fig = plt.figure()
