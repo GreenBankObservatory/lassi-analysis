@@ -7,7 +7,7 @@ from astropy.coordinates import cartesian_to_spherical
 from astropy.coordinates import spherical_to_cartesian
 #import matplotlib.pyplot as plt
 #from mpl_toolkits.mplot3d import axes3d, Axes3D
-import opticspy
+#import opticspy
 from scipy import interpolate
 
 from dask import delayed
@@ -123,6 +123,13 @@ def process(fn, n, outputName, noise=False):
     # np.savez(outputName, x=xss, y=yss, z=zss)
     # np.savez(outputName, x=xs, y=ys, z=zs)
 
+def getCenterData(x, y, z, n, m):
+
+    start = n / m
+    end = n - m
+
+    return x[start:end, start:end], y[start:end], z[start:end]
+
 def interpXYZ(x, y, z, n, xrange=None, yrange=None, checkLevels=False, center=False):
 
     x2 = copy(x)
@@ -178,7 +185,7 @@ def interpXYZ(x, y, z, n, xrange=None, yrange=None, checkLevels=False, center=Fa
     assert len(x3) == len(y3)
     assert len(y3) == len(z3)
 
-    f = interpolate.interp2d(x3, y3, z3, kind='linear')
+    f = interpolate.interp2d(x3, y3, z3, kind='cubic')
     #f = interpolate.interp2d(x2.flatten(),
     #                         y2.flatten(),
     #                         z2.flatten(),
@@ -212,11 +219,11 @@ def interpXYZ(x, y, z, n, xrange=None, yrange=None, checkLevels=False, center=Fa
     # Here, we simply define bad points as being ones that are outside
     # the original range of the original data
     if checkLevels:
-        lgtMax = znew > np.nanmax(z)
+        lgtMax = znew > 2.*np.nanmax(z)
         if lgtMax.any():
             print "Replacing values greater then original with NaNs"
             znew[lgtMax] = np.nan
-        lstMin = znew < np.nanmin(z)
+        lstMin = znew < np.nanmin(z)/2.
         if lstMin.any():
             print "Replacing values less then original with NaNs"
             znew[lstMin] = np.nan    
@@ -240,6 +247,10 @@ def zernikeFit(z):
 def getWeight(az, el, azLoc, elLoc, sigAz, sigEl, j, k):
     return 2*np.pi*np.exp((-(np.cos(elLoc[j,k])**2)*(az-azLoc[j,k])**2/(2.*sigAz**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 )))
 
+def getWeightXYZ(x, y, xLoc, yLoc, sigX, sigY, j, k):
+    #return 2*np.pi*np.exp((az-azLoc[j,k])**2/(2.*sigAz**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 ))
+    return 2*np.pi*np.exp((-(x-xLoc[j,k])**2 /( 2.*sigX**2 )-(y-yLoc[j,k])**2 /(2.*sigY**2 )))
+
 def assignWeight(w, r):
 
     norm=sum(w)
@@ -251,6 +262,35 @@ def assignWeight(w, r):
         w = w / norm
         v = sum(r * w)   
     return v
+
+def smoothXYZNew(x, y, z, n, sigX=None, sigY=None):
+
+    if sigX is None:
+        sigX=0.001
+    if sigY is None:    
+        sigY=0.001;
+
+    xRange = np.linspace(min(x), max(x), n)
+    yRange = np.linspace(min(y), max(y), n)
+
+    xLoc, yLoc = np.meshgrid(xRange, yRange)
+
+
+    zSm = np.ndarray(shape=(n,n))
+    print "starting smoothing"
+    for j in range(n):
+        print "J:", j
+        for k in range(n):
+            w=2*np.pi*np.exp( (- (x - xLoc[j,k])**2 /( 2.*sigX**2 )-(y-yLoc[j,k])**2 /(2.*sigY**2 )))
+            norm=sum(w)
+            if norm==0:
+                norm=1
+                zSm[j,k]=np.nan #0 #min( r )
+            else:
+                w = w / norm
+                zSm[j,k] = sum(z * w)
+
+    return (xLoc, yLoc, zSm)    
 
 def smoothSlow(az, el, r, n, sigEl=None, sigAz=None):
     "smooth our data"
@@ -342,6 +382,15 @@ def daskWeight(n, az, el, r, azLoc, elLoc, sigAz, sigEl, j):
         rSms.append((j, k, v))
     return rSms
 
+def daskWeightXYZ(n, az, el, r, azLoc, elLoc, sigAz, sigEl, j):
+    rSms = []
+    for k in range(n):
+        w=getWeightXYZ(az, el, azLoc, elLoc, sigAz, sigEl, j, k)
+        
+        v = assignWeight(w, r)
+        rSms.append((j, k, v))
+    return rSms
+
 def smoothDask(az, el, r, n, sigEl=None, sigAz=None):
     "smooth our data with Dask"
 
@@ -411,7 +460,7 @@ def smoothXYZ(x, y, z, n, sigX=None, sigY=None):
     # yRange = np.linspace(yNoNan.min(), yNoNan.max(), n)
     x2 = x[[not b for b in np.isnan(x)]]
     y2 = y[[not b for b in np.isnan(y)]]
-    z2 = y[[not b for b in np.isnan(z)]]
+    z2 = z[[not b for b in np.isnan(z)]]
 
     x = x2
     y = y2
@@ -430,23 +479,84 @@ def smoothXYZ(x, y, z, n, sigX=None, sigY=None):
     # init our smoothing result
     zSm = np.ndarray(shape=(n,n))
 
+    print "Starting smoothing"
     for j in range(n):
-        # print "J:", j
+        print "J:", j
         for k in range(n):
-            w=2*np.pi*np.exp( (- (x - xLoc[j,k])**2 /( 2.*sigX**2 )-(y-yLoc[j,k])**2 /(2.*sigY**2 )))
+            # rSms.append(rrr)
+            w=2*np.pi*np.exp((-(x-xLoc[j,k])**2 /( 2.*sigX**2 )-(y-yLoc[j,k])**2 /(2.*sigY**2 )))
+            #w=2*np.pi*np.exp((az-azLoc[j,k])**2/(  2.*sigAz**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 ))
             norm=sum(w)
             if norm==0:
                 norm=1
                 zSm[j,k]=np.nan #0 #min( r )
             else:
+                #import ipdb; ipdb.set_trace()
                 w = w / norm
-                zSm[j,k] = sum(z * w)
+                v = sum(z * w)
+                zSm[j,k] = v
 
     print "xLoc", xLoc
     print "yLoc", yLoc
     print "zSm", zSm
     return (xLoc, yLoc, zSm)
 
+
+def smoothXYZDask(x, y, z, n, sigX=None, sigY=None):
+    "smooth our data"
+
+    x = x.flatten()
+    y = y.flatten()
+    z = z.flatten()
+
+    x2 = x[[not b for b in np.isnan(x)]]
+    y2 = y[[not b for b in np.isnan(y)]]
+    z2 = z[[not b for b in np.isnan(z)]]
+
+    x = x2
+    y = y2
+    z = z2
+
+    xRange = np.linspace(x.min(), x.max(), n)
+    yRange = np.linspace(y.min(), y.max(), n)
+
+    xLoc, yLoc = np.meshgrid(xRange, yRange)
+
+    if sigX is None:
+        sigX=0.1
+    if sigY is None:    
+        sigY=0.1;
+
+    # init our smoothing result
+    zSm = np.ndarray(shape=(n,n))
+    zSms = []
+    print "Starting smoothing"
+    for j in range(n):
+        #print "J:", j
+        rr =delayed(daskWeightXYZ)(n, x, y, z, xLoc, yLoc, sigX, sigY, j)
+        # for rrr in rr:
+            # rSms.append(rrr)
+        zSms.append(rr)    
+        #for k in range(n):
+        #    w=2*np.pi*np.exp( (- (x - xLoc[j,k])**2 /( 2.*sigX**2 )-(y-yLoc[j,k])**2 /(2.*sigY**2 )))
+        #    norm=sum(w)
+        #    if norm==0:
+        #        norm=1
+        #        zSm[j,k]=np.nan #0 #min( r )
+        #    else:
+        #        w = w / norm
+        #        zSm[j,k] = sum(z * w)
+
+    zSms = delayed(identity)(zSms)
+
+    with ProgressBar(), Profiler() as prof, ResourceProfiler() as rprof, CacheProfiler() as cprof:    
+        zSms = zSms.compute(scheduler="processes")
+
+    for zSmss in zSms:
+        for j, k, v in zSmss:
+            zSm[j][k] = v
+
+    return (xLoc, yLoc, zSm)
 
 def unwrap(azs):
     "make sure all az values are between 0 and 2pi"
@@ -779,11 +889,22 @@ def findTheDamnBumps():
     x2, y2, z2 = smoothSpherical(fn1, n)    
 
 
+def testSmoothXYZ():
+
+    x = np.linspace(-20, 20)
+    y = np.linspace(-20, 20)
+    xx, yy = np.meshgrid(x, y)
+    zz = np.zeros(xx.shape)
+    xs, ys, zs = smoothXYZDask(xx, yy, zz, xx.shape[0], sigX=1, sigY=1)
+    print zs
+
 def main():
-    fn1 = "data/randomSampleSta10.csv"
+    testSmoothXYZ()
+
+    #fn1 = "data/randomSampleSta10.csv"
     # fn2 = "data/randomSampleScan10.csv"
-    n = 30
-    x1, y1, z1 = smoothSpherical(fn1, n)    
+    #n = 30
+    #x1, y1, z1 = smoothSpherical(fn1, n)    
     # testInterp()
     # testDask()
     # n = 50
