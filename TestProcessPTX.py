@@ -79,6 +79,7 @@ class TestProcessPTX(unittest.TestCase):
         self.almostEqualMatrix(exp, newXyz)
 
     def testFitlerOutRadius(self):
+        "make sure our filtering by radius works"
 
         xyz = [
             (0,0,0),
@@ -102,6 +103,7 @@ class TestProcessPTX(unittest.TestCase):
         self.assertTrue((r == exp).all()) 
 
     def testProcessPTXdata(self):
+        "process data with no filters"
 
         hdr = ['\n']*10
         ls = [
@@ -123,6 +125,7 @@ class TestProcessPTX(unittest.TestCase):
         self.almostEqualMatrix(exp, rs)
 
     def testProcessPTXdata2(self):
+        "process data with standard filters"
 
         hdr = ['\n']*10
         ls = [
@@ -160,6 +163,7 @@ class TestProcessPTX(unittest.TestCase):
         self.almostEqualMatrix(exp, rs)
  
     def testProcessPTX2(self):
+        "test high level processing of simple sample file with standard filters"
 
         fn = "Test1_STA14_Bump1_High-02_METERS_SAMPLE.ptx"
         fpath = os.path.join("data", fn)
@@ -199,6 +203,7 @@ class TestProcessPTX(unittest.TestCase):
 
 
     def testProcessPTX(self):
+        "Test high level processing function against a simple sample and no filters"
 
         fn = "Test1_STA14_Bump1_High-02_METERS_SAMPLE.ptx"
         fpath = os.path.join("data", fn)
@@ -244,4 +249,46 @@ class TestProcessPTX(unittest.TestCase):
         self.almostEqualMatrix(np.array(xyzs), np.array(exp))
 
 
+    def readCsvFile(self, fpath):
+        "read CSV file produced by Mathematica and processPTX"
+        xyzs = []
+        fieldnames = ['x', 'y', 'z']
+        with open(fpath, 'r') as f:
+            reader = csv.DictReader(f, fieldnames=fieldnames)
+            for row in reader:
+                 xyz = (float(row['x']),
+                 float(row['y']),
+                 float(row['z']))
+                 xyzs.append(xyz)
+        return xyzs
+
+    def testProcessPTX3(self):
+        "tests our processing of 500K lines of input against Mathematica output"
+
+        fn = "Test1_STA14_Bump1_High-02_METERS_SAMPLES_500000.ptx"
+        fpath = os.path.join("data", fn)
+
+        # make sure input exists
+        self.assertTrue(os.path.isfile(fpath))
+
+        opath = fpath + ".csv"
+
+        # make sure the expected output does NOT exist yet
+        if os.path.isfile(opath):
+            os.remove(opath)
+        self.assertTrue(not os.path.isfile(opath))
+
+        # now create the file we just might have cleaned up
+        processPTX(fpath)
+
+        # make sure output exists
+        self.assertTrue(os.path.isfile(opath))
+
+        actual = np.array(self.readCsvFile(opath))
+
+        # here's the file actually produced by Mathematica!
+        expPath = opath + ".exp"
+        exp = np.array(self.readCsvFile(expPath))
+
+        self.almostEqualMatrix(actual, exp)
 
