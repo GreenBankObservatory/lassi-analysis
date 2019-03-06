@@ -899,12 +899,15 @@ def testSmoothXYZ():
     print zs
 
 def main():
-    testSmoothXYZ()
+    #testSmoothXYZ()
 
     #fn1 = "data/randomSampleSta10.csv"
-    # fn2 = "data/randomSampleScan10.csv"
-    #n = 30
-    #x1, y1, z1 = smoothSpherical(fn1, n)    
+    fn = "data/randomSampleScan10.csv"
+    n = 30
+    x1, y1, z1 = smoothSpherical(fn, n)    
+    np.savetxt("x.smoothed.csv", x1, delimiter=",")
+    np.savetxt("y.smoothed.csv", y1, delimiter=",")
+    np.savetxt("z.smoothed.csv", z1, delimiter=",")
     # testInterp()
     # testDask()
     # n = 50
