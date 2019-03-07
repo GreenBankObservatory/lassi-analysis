@@ -34,7 +34,7 @@ def surfaceZoom(data, dataLog, x, y, w, h, title):
     imagePlot(dataLogZm, title + " log")
 
     # calculate and return mean of zoomed area
-    return np.mean(dataZm), np.std(dataZm)
+    return np.mean(dataZm), np.std(dataZm), dataZm.shape
 
 def analyzeZooms(data, dataLog):
 
@@ -60,8 +60,10 @@ def analyzeZooms(data, dataLog):
     rs = []
     means = []
     for x, y, w, h, title in boxes:
-        mean, std = surfaceZoom(data, dataLog, x, y, w, h, title)
-        rs.append((title, mean, std))
+        mean, std, shape = surfaceZoom(data, dataLog, x, y, w, h, title)
+        n = shape[0]*shape[1]
+        stdn = std / np.sqrt(n)
+        rs.append((title, mean, std, n, stdn))
         means.append(mean)
 
     
@@ -79,5 +81,32 @@ def analyzeZooms(data, dataLog):
         ax.add_patch(rect)
         plt.text(x, y, "%e" % means[i])
 
-    for title, mean, std in rs:
-        print "%s: mean=%e std=%e" % (title, mean, std)
+    for title, mean, std, n, stdn in rs:
+        print "%s: mean=%e std=%e N=%e stdN=%e" % (title, mean, std, n, stdn)
+
+    return rs    
+
+def calculateVertexDisplacements(data, dataLog):
+
+
+    rs = analyzeZooms(data, dataLog)
+
+    topPanel = 0
+    topSurf = 1
+    mdlPanel = 2
+    btmSurf = 3
+    btmPanel = 4
+
+    diffs = [(topPanel, topSurf), (mdlPanel, topSurf), (btmPanel, btmSurf)]
+    titles = ["top panel", "middle panel", "bottom panel"]
+    i = 0
+    for pnl, srf in diffs:
+        tPnl, meanPnl, stdPnl, nPnl, stdNpnl = rs[pnl]
+        tSrf, meanSrf, stdSrf, nSrf, stdNsrf = rs[srf]
+       
+        disp = (meanSrf - meanPnl) * 1e6
+        dispSig = np.sqrt(stdNpnl**2 + stdNsrf**2) * 1e6
+
+        print "%s: disp(microm)=%e stdN=%e" % (titles[i], disp, dispSig)
+        i += 1
+
