@@ -1,0 +1,1 @@
+python pmargani_lassi_env/bin/nosetests --nocapture --verbose TestParabolas.py
