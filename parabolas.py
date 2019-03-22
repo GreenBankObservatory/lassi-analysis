@@ -1,9 +1,11 @@
+from copy import copy
+
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.optimize import leastsq
 # Do this if you run into the dreaded Tkinter import error
-import matplotlib
-matplotlib.use('agg')
+#import matplotlib
+#matplotlib.use('agg')
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 
@@ -111,11 +113,14 @@ def findTheBumps():
 
     return bumps
 
-def fitLeicaScan(fn):
+def fitLeicaScan(fn, numpy=True, N=None):
 
-    N = 512
+    if N is None:
+        N = 512
 
-    orgData, cleanData = loadLeicaData(fn)
+    # load the data: it might be two different formats, depending
+    # on whether it was done in python (numpy) or with GPUs
+    orgData, cleanData = loadLeicaData(fn, n=N, numpy=numpy)
     x0, y0, z0 = orgData
     x, y, z = cleanData
     scatter3dPlot(x, y, z, "Leica Data")
@@ -173,7 +178,7 @@ def fitLeicaData(x, y, z, guess):
                       xtol=1e-15)
     return r
 
-def loadLeicaData(fn):
+def loadLeicaDataFromNumpy(fn):
 
     data = np.load(fn)
 
@@ -185,6 +190,41 @@ def loadLeicaData(fn):
     yy = y.flatten()
     zz = z.flatten()
     
+    return (x, y, z), (xx, yy, zz)
+
+def loadLeicaDataFromGpus(fn):
+    "Crudely loads x, y, z csv files into numpy arrays"
+
+    xyzs = {}
+    dims = ['x', 'y', 'z']
+    for dim in dims:
+        data = []
+        fnn = "%s.%s.csv" % (fn, dim)
+        with open(fnn, 'r') as f:
+            ls = f.readlines()
+        for l in ls:
+            ll = l[:-1]
+            if ll == 'nan':
+                data.append(np.nan)
+            else:
+                data.append(float(ll))
+        xyzs[dim] = np.array(data)
+    return xyzs['x'], xyzs['y'], xyzs['z']
+
+def loadLeicaData(fn, n=None, numpy=True):
+
+    if numpy:
+        orgData, flatData = loadLeicaDataFromNumpy(fn)
+        x, y, z = orgData
+        xx, yy, zz = flatData
+    else:
+        xx, yy, zz = loadLeicaDataFromGpus(fn)
+        x = copy(xx)
+        y = copy(yy)
+        z = copy(zz)
+        if n is not None:
+            x.shape = y.shape = z.shape = (n, n)
+
     xxn = xx[np.logical_not(np.isnan(xx))];
     yyn = yy[np.logical_not(np.isnan(yy))];
     zzn = zz[np.logical_not(np.isnan(zz))];
@@ -484,7 +524,12 @@ def checkFit(answer, guess, fit, diff):
 
 
 def main():
-    tryFits()
+    #tryFits()
+    fn = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/randomSampleScan10.csv"
+    x, y, z = loadLeicaDataFromGpus(fn)
+    print x, x[np.logical_not(np.isnan(x))]
+    print y
+    print z
 
 if __name__=='__main__':
     main()
