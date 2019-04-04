@@ -7,10 +7,11 @@ import time
 
 # import matplotlib
 # matplotlib.use('agg')
+import numpy as np
 
-from processPTX import processPTX
+from processPTX import processPTX, processNewPTX
 from main import smoothGPUs, smoothXYZGpu
-from parabolas import fitLeicaScan
+from parabolas import fitLeicaScan, imagePlot
  
 # where is the code we'll be running?
 GPU_PATH = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
@@ -37,7 +38,7 @@ def smooth(fpath, N=512):
 
     return outfiles
 
-def processLeicaScan(fpath, N=512):
+def processLeicaScan(fpath, N=512, rot=None, sampleSize=None):
     """
     High level function for processing leica data:
        * processes PTX file
@@ -55,7 +56,11 @@ def processLeicaScan(fpath, N=512):
 
     # removes headers, does basic rotations, etc.
     print "Processing PTX file ..."
-    processPTX(fpath)
+    xOffset = -8.
+    yOffset = 50.0
+    if rot is None:
+        rot = 0.
+    processNewPTX(fpath, rot=rot, sampleSize=sampleSize) #xOffset=xOffset, yOffset=yOffset)
     processedPath = fpath + ".csv"
 
     e = time.time()
@@ -89,6 +94,13 @@ def processLeicaScan(fpath, N=512):
     e = time.time()
     print "Elapsed minutes: %5.2f" % ((e - s) / 60.)
 
+    xs.shape = ys.shape = diffs.shape = (N, N)
+
+    imagePlot(diffs, "Regridded Diff")
+
+    diffsLog = np.log(np.abs(np.diff(diffs)))
+    imagePlot(diffsLog, "Regridded Diff Log")
+    
     return xs, ys, diffs
 
 def main():
