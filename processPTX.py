@@ -8,6 +8,8 @@ from astropy import units as u
 from astropy.coordinates import CartesianRepresentation
 from astropy.coordinates.matrix_utilities import rotation_matrix
 
+from parabolas import scatter3dPlot
+
 def rotateXYaboutZ(xyz, rotDegrees):
 
     # define it as cartesian
@@ -52,7 +54,7 @@ def processPTX(fpath, rotationAboutZdegrees=None, searchRadius=None):
     outf = fpath + ".csv"
     np.savetxt(outf, xyz, delimiter=",")
 
-def processPTXdata(lines, rotationAboutZdegrees, searchRadius, quiet=True, sampleSize=None):
+def processPTXdata(lines, rotationAboutZdegrees, searchRadius, quiet=True, sampleSize=None, preview=True):
 
     ls = lines
 
@@ -112,8 +114,26 @@ def processPTXdata(lines, rotationAboutZdegrees, searchRadius, quiet=True, sampl
     # and 54 is added to each x.  Norm == Sqrt(x**2 + y**2); that looks like a radius to me.
     # so, if the radius is less the 47, this data element is kept.
 
-    return filterOutRadius(xyz, searchRadius=searchRadius)
 
+    if preview:
+        # a preview of what our processed data looks like
+        sampleSize = 10000
+        lsIdx = random.sample(range(len(xyz)), sampleSize)
+        xyzr = xyz[lsIdx]
+        xr, yr, zr = splitXYZ(xyzr)
+        xlim = (-100, 100)
+        ylim = (-100, 100)
+        scatter3dPlot(xr, yr, zr, "Sampling of processed data", xlim=xlim, ylim=ylim)
+        f = plt.figure()
+        ax = f.gca()
+        # take a look at the x y orientation
+        ax.plot(xr, yr, 'bo', [0], [0], '*')
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.title("X Y orientation of data")
+
+    return filterOutRadius(xyz, searchRadius=searchRadius)
+    
 def filterOutRadius(xyz, searchRadius=None, mysteryX=None):
     "return only those xyz points where sqrt(x**2 + y**2) is within a limit"
 
@@ -275,10 +295,16 @@ def radialFilter(x, y, z, xOffset, yOffset, radius):
     zr = np.array(zr)        
     return xr, yr, zr
 
-def processNewPTXData(lines, xOffset=None, yOffset=None, plotTest=True, rot=None):
+def processNewPTXData(lines,
+                      xOffset=None,
+                      yOffset=None,
+                      plotTest=True,
+                      rot=None,
+                      sampleSize=None):
+    "this is the processing we see works with 2019 data"
 
     if rot is None:
-        rot = 0.0
+        rot = -90.0
     if xOffset is None:
         xOffset = -8.0
     if yOffset is None:    
@@ -287,12 +313,35 @@ def processNewPTXData(lines, xOffset=None, yOffset=None, plotTest=True, rot=None
     radius = 47.
 
     if plotTest:
+        # make some plots that ensure how we are doing
+        # our radial filtering
         testOffsets(lines, xOffset, yOffset, radius)
 
-    x, y, z = getRawXYZ(lines)
+    # get the actual float values from the file contents
+    x, y, z = getRawXYZ(lines, sampleSize=sampleSize)
 
+    # we only want the inner 90% or so of the dish
     x, y, z =  radialFilter(x, y, z, xOffset, yOffset, radius)
 
+    # TBF: why must we do this?  No idea, but this,
+    # along with a rotation of -90. gets our data to
+    # look just like the 2016 data at the same stage
+    z = -z
+
+    # z - filter: at this point we should have the
+    # dish, but with some things the radial filter didn't
+    # get rid of above or below the dish
+    zLimit = -80
+    mask = z > -80
+    orgNum = len(z)
+    x = x[mask]
+    y = y[mask]
+    z = z[mask]
+    newNum = len(z)
+    print "z - limit filtered out %d points below %5.2f" % ((orgNum - newNum), zLimit)
+
+    # x, y, z -> [(x, y, z)]
+    # for rotation phase
     xyz = []
     for i in range(len(x)):
         xyz.append((x[i], y[i], z[i]))
@@ -303,7 +352,34 @@ def processNewPTXData(lines, xOffset=None, yOffset=None, plotTest=True, rot=None
         rotationAboutZdegrees = rot
         xyz = rotateXYaboutZ(xyz, rotationAboutZdegrees)
 
+    if plotTest:
+        # we plotted stuff earlier, so let's get
+        # a preview of what our processed data looks like
+        if sampleSize is None:
+            sampleSize = 10000
+            lsIdx = random.sample(range(len(xyz)), sampleSize)
+            xyzr = xyz[lsIdx]
+            xr, yr, zr = splitXYZ(xyzr)
+        else:
+            xr, yr, zr = splitXYZ(xyz)    
+        xlim = (-100, 100)
+        ylim = (-100, 100)
+        scatter3dPlot(xr, yr, zr, "Sampling of processed data", xlim=xlim, ylim=ylim)
+        f = plt.figure()
+        ax = f.gca()
+        # take a look at the x y orientation
+        ax.plot(xr, yr, 'bo', [0], [0], '*')
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.title("X Y orientation of data")
+
     return xyz
+
+def aggregateXYZ(x, y, z):
+    xyz = []
+    for i in range(len(x)):
+        xyz.append((x[i], y[i], z[i]))
+    return np.array(xyz)
 
 def splitXYZ(xyz):
     x = []
@@ -318,12 +394,12 @@ def splitXYZ(xyz):
     y = np.array(y)    
     return x, y, z
 
-def processNewPTX(fpath):
+def processNewPTX(fpath, rot=None, sampleSize=None):
 
     with open(fpath, 'r') as f:
         ls = f.readlines()
     
-    xyz = processNewPTXData(ls, rot=90.0)
+    xyz = processNewPTXData(ls, rot=rot, sampleSize=sampleSize)
 
     # TBF: the old interface expects this 
     # in a different format
