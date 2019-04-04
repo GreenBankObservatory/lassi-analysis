@@ -311,7 +311,9 @@ def smoothSlow(az, el, r, n, sigEl=None, sigAz=None):
     for j in range(n):
         # print "J:", j
         for k in range(n):
-            w=2*np.pi*np.exp( (- (az - azLoc[j,k])**2 /( 2.*sigAz**2 )-(el-elLoc[j,k])**2 /(2.*sigEl**2 )))
+            #w=2*np.pi*np.exp( (- (az - azLoc[j,k])**2 /( 2.*sigAz**2 )-(el-elLoc[j,k])**2 /(2.*sigEl**2 )))
+            #w=2*np.pi*np.exp((-(np.cos(elLoc[j,k])**2)*(az-azLoc[j,k])**2/(2.*sigAz**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 )))
+            w = getWeight(az, el, azLoc, elLoc, sigAz, sigEl, j, k)
             norm=sum(w)
             if norm==0:
                 norm=1
