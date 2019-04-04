@@ -162,18 +162,24 @@ def imagePlot(z, title):
     plt.title(title)
 
 def fitLeicaData(x, y, z, guess):
-
+    print "fit leica boss!"
     #guess = [f, v1x, v1y, v2, 0., 0.]
     inf = np.inf
     pi2 = 2*np.pi
     b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
     b2 = [inf, inf, inf, inf, pi2, pi2]
     bounds = (b1, b2)
-    r = least_squares(fitParabola, guess, args=(x .flatten(), y.flatten(), z.flatten()),
-                      #bounds=bounds,
-                      method='lm',
+    # robust fit: weights outliers outside of f_scale less
+    loss = "soft_l1"
+    f_scale = .05
+    r = least_squares(fitParabola,
+                      guess,
+                      args=(x .flatten(), y.flatten(), z.flatten()),
+                      bounds=bounds,
+                      # method='lm',
                       max_nfev=1000000,
-                  
+                      # loss=loss,
+                      # f_scale=f_scale,
                       ftol=1e-15,
                       xtol=1e-15)
     return r
@@ -231,21 +237,29 @@ def loadLeicaData(fn, n=None, numpy=True):
 
     return (x, y, z), (xxn, yyn, zzn)
 
-def surface3dPlot(x, y, z, title):
+def surface3dPlot(x, y, z, title, xlim=None, ylim=None):
     fig = plt.figure()
     ax = Axes3D(fig)
     ax.plot_surface(x, y, z)
     plt.xlabel("x")
     plt.ylabel("y")
     plt.title(title)
+    if xlim is not None:
+        plt.xlim(xlim)
+    if ylim is not None:
+        plt.ylim(ylim)
 
-def scatter3dPlot(x, y, z, title):
+def scatter3dPlot(x, y, z, title, xlim=None, ylim=None):
     fig = plt.figure()
     ax = Axes3D(fig)
     ax.scatter(x, y, z)
     plt.xlabel("x")
     plt.ylabel("y")
     plt.title(title)
+    if xlim is not None:
+        plt.xlim(xlim)
+    if ylim is not None:
+        plt.ylim(ylim)
 
 def fitNoRot():
 
