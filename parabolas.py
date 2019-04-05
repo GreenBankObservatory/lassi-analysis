@@ -1,4 +1,5 @@
 from copy import copy
+import random
 
 import numpy as np
 from scipy.optimize import least_squares
@@ -237,9 +238,40 @@ def loadLeicaData(fn, n=None, numpy=True):
 
     return (x, y, z), (xxn, yyn, zzn)
 
-def surface3dPlot(x, y, z, title, xlim=None, ylim=None):
+def sampleXYZData(x, y, z, samplePercentage):
+    "Return a random percentage of the data"
+
+    assert len(x) == len(y)
+    assert len(y) == len(z)
+
+    lenx = len(x)
+
+    sampleSize = int((lenx * samplePercentage) / 100.)
+
+    idx = random.sample(range(lenx), sampleSize)
+
+    return copy(x[idx]), copy(y[idx]), copy(z[idx])
+
+def radialReplace(x, y, z, xOffset, yOffset, radius, replacement):
+    "Replace z values outside of given radius with a new value"
+
+    for i in range(len(x)):
+        r = np.sqrt((x[i]-xOffset)**2 + (y[i]-yOffset)**2)
+        if r > radius:
+            z[i] = replacement
+
+    # only z gets changed
+    return z
+
+def surface3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
     fig = plt.figure()
     ax = Axes3D(fig)
+
+    # plot all the data, or just some?
+    if sample is not None:
+        print "Plotting %5.2f percent of data" % sample
+        x, y, z = sampleXYZData(x, y, z, sample)
+
     ax.plot_surface(x, y, z)
     plt.xlabel("x")
     plt.ylabel("y")
@@ -249,7 +281,13 @@ def surface3dPlot(x, y, z, title, xlim=None, ylim=None):
     if ylim is not None:
         plt.ylim(ylim)
 
-def scatter3dPlot(x, y, z, title, xlim=None, ylim=None):
+def scatter3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
+
+    # plot all the data, or just some?
+    if sample is not None:
+        print "Plotting %5.2f percent of data" % sample
+        x, y, z = sampleXYZData(x, y, z, sample)
+
     fig = plt.figure()
     ax = Axes3D(fig)
     ax.scatter(x, y, z)
