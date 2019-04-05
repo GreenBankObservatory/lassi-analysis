@@ -112,12 +112,31 @@ def processLeicaScan(fpath, N=512, rot=None, sampleSize=None):
 
     return xs, ys, diffs
 
-def processLeicaScanPair(filename1, filename2, fitZernikies=True):
+def loadProcessedData(filename):
+    "Loads the results of processLeicaScan from file"
+    d = np.load(filename)
+    return d["xs"], d["ys"], d["diffs"]
 
-    xs1, ys1, diff1 = processLeicaScan(filename1)
-    xs2, ys2, diff2 = processLeicaScan(filename2)
+def processLeicaScanPair(filename1, filename2, processed=False, fitZernikies=True):
+    "Process each scan, find diffs, and fit for zernikies"
+
+    if processed:
+        # load results from file; these files should exist
+        # here in the CWD
+        fn1 = "%s.processed.npz" % os.path.basename(filename1)
+        print "Loading processed data from file:", fn1
+        xs1, ys1, diff1 = loadProcessedData(fn1)
+        fn2 = "%s.processed.npz" % os.path.basename(filename2)
+        print "Loading processed data from file:", fn2
+        xs2, ys2, diff2 = loadProcessedData(fn2)
+    else:
+        # we need to process each scan
+        # WARNING: each scan takes about 10 minutes    
+        xs1, ys1, diff1 = processLeicaScan(filename1)
+        xs2, ys2, diff2 = processLeicaScan(filename2)
 
     # find the difference of the difference!
+    print "Finding difference between scans ..."
     N = 512
     diffData = diff1 - diff2
     diffData.shape = (N, N)
@@ -127,6 +146,8 @@ def processLeicaScanPair(filename1, filename2, fitZernikies=True):
     # find the zernike
     if not fitZernikies:
         return 
+
+    print "Fitting difference to zernikies ..."
 
     # replace NaNs with zeros
     diffDataOrg = copy(diffData)
@@ -145,6 +166,7 @@ def processLeicaScanPair(filename1, filename2, fitZernikies=True):
     C1.listcoefficient()
     C1.zernikemap()
 
+    print "Converting from Noll to Active Surface ANSI Zernikies ..."
     # and now convert this to active surface zernike convention
     # why does the fitlist start with a zero? for Z0??  Anyways, avoid it
     nollZs = fitlist[1:(numZsFit+1)]
