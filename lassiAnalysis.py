@@ -65,7 +65,11 @@ def processLeicaScan(fpath, N=512, rot=None, sampleSize=None):
     yOffset = 50.0
     if rot is None:
         rot = 0.
-    processNewPTX(fpath, rot=rot, sampleSize=sampleSize) #xOffset=xOffset, yOffset=yOffset)
+    processNewPTX(fpath,
+                  rot=rot,
+                  rFilter=True,
+                  iFilter=False,
+                  sampleSize=sampleSize) #xOffset=xOffset, yOffset=yOffset)
     processedPath = fpath + ".csv"
 
     e = time.time()
@@ -87,14 +91,18 @@ def processLeicaScan(fpath, N=512, rot=None, sampleSize=None):
     fn = smoothedFiles[0]
     assert fn[-5:] == 'x.csv'
     fn = fn[:-6]
-    diff, x, y = fitLeicaScan(fn, numpy=False, N=N)
+    diff, x, y = fitLeicaScan(fn,
+                              numpy=False,
+                              N=N,
+                              rFilter=False)
 
     e = time.time()
     print "Elapsed minutes: %5.2f" % ((e - s) / 60.)
 
     s = time.time()
     print "Regriding data ..."
-    xs, ys, diffs = smoothXYZGpu(x, y, diff, N)
+    filename = "%s.regrid" % fileBasename
+    xs, ys, diffs = smoothXYZGpu(x, y, diff, N, filename=filename)
 
     e = time.time()
     print "Elapsed minutes: %5.2f" % ((e - s) / 60.)
