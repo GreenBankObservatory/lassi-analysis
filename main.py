@@ -522,7 +522,7 @@ def loadLeicaDataFromGpus(fn):
         xyzs[dim] = np.array(data)
     return xyzs['x'], xyzs['y'], xyzs['z']
 
-def smoothXYZGpu(x, y, z, n, sigX=None, sigY=None):
+def smoothXYZGpu(x, y, z, n, sigX=None, sigY=None, filename=None):
     "use GPU code to do the simple XYZ smoothing"
 
     # first get data into file format expected by GPU code:
@@ -546,7 +546,11 @@ def smoothXYZGpu(x, y, z, n, sigX=None, sigY=None):
 
     # where's our input data?
     abspath = os.path.abspath(os.path.curdir)
-    fn = "test"
+    if filename is None:
+        fn = "test"
+    else:
+        fn = filename
+            
     inFile = os.path.join(abspath, "data", fn)
 
     np.savetxt(inFile, xyz, delimiter=",") 
