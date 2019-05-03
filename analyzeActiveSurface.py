@@ -10,17 +10,86 @@ except:
 import numpy as np
 
 from ProjectScanLog import ProjectScanLog
+from AsZernikeFile import AsZernikeFile
 
-def plotData(data, scanNumber, fieldName):
-    fig = plt.figure()
-    ax = Axes3D(fig)
+def plotData(data,
+             scanNumber,
+             fieldName,
+             xlim=None,
+             ylim=None,
+             zlim=None,
+             xy=False,
+             dividePhi=False,
+             filterMin=False):
     hoops = data.field('HOOP')
     ribs = data.field('RIB')
-    plt.xlabel('hoop #')
-    plt.ylabel('rib #')
-    plt.title("%s:%s" % (scanNumber, fieldName))
-    ax.scatter(hoops, ribs, data.field(fieldName))
+    z = data.field(fieldName)
+
+    if filterMin:
+        orgLen = len(z)
+        tol = np.min(z)
+        wh = np.where(z <= tol)
+        z = np.delete(z, wh[0])
+        hoops = np.delete(hoops, wh[0])
+        ribs = np.delete(ribs, wh[0])
+        print "Filtered min values from data, len from %d to %d" % (orgLen, len(z))
+
+    title = "%s:%s" % (scanNumber, fieldName)
+
+    if dividePhi:
+        phis = []
+        fn = "/home/gbt/etc/config/AsZernike.conf"
+        asz = AsZernikeFile(fn)
+        asz.parse()
+        for i, h in enumerate(hoops):
+            r = ribs[i]
+            act = asz.actuators[(h,r)]
+            phis.append(act.phi)
+        phis = np.array(phis)
+        print "Dividing z axis by phis."
+        z = z / phis
+        title += ":phis"
+
+    if xy:
+        print "Plotting in x and y."
+        # convert to x and y
+        xlabel = 'x'
+        ylabel = 'y'
+        # TBF: make this a singleton
+        fn = "/home/gbt/etc/config/AsZernike.conf"
+        asz = AsZernikeFile(fn)
+        asz.parse()
+        x = []
+        y = []
+        for i, h in enumerate(hoops):
+            r = ribs[i]
+            act = asz.actuators[(h,r)]
+            x.append(act.x)
+            y.append(act.y)
+    else:
+        # stick with hoops and ribs
+        xlabel = 'hoop #'
+        ylabel = 'rib #'
+        x = hoops
+        y = ribs
+
+    # now that we have the data the way we want it,
+    # plot it
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    if xlim is not None:
+        plt.xlim(xlim)
+    if ylim is not None:
+        plt.ylim(ylim)
+    if zlim is not None:
+        ax.set_zlim(zlim)
+    ax.scatter(x, y, z)
     
+    return x, y, z
+
 def plotIndicated(data, scanNumber):
     "There's a wierd point we want to filter out"
     fig = plt.figure()
@@ -45,6 +114,8 @@ def plotIndicated(data, scanNumber):
     print "filtered indicated: ", len(ind)
     ax.scatter(hoops, ribs, ind)
     
+    return hoops, ribs, ind
+
 def plotZernikes(ext, title):
     names = ext.data.field('NAME')
     values = ext.data.field('VALUE')
@@ -52,8 +123,15 @@ def plotZernikes(ext, title):
     ax = fig.gca()
     plt.title(title)
     ax.plot(range(len(values)), values)
-    
-def plotFile(fn):
+
+    # print non-zero values
+    nzValues = [(i, v) for i, v in enumerate(values) if v > 0.0 ]
+    if len(nzValues) > 0:
+        print "Non-zero zernikies for", title
+        for i, v in nzValues:
+            print "%d: %5.2f" % (i, v)
+
+def plotFile(fn, filterMin=False):
     hs = fits.open(fn)
     hdr = hs[0].header
     
@@ -68,11 +146,23 @@ def plotFile(fn):
         print "Active Surface FITS file only has Primary Header"
         return
 
-    if len(hs) > 1 and hs[1].name == "ZERNIKE":
-        plotZernikes(hs[1], hs[1].name)
-    if len(hs) > 2 and hs[2].name == "THRMZERN":
-        plotZernikes(hs[2], hs[2].name)
+    #if len(hs) > 1 and hs[1].name == "ZERNIKE":
+    #    plotZernikes(hs[1], hs[1].name)
+    #if len(hs) > 2 and hs[2].name == "THRMZERN":
+    #    plotZernikes(hs[2], hs[2].name)
     
+    try:
+        hdu = hs['ZERNIKE']
+        plotZernikes(hdu, 'ZERNIKE')
+    except KeyError:
+        print "Does not contain ZERNIKE extension"
+
+    try:
+        hdu = hs['THRMZERN']
+        plotZernikes(hdu, 'THRMZERN')
+    except KeyError:
+        print "Does not contain ZERNIKE extension"
+
     try:
         data = hs['SURFACE'].data
     except KeyError:
@@ -80,9 +170,40 @@ def plotFile(fn):
         return
 
     #plotData(data, scan, 'INDICATED')
-    plotIndicated(data, scan)
-    plotData(data, scan, 'ABSOLUTE')
+    print "The Indicated column in FITS is *actually*"
+    print "the Indicated actuator values minus their zero points"
+    # indData = plotIndicated(data, scan)
+    indData = plotData(data, scan, 'INDICATED', filterMin=filterMin)
+    h, r, ind = indData
+    zlim = (np.min(ind), np.max(ind))
 
+    print "Plot Indicated again, but taking into account phi"
+    h, r, indPhi = plotData(data,
+                 scan,
+                 'INDICATED',
+                 zlim=zlim,
+                 filterMin=filterMin,
+                 dividePhi=True)
+
+    print "Plot Indicated again, but taking into account phi, and in x, y"
+    x, y, indPhi = plotData(data,
+                 scan,
+                 'INDICATED',
+                 zlim=zlim,
+                 xy=True,
+                 filterMin=filterMin,
+                 dividePhi=True)
+
+    print "The Absolute column in FITS is *actually*"
+    print "the Indicated (readback from hardware) actuator values."
+    h, r, absd = plotData(data, scan, 'ABSOLUTE')
+
+    print "The Delta column in FITS is *actually*"
+    print "the difference between the commanded and indicated (actual) positions"
+    print "this will be all zeros in the simulator"
+    delData = plotData(data, scan, 'DELTA')
+
+    return h, r, x, y, ind, indPhi, absd
 
 def surfacePlot(data, z, title):
     fig = plt.figure()
