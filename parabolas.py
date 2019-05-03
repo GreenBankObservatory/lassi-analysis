@@ -114,7 +114,7 @@ def findTheBumps():
 
     return bumps
 
-def fitLeicaScan(fn, numpy=True, N=None):
+def fitLeicaScan(fn, numpy=True, N=None, rFilter=False):
 
     if N is None:
         N = 512
@@ -125,6 +125,18 @@ def fitLeicaScan(fn, numpy=True, N=None):
     x0, y0, z0 = orgData
     x, y, z = cleanData
     scatter3dPlot(x, y, z, "Leica Data")
+
+
+    if np.all(np.isnan(x)) or np.all(np.isnan(y)) or np.all(np.isnan(z)):
+        print "fitLeicaScan cannot work on data with all NANs"
+        return None, None, None
+
+    if rFilter:
+        xOffset = -8.0
+        yOffset = 50.0
+        radius = 47.
+        x, y, z = radialFilter(x, y, z, xOffset, yOffset, radius)
+        scatter3dPlot(x, y, z, "Leica Data Radial Filtered")
 
     f = 60.
     v1x = v1y = v2 = 0
@@ -172,15 +184,18 @@ def fitLeicaData(x, y, z, guess):
     bounds = (b1, b2)
     # robust fit: weights outliers outside of f_scale less
     loss = "soft_l1"
-    f_scale = .05
+    # 0.05 is a good educated guess from Andrew
+    # f_scale = .05
+    f_scale = .01
+    print "fitLeicaData with robust, soft_l1, f_scale .01"
     r = least_squares(fitParabola,
                       guess,
                       args=(x .flatten(), y.flatten(), z.flatten()),
                       bounds=bounds,
                       # method='lm',
                       max_nfev=1000000,
-                      # loss=loss,
-                      # f_scale=f_scale,
+                      loss=loss,
+                      f_scale=f_scale,
                       ftol=1e-15,
                       xtol=1e-15)
     return r
@@ -287,6 +302,7 @@ def scatter3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
     if sample is not None:
         print "Plotting %5.2f percent of data" % sample
         x, y, z = sampleXYZData(x, y, z, sample)
+        print "Now length of data is %d" % len(x)
 
     fig = plt.figure()
     ax = Axes3D(fig)
@@ -574,6 +590,21 @@ def checkFit(answer, guess, fit, diff):
     print "fit passed with diff: ", answer, diff
     return True
 
+def radialFilter(x, y, z, xOffset, yOffset, radius):
+    "returns only those points within the radius"
+    xr = []
+    yr = []
+    zr = []
+    for i in range(len(x)):
+        r = np.sqrt((x[i]-xOffset)**2 + (y[i]-yOffset)**2)
+        if r < radius:
+            xr.append(x[i])
+            yr.append(y[i])
+            zr.append(z[i])
+    xr = np.array(xr)        
+    yr = np.array(yr)        
+    zr = np.array(zr)        
+    return xr, yr, zr
 
 def main():
     #tryFits()
