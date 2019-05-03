@@ -1,6 +1,9 @@
 import sys
 import random
 
+# import matplotlib
+# matplotlib.use("agg")
+
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 import numpy as np
@@ -36,7 +39,7 @@ def rotateXYaboutZ(xyz, rotDegrees):
     return np.array(xyzNew)    
         
     
-def processPTX(fpath, rotationAboutZdegrees=None, searchRadius=None):
+def processPTX(fpath, rotationAboutZdegrees=None, searchRadius=None, rFilter=True):
 
 
     # import ipdb; ipdb.set_trace() 
@@ -205,33 +208,44 @@ def getRawXYZ(ls, sampleSize=None):
     xs = []
     ys = []
     zs = []
+    it = []
+
+    numLines = 0
 
     # for i, l in enumerate(ls):
     for i in lsIdx:
         l = ls[i]
+
         # print i, l
         if "Line" in l:
             # print l
+            numLines += 1
             continue
+
         ll = l.split(' ')
         x = float(ll[0])
         y = float(ll[1])
         z = float(ll[2])
+        i = float(ll[3])
         xs.append(x)
         ys.append(y)
         zs.append(z)
+        it.append(i)
+
+    print "Skipped %d non-data lines" % numLines
 
     xs = np.array(xs)
     ys = np.array(ys)
     zs = np.array(zs)
+    it = np.array(it)
 
-    return xs, ys, zs
+    return xs, ys, zs, it
 
 def testOffsets(lines, xOffset, yOffset, radius):
     "creates plots to make sure we are centered"
 
     sampleSize = 10000
-    x, y, z = getRawXYZ(lines, sampleSize=sampleSize)
+    x, y, z, _ = getRawXYZ(lines, sampleSize=sampleSize)
 
     # plot the random sample of xyz data
     fig = plt.figure()
@@ -300,7 +314,9 @@ def processNewPTXData(lines,
                       yOffset=None,
                       plotTest=True,
                       rot=None,
-                      sampleSize=None):
+                      sampleSize=None,
+                      iFilter=False,
+                      rFilter=True):
     "this is the processing we see works with 2019 data"
 
     if rot is None:
@@ -318,10 +334,64 @@ def processNewPTXData(lines,
         testOffsets(lines, xOffset, yOffset, radius)
 
     # get the actual float values from the file contents
-    x, y, z = getRawXYZ(lines, sampleSize=sampleSize)
+    x, y, z, i = getRawXYZ(lines, sampleSize=sampleSize)
+
+    print "Starting with %d lines of data" % len(x)
+
+
+    # lets first just remove all the zero data
+    mask = i != 0.0
+    i = i[mask]
+
+    numFilteredOut = len(x) - len(i)
+    percent = (float(numFilteredOut) / float(len(x))) * 100.
+    print "Filtered out %d points of %d (%5.2f%%) intensity equal to zero" % (numFilteredOut, len(x), percent)
+
+    x = x[mask]
+    y = y[mask]
+    z = z[mask]
+
+    print "Now we have %d lines of data" % len(x)
+
+    # we only want the data that has a decent intesity
+    meanI = np.mean(i)
+    stdI = np.std(i)
+    print "Intensity: max=%5.2f, min=%5.2f, mean=%5.2f, std=%5.2f" % (np.max(i),
+                                                                      np.min(i),
+                                                                      meanI,
+                                                                      stdI)
+
+    if iFilter:    
+        #lowestI = meanI # - stdI
+        #mask = i > lowestI
+        #highest = 0.8
+        #mask = i < highest
+        mask = np.logical_and(i > 0.75, i < 0.85)
+        i = i[mask]
+
+        numFilteredOut = len(x) - len(i)
+        percent = (float(numFilteredOut) / float(len(x))) * 100.
+        #print "Filtered out %d points of %d (%5.2f%%) below intensity %5.2f" % (numFilteredOut, len(x), percent, lowestI)
+        #print "Filtered out %d points of %d (%5.2f%%) higher intensity %5.2f" % (numFilteredOut, len(x), percent, highest)
+        print "Filtered out %d points of %d (%5.2f%%) via intensity" % (numFilteredOut, len(x), percent)
+
+        x = x[mask]
+        y = y[mask]
+        z = z[mask]
+
+        print "Now we have %d lines of data" % len(x)
+
+    assert len(x) == len(y)
+    assert len(y) == len(z)
+    assert len(z) == len(i)
 
     # we only want the inner 90% or so of the dish
-    x, y, z =  radialFilter(x, y, z, xOffset, yOffset, radius)
+    if rFilter:
+        orgNum = len(x)
+        x, y, z =  radialFilter(x, y, z, xOffset, yOffset, radius)
+        newNum = len(x)
+        print "radial limit filtered out %d points outside radius %5.2f" % ((orgNum - newNum), radius)
+        print "Now we have %d lines of data" % len(x)
 
     # TBF: why must we do this?  No idea, but this,
     # along with a rotation of -90. gets our data to
@@ -351,6 +421,8 @@ def processNewPTXData(lines,
         print "Rotating about Z by %5.2f degrees" % rot
         rotationAboutZdegrees = rot
         xyz = rotateXYaboutZ(xyz, rotationAboutZdegrees)
+    
+    print "Now we have %d lines of data" % len(xyz)
 
     if plotTest:
         # we plotted stuff earlier, so let's get
@@ -394,12 +466,20 @@ def splitXYZ(xyz):
     y = np.array(y)    
     return x, y, z
 
-def processNewPTX(fpath, rot=None, sampleSize=None):
+def processNewPTX(fpath,
+                  rot=None,
+                  sampleSize=None,
+                  iFilter=False,
+                  rFilter=True):
 
     with open(fpath, 'r') as f:
         ls = f.readlines()
     
-    xyz = processNewPTXData(ls, rot=rot, sampleSize=sampleSize)
+    xyz = processNewPTXData(ls,
+                            rot=rot,
+                            sampleSize=sampleSize,
+                            iFilter=iFilter,
+                            rFilter=rFilter)
 
     # TBF: the old interface expects this 
     # in a different format
