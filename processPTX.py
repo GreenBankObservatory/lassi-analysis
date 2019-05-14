@@ -1,5 +1,6 @@
 import sys
 import random
+from copy import copy
 
 # import matplotlib
 # matplotlib.use("agg")
@@ -315,7 +316,9 @@ def processNewPTXData(lines,
                       plotTest=True,
                       rot=None,
                       sampleSize=None,
+                      simSignal=None,
                       iFilter=False,
+                      nFilter=True,
                       rFilter=True):
     "this is the processing we see works with 2019 data"
 
@@ -352,6 +355,13 @@ def processNewPTXData(lines,
     z = z[mask]
 
     print "Now we have %d lines of data" % len(x)
+
+    # remove aggregious jumps in data?
+    if nFilter:
+        # TBF: document where our tolerance comes from
+        x, y, z, mask = neighborFilter(x, y, z, 0.122)
+        i = i[mask]
+        print "Now we have %d lines of data" % len(x)
 
     # we only want the data that has a decent intesity
     meanI = np.mean(i)
@@ -409,6 +419,11 @@ def processNewPTXData(lines,
     z = z[mask]
     newNum = len(z)
     print "z - limit filtered out %d points below %5.2f" % ((orgNum - newNum), zLimit)
+
+    if simSignal is not None:
+        # just now we add a bump
+        print "Adding Center Bump"
+        z = addCenterBump(x, y, z)
 
     # x, y, z -> [(x, y, z)]
     # for rotation phase
@@ -469,6 +484,7 @@ def splitXYZ(xyz):
 def processNewPTX(fpath,
                   rot=None,
                   sampleSize=None,
+                  simSignal=None,
                   iFilter=False,
                   rFilter=True):
 
@@ -478,6 +494,7 @@ def processNewPTX(fpath,
     xyz = processNewPTXData(ls,
                             rot=rot,
                             sampleSize=sampleSize,
+                            simSignal=simSignal,
                             iFilter=iFilter,
                             rFilter=rFilter)
 
@@ -491,6 +508,79 @@ def processNewPTX(fpath,
     # write to CSV file
     outf = fpath + ".csv"
     np.savetxt(outf, xyz, delimiter=",")
+
+def addCenterBump(x, y, z, rScale=10., zScale=0.05):
+
+    # add a bump to the center bit
+    xMin = np.nanmin(x)
+    xMax = np.nanmax(x)
+    yMin = np.nanmin(y)
+    yMax = np.nanmax(y)
+
+    # d = 10
+    d = rScale
+
+    xW = xMax - xMin
+    xStep = xW / d
+    xStart = xMin + (d/2 - 1)*xStep
+    xEnd = xMax - (d/2 -1)*xStep
+    assert xStart < xEnd
+
+    yW = yMax - yMin
+    yStep = yW / d
+    yStart = yMin + (d/2 - 1)*yStep
+    yEnd = yMax - (d/2 -1)*yStep
+    assert yStart < yEnd
+
+    cnt = 0
+    for i in range(len(x)):
+        xi = x[i]
+        yi = y[i]
+        zi = z[i]
+        if xi > xStart and xi < xEnd and yi > yStart and yi < yEnd:
+            cnt +=1 
+            # don't just add to z, but to radial distance
+            z[i] = zi + (zScale*zi)
+            #r = np.sqrt(xi**2 + yi**2 + zi**2)
+            #r = r + (zScale*r)
+            # how does that change z?
+            #z[i] = np.sqrt(r**2 - xi**2 - yi**2)
+
+    print "Added bump to %d pnts of %d pnts using rscale %5.2f and zscale %5.2f" % (cnt, len(z), rScale, zScale)
+
+    return z
+
+def neighborFilter(x, y, z, tol):
+    assert len(x) == len(y)
+    assert len(y) == len(z)
+
+    orgLen = len(x)
+
+    r = np.sqrt(x**2 + y**2 + z**2)
+    rdiff = np.diff(r)
+    # TBF: why does this return a tuple?
+    rdiffTolIdx = np.where(np.abs(rdiff) > tol)[0]
+    # convert these diff indicies to the indicies of the pairs
+    rdiffTolIdx2 = copy(rdiffTolIdx)
+    rdiffTolIdx2 = rdiffTolIdx2 + 1
+    # these are the indicies of the points we want to filter out
+    rTolIdx = np.concatenate((rdiffTolIdx, rdiffTolIdx2))
+
+    # convert this to the indicies of the points we want to keep
+    rIdx = np.array(range(orgLen))
+    badMask = np.isin(rIdx, rTolIdx)
+    mask = np.logical_not(badMask)
+
+    xnew = x[mask]
+    newLen = len(xnew)
+    fLen = orgLen - newLen
+    fPcnt = (float(fLen) / float(orgLen)) * 100.0
+    print "neighborFilter reduces %d points to %d points (%d filtered, %f %%) using tol: %f" % (orgLen, newLen, fLen, fPcnt, tol)
+
+    # return the mask as well so we can filter out other things as well
+    return xnew, y[mask], z[mask], mask
+        
+
 
 if __name__ == "__main__":
     import os
