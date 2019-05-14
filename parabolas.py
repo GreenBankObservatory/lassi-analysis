@@ -270,11 +270,14 @@ def sampleXYZData(x, y, z, samplePercentage):
 def radialReplace(x, y, z, xOffset, yOffset, radius, replacement):
     "Replace z values outside of given radius with a new value"
 
+    cnt = 0
     for i in range(len(x)):
         r = np.sqrt((x[i]-xOffset)**2 + (y[i]-yOffset)**2)
         if r > radius:
+            cnt += 1
             z[i] = replacement
 
+    print "radialReplace replaced %d points with %s" % (cnt, replacement)
     # only z gets changed
     return z
 
