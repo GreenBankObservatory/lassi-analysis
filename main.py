@@ -522,8 +522,13 @@ def loadLeicaDataFromGpus(fn):
         xyzs[dim] = np.array(data)
     return xyzs['x'], xyzs['y'], xyzs['z']
 
-def smoothXYZGpu(x, y, z, n, sigX=None, sigY=None, filename=None):
+# def smoothXYZGpu(x, y, z, n, sigX=None, sigY=None, filename=None):
+def smoothXYZGpu(x, y, z, n, sigXY=None, filename=None):
     "use GPU code to do the simple XYZ smoothing"
+
+    if sigXY is None:
+        sigXY = 0.1
+
 
     # first get data into file format expected by GPU code:
     # x, y, z per line
@@ -559,7 +564,7 @@ def smoothXYZGpu(x, y, z, n, sigX=None, sigY=None, filename=None):
     # where is the code we'll be running?
     gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
     outFile = fn
-    smoothGPUs(gpuPath, inFile, outFile, n, noCos=True, sigAzEl=0.1)
+    smoothGPUs(gpuPath, inFile, outFile, n, noCos=True, sigAzEl=sigXY)
 
     # make sure the output is where it should be
     for dim in ['x', 'y', 'z']:
@@ -848,6 +853,41 @@ def testInterp():
     mx, my = np.meshgrid(xnew, ynew)
 
     plotXYZ(mx, my, znew)
+
+def addCenterBump(x, y, z, rScale=10, zScale=0.25):
+
+    # add a bump to the center bit
+    xMin = np.nanmin(x)
+    xMax = np.nanmax(x)
+    yMin = np.nanmin(y)
+    yMax = np.nanmax(y)
+
+    # d = 10
+    d = rScale
+
+    xW = xMax - xMin
+    xStep = xW / d
+    xStart = xMin + (d/2 - 1)*xStep
+    xEnd = xMax - (d/2 -1)*xStep
+    assert xStart < xEnd
+
+    yW = yMax - yMin
+    yStep = yW / d
+    yStart = yMin + (d/2 - 1)*yStep
+    yEnd = yMax - (d/2 -1)*yStep
+    assert yStart < yEnd
+
+    cnt = 0
+    for i in range(len(x)):
+        xi = x[i]
+        yi = y[i]
+        zi = z[i]
+        if xi > xStart and xi < xEnd and yi > yStart and yi < yEnd:
+            cnt +=1 
+            z[i] = zi + (zScale*zi)
+    print "Added bump to %d pnts" % cnt
+
+    return z
 
 def smoothSpherical(fn, n, sigAz=None, sigEl=None, addBump=False):
 
