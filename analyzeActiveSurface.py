@@ -18,12 +18,16 @@ def plotData(data,
              xlim=None,
              ylim=None,
              zlim=None,
+             filterDisabled=True,
              xy=False,
              dividePhi=False,
              filterMin=False):
+
     hoops = data.field('HOOP')
     ribs = data.field('RIB')
     z = data.field(fieldName)
+
+
 
     if filterMin:
         orgLen = len(z)
@@ -66,12 +70,25 @@ def plotData(data,
             act = asz.actuators[(h,r)]
             x.append(act.x)
             y.append(act.y)
+        x = np.array(x)    
+        y = np.array(y)    
     else:
         # stick with hoops and ribs
         xlabel = 'hoop #'
         ylabel = 'rib #'
         x = hoops
         y = ribs
+
+    if filterDisabled:
+        enabled= data.field('ENABLED')
+        print enabled
+        mask = enabled == True
+        print "mask: ", mask
+        orgLen = len(x)
+        x = x[mask]
+        y = y[mask]
+        z = z[mask]
+        print "Removing %d disabled actuators" % (orgLen - len(z))
 
     # now that we have the data the way we want it,
     # plot it
@@ -131,7 +148,7 @@ def plotZernikes(ext, title):
         for i, v in nzValues:
             print "%d: %5.2f" % (i, v)
 
-def plotFile(fn, filterMin=False):
+def plotFile(fn, filterMin=False, filterDisabled=True):
     hs = fits.open(fn)
     hdr = hs[0].header
     
@@ -173,7 +190,11 @@ def plotFile(fn, filterMin=False):
     print "The Indicated column in FITS is *actually*"
     print "the Indicated actuator values minus their zero points"
     # indData = plotIndicated(data, scan)
-    indData = plotData(data, scan, 'INDICATED', filterMin=filterMin)
+    indData = plotData(data,
+                       scan,
+                       'INDICATED',
+                       filterDisabled=filterDisabled,
+                       filterMin=filterMin)
     h, r, ind = indData
     zlim = (np.min(ind), np.max(ind))
 
@@ -183,6 +204,7 @@ def plotFile(fn, filterMin=False):
                  'INDICATED',
                  zlim=zlim,
                  filterMin=filterMin,
+                 filterDisabled=filterDisabled,
                  dividePhi=True)
 
     print "Plot Indicated again, but taking into account phi, and in x, y"
@@ -192,11 +214,15 @@ def plotFile(fn, filterMin=False):
                  zlim=zlim,
                  xy=True,
                  filterMin=filterMin,
+                 filterDisabled=filterDisabled,
                  dividePhi=True)
 
     print "The Absolute column in FITS is *actually*"
     print "the Indicated (readback from hardware) actuator values."
-    h, r, absd = plotData(data, scan, 'ABSOLUTE')
+    h, r, absd = plotData(data,
+                          scan,
+                          'ABSOLUTE',
+                          filterDisabled=filterDisabled)
 
     print "The Delta column in FITS is *actually*"
     print "the difference between the commanded and indicated (actual) positions"
