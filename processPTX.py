@@ -12,7 +12,7 @@ from astropy import units as u
 from astropy.coordinates import CartesianRepresentation
 from astropy.coordinates.matrix_utilities import rotation_matrix
 
-from parabolas import scatter3dPlot
+from parabolas import scatter3dPlot, parabola
 
 def rotateXYaboutZ(xyz, rotDegrees):
 
@@ -316,6 +316,7 @@ def processNewPTXData(lines,
                       plotTest=True,
                       rot=None,
                       sampleSize=None,
+                      parabolaFit=None,
                       simSignal=None,
                       iFilter=False,
                       nFilter=True,
@@ -328,8 +329,12 @@ def processNewPTXData(lines,
         xOffset = -8.0
     if yOffset is None:    
         yOffset = 50.0
+        #yOffset = 60.0
+        #yOffset = 55.0
 
     radius = 47.
+
+    print "ProcessNewPTXData with: ", xOffset, yOffset, rot, radius
 
     if plotTest:
         # make some plots that ensure how we are doing
@@ -439,6 +444,27 @@ def processNewPTXData(lines,
     
     print "Now we have %d lines of data" % len(xyz)
 
+    if parabolaFit is not None:
+        pTol = 0.4
+        print "Using parabola fit to filter: ", parabolaFit
+        x, y, z = splitXYZ(xyz)
+        orgLenX = len(x)
+        focus, v1x, v1y, v2 = parabolaFit
+        zPar = parabola(x, y, focus, v1x, v1y, v2)
+        res = z - zPar
+        scatter3dPlot(x, y, res, "sample of residuals from parabola fit", sample=0.1)
+        parMask = np.abs(res) < pTol 
+        x = x[parMask]
+        y = y[parMask]
+        z = z[parMask]
+        xyz = aggregateXYZ(x, y, z)
+        res = res[parMask]
+        numFiltered = orgLenX - len(x)
+        print "After rejecting %d outliers (> %f), residuals look like:" % (numFiltered, pTol)
+        print "mean: %f, std: %f" % (np.mean(res), np.std(res))
+        print "Now we have %d lines of data" % len(xyz)
+        scatter3dPlot(x, y, res, "residuals from parabola fit (no outliers)", sample=0.1)
+
     if plotTest:
         # we plotted stuff earlier, so let's get
         # a preview of what our processed data looks like
@@ -486,6 +512,7 @@ def processNewPTX(fpath,
                   sampleSize=None,
                   simSignal=None,
                   iFilter=False,
+                  parabolaFit=None,
                   rFilter=True):
 
     with open(fpath, 'r') as f:
@@ -495,6 +522,7 @@ def processNewPTX(fpath,
                             rot=rot,
                             sampleSize=sampleSize,
                             simSignal=simSignal,
+                            parabolaFit=parabolaFit,
                             iFilter=iFilter,
                             rFilter=rFilter)
 
