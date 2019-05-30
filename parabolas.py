@@ -186,8 +186,9 @@ def fitLeicaData(x, y, z, guess):
     loss = "soft_l1"
     # 0.05 is a good educated guess from Andrew
     # f_scale = .05
-    f_scale = .01
-    print "fitLeicaData with robust, soft_l1, f_scale .01"
+    # f_scale = .01
+    f_scale = 1.0
+    print "fitLeicaData with robust, soft_l1, f_scale %f" % f_scale
     r = least_squares(fitParabola,
                       guess,
                       args=(x .flatten(), y.flatten(), z.flatten()),
