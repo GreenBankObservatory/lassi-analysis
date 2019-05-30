@@ -47,6 +47,7 @@ def processLeicaScan(fpath,
                      N=512,
                      rot=None,
                      sampleSize=None,
+                     parabolaFit=None,
                      simSignal=None):
     """
     High level function for processing leica data:
@@ -75,6 +76,7 @@ def processLeicaScan(fpath,
                   rot=rot,
                   rFilter=True,
                   iFilter=False,
+                  parabolaFit=parabolaFit,
                   simSignal=simSignal,
                   sampleSize=sampleSize) #xOffset=xOffset, yOffset=yOffset)
     processedPath = fpath + ".csv"
@@ -135,7 +137,9 @@ def loadProcessedData(filename):
 def processLeicaScanPair(filename1,
                          filename2,
                          processed=False,
+                         rot=None,
                          rFilter=False,
+                         parabolaFit=None,
                          fitZernikies=True):
     "Process each scan, find diffs, and fit for zernikies"
 
@@ -151,8 +155,8 @@ def processLeicaScanPair(filename1,
     else:
         # we need to process each scan
         # WARNING: each scan takes about 10 minutes    
-        xs1, ys1, diff1 = processLeicaScan(filename1)
-        xs2, ys2, diff2 = processLeicaScan(filename2)
+        xs1, ys1, diff1 = processLeicaScan(filename1, rot=rot, parabolaFit=parabolaFit)
+        xs2, ys2, diff2 = processLeicaScan(filename2, rot=rot, parabolaFit=parabolaFit)
 
     print "Finding difference between scans ..."
     N = 512
@@ -160,8 +164,21 @@ def processLeicaScanPair(filename1,
 
     if rFilter:
         # TBF: which x, y to use?
-        print "Removing points close to edge: radius=45.5"
-        diffData = radialReplace(xs2.flatten(), ys2.flatten(), diffData.flatten(), -8, 51.5, 45.5, np.nan)
+        print "xs1 dims", np.min(xs1), np.max(xs1), np.min(xs1) + ((np.max(xs1) - np.min(xs1))/2)
+        print "ys1 dims", np.min(ys1), np.max(ys1), np.min(ys1) + ((np.max(ys1) - np.min(ys1))/2)
+        print "xs2 dims", np.min(xs2), np.max(xs2), np.min(xs2) + ((np.max(xs2) - np.min(xs2))/2)
+        print "ys2 dims", np.min(ys2), np.max(ys2), np.min(ys2) + ((np.max(ys2) - np.min(ys2))/2)
+        rLimit = 45.5
+        xOffset = np.min(xs1) + ((np.max(xs1) - np.min(xs1))/2)
+        yOffset = np.min(ys1) + ((np.max(ys1) - np.min(ys1))/2)
+        print "Center (%f, %f), Removing points close to edge: radius=%f" % (xOffset, yOffset, rLimit)
+        diffData = radialReplace(xs1.flatten(),
+                                 ys1.flatten(),
+                                 diffData.flatten(),
+                                 xOffset,
+                                 yOffset, 
+                                 rLimit,
+                                 np.nan)
         diffData.shape= (N, N)
         
 
@@ -204,7 +221,7 @@ def processLeicaScanPair(filename1,
     print "active surface Zs"
     printZs(asAnsiZs)
 
-    return diffData
+    return (xs1, ys1, xs2, ys2), diffData
 
 def simulateSignal(sigFn,
                    refFn,
@@ -303,7 +320,9 @@ def simulateSignal(sigFn,
         imagePlot(diffSigS, 'diffSigsS (added gaussian)')
         imagePlot(np.log(np.abs(np.diff(diffSigS))), 'diffSigS log (added gaussian)')
 
-
+    else:
+        print "sigType not recognized: ", sigType
+        
     # regrid to get into evenly spaced x y
     regridFn = "%s.%s.regridded" % (sigFn, sigType)
     xSigr, ySigr, diffsSigS = smoothXYZGpu(xSig,
