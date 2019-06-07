@@ -14,19 +14,38 @@ from mpl_toolkits.mplot3d import axes3d, Axes3D
 
 from rotate import *
 
-def parabola(xdata, ydata, focus, v1x, v1y, v2, heavy=False):
+def parabola(xdata, ydata, focus, v1x, v1y, v2, heavy=True):
     if heavy:
         return parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2)
     else:
         return parabolaSimple(xdata, ydata, focus, v1x, v1y, v2)
 
 def parabolaSimple(xdata, ydata, focus, v1x, v1y, v2):
+    "simply the equation for a 2-D parabola"
     return (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 + v2
 
-def parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2, hr=104.):
+def parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2): #, hr=104.):
+    "Reject everything outside the circle our data shows up in"
     #return (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 + v2
-    r2 = (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 
-    return (r2 * (hr**2 > r2)) + v2
+    #r2 = (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 
+    #return (r2 * (hr**2 > r2)) + v2
+
+    # caluclate the parabola normally
+    z = parabolaSimple(xdata, ydata, focus, v1x, v1y, v2)
+
+    # now return only those values within our cynlinder
+    xoffset = 0. #54.
+    yoffset = 54. #0.
+    radius = 50.
+    mask = heavySide(xdata, ydata, v1x, v1y, xoffset, yoffset, radius)
+    print "Of %d elements, %d masked by heavyside" % (len(z), np.sum(mask))
+    #assert np.all(mask)
+    #return z[mask]
+    # z[mask] = 0.0
+    return z
+    
+def heavySide(x, y, v1x, v1y, xoffset, yoffset, radius):
+    return ((x - v1x - xoffset)**2 + (y - v1y - yoffset)**2) > radius**2    
 
 def rotate(x, y, z, aroundXrads, aroundYrads):
     # first, around x
@@ -124,7 +143,10 @@ def fitLeicaScan(fn, numpy=True, N=None, rFilter=False):
     orgData, cleanData = loadLeicaData(fn, n=N, numpy=numpy)
     x0, y0, z0 = orgData
     x, y, z = cleanData
-    scatter3dPlot(x, y, z, "Leica Data")
+    scatter3dPlot(x, y, z, "Sample of Leica Data", sample=10.0)
+
+    print "x range:", np.min(x), np.max(x)
+    print "y range:", np.min(y), np.max(y)
 
 
     if np.all(np.isnan(x)) or np.all(np.isnan(y)) or np.all(np.isnan(z)):
