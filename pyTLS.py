@@ -12,14 +12,27 @@ import inspect
 CONTROL_PORT=':55560'
 DATAPUB_PORT=':55562'
 
+SCAN_MODES = {"Speed" : 0, "Range" : 1, "Medium Range" : 2, "Long Range" : 3}
+SCANSENSITIVITY = {"Normal" : 0, "High" : 1}
+SCANRESOLUTION = {"500mm@100m" : 0, "250mm@100m" : 1, "125mm@100m" : 2, \
+                  "63mm@100m" : 3, "31mm@100m" : 4, "16mm@100m" : 5, "8mm@100m" : 6}
+
+def mycb(a, b):
+    if a in "OK_STATUS":
+        print("\nScanner State=", b.state)
+    else:
+        print("\nGOT frame ", a, "  of type ", type(b))
+
 class OKStatus:
     def __init__(self, g):
         self.error_msg = g[0]
-        self.state = g[1]
-        self.is_ok = g[2]
+        self.is_ok = g[1]
+        self.scan_number = g[2]
+        self.state = g[3]
+        self.state_id = g[4]
 
     def __str__(self):
-        return "is_ok=%s, state=%d, message=%s" % (str(self.is_ok), self.state, self.error_msg)
+        return "is_ok=%s, state=%s, message=%s scan_number=%d" % (str(self.is_ok), self.state, self.error_msg,self.scan_number)
 
 
 class TLSaccess(object):
@@ -54,6 +67,7 @@ class TLSaccess(object):
 
         self._sub_task = None
         self.results = {}
+        self.subscribe("OK_STATUS", mycb)
 
     def __del__(self):
         "An attempt to shutdown the subscriber thread, which doesnt seem to work"
@@ -63,7 +77,7 @@ class TLSaccess(object):
         "A help page to guide you through"
 
         print("Method documentation:")
-        help="""configure_scanner(project, resolution, sensitivity, scan_quality, scan_mode, center_az, center_el, fov_az, fov_el) """
+        help="""configure_scanner(project, resolution, sensitivity, scan_mode, center_az, center_el, fov_az, fov_el) """
         print(help)
         print(self.configure_scanner.__doc__)
         help="""move_az(az) """
@@ -84,6 +98,9 @@ class TLSaccess(object):
 
         print("""get_status()""")
         print(self.get_status.__doc__)
+
+        print("""set_scan_number""")
+        print(self.set_scan_number.__doc__)
 
         print("""subscribe(which_array, callback=None)""")
         print(self.subscribe.__doc__)
@@ -112,7 +129,7 @@ class TLSaccess(object):
       
 
     def parse_OKStatus(self, msg):
-        if msg is None or len(msg) < 1:
+        if msg is None:
             return None
 
         kk = msgpack.unpackb(msg[1])
@@ -122,8 +139,12 @@ class TLSaccess(object):
     def encode_MoveAz(self, azcmd):
         return msgpack.packb([azcmd], use_bin_type=True)
 
-    def encode_Config(self, project, res, sensitivity, scnrange, mode, ctr_az, ctr_el, fov_az, fov_el):
-        return msgpack.packb([project, res, sensitivity, scnrange, mode, ctr_az, ctr_el, fov_az, fov_el])
+    def encode_ScanNumber(self, scannum):
+        return msgpack.packb([scannum], use_bin_type=True)
+
+    def encode_Config(self, project, res, sensitivity, mode, ctr_az, ctr_el, fov_az, fov_el):
+        #Note: this order must match the ordering in lassi_daq
+        return msgpack.packb([ctr_az, ctr_el, fov_az, fov_el, project, res, mode, sensitivity])
 
     def simple_cmd(self, cmd):
         self.csock.send_string(cmd)
@@ -135,21 +156,58 @@ class TLSaccess(object):
 
     # API methods below
 
-    def configure_scanner(self, project, resolution, sensitivity, scan_quality, scan_mode, center_az, center_el, fov_az, fov_el):
+    def configure_scanner(self, project, resolution, sensitivity, scan_mode, center_az, center_el, fov_az, fov_el):
         """
         Sends a configuration to the scanner. Fields are:
             project : a valid string for tl_scanner project (not GBT project)
-            resolution : an enum (0-6) specifying the resolution
-            sensitivity: 0=normal, 1=high
-            scan_quaility: 0-3
-            scan_mode: enum (0-3) specifying Speed vs. Range
+            resolution : specifies the resolution as one of the strings:
+                  500mm@100m, 250mm@100m, 125mm@100m, 63mm@100m, 31mm@100m, 16mm@100m, 8mm@100m
+            sensitivity: specifies the sensitivity as one of the strings: Normal, High
+            scan_mode: specifies Speed vs. Range or one of the strings:
+                  Speed, Range, Medium Range, Long Range (Note not all are valid Speed, Range are known to work)
             center_az: center of scan in degrees
             center_el: center of scan in degrees
             fov_az: width of scan in degrees
             fov_el: height of scan in degrees
         returns an OKStatus object
         """
-        msg = self.encode_Config(project, resolution, sensitivity, scan_quality, scan_mode, center_az, center_el, fov_az, fov_el)
+
+        if type(project) != str:
+            print("project must be a string")
+            return False
+        if type(resolution) == str:
+            if resolution in SCANRESOLUTION.keys():
+                _resolution = SCANRESOLUTION[resolution]
+            else:
+                print("unknown scan resolution. Must be one of:")
+                print(SCANRESOLUTION.keys())
+                return False
+        else:
+            _resolution = resolution
+
+        if type(sensitivity) == str:
+            if sensitivity in SCANSENSITIVITY.keys():
+                _sensitivity = SCANSENSITIVITY[sensitivity]
+            else:
+                print("unknown scan sensitivity. Must be one of:")
+                print(SCANSENSITIVITY.keys())
+                return False
+        else:
+            _sensitivity = sensitivity
+
+        if type(scan_mode) == str:
+            if scan_mode in SCAN_MODES.keys():
+                _scan_mode = SCAN_MODES[scan_mode]
+            else:
+                print("unknown scan mode. Must be one of:")
+                print(SCAN_MODES.keys())
+                return False
+        else:
+            _scan_mode = scan_mode
+
+
+        msg = self.encode_Config(project, _resolution, _sensitivity, _scan_mode, \
+                                 center_az, center_el, fov_az, fov_el)
         self.csock.send('Configure', zmq.SNDMORE)
         self.csock.send(msg)
 
@@ -169,6 +227,20 @@ class TLSaccess(object):
         rtn = self.csock.recv_multipart()
         return self.parse_OKStatus(rtn)
 
+    def set_scan_number(self, scannum):
+        """
+        Sets the user defined scan number. The scan number is incremented every time a start_scan()
+        is issued. The scan number is now a field in the OK_State feedback.
+        e.g print(a.get_result("OK_STATUS").scan_number) would print the scan number and also
+            print(a.get_status().scan_number) also works.
+        """
+        msg = self.encode_ScanNumber(scannum)
+        self.csock.send('SetScanNumber', zmq.SNDMORE)
+        self.csock.send(msg)
+
+        rtn = self.csock.recv_multipart()
+        return self.parse_OKStatus(rtn)
+
     def subscribe_array(self, which_array):
         self.csock.send_string("ArraySubscribe", zmq.SNDMORE)
         msg = self.encode_string(which_array)
@@ -183,7 +255,7 @@ class TLSaccess(object):
         rtn = self.csock.recv_multipart()
         return self.parse_OKStatus(rtn)
 
-    def unsubscribe_array_all(self, which_array):
+    def unsubscribe_array_all(self):
         for array_name in self.array_names:
             rtn = self.unsubscribe_array(array_name)
         return rtn
@@ -217,6 +289,10 @@ class TLSaccess(object):
         return self.simple_cmd("ResumeScan")
 
     def get_status(self):
+        """
+        Polls the scanner for the most recent status/scan number.
+        :return: returns a OKStatus object which contains the state, status, and scan number
+        """
         return self.simple_cmd("GetStatus")
 
     def export_data(self):
@@ -224,6 +300,9 @@ class TLSaccess(object):
         Sends the command to command the lassi_daq to publish the most recent scan.
         :return: returns an OKStatus object
         """
+        # clear the buffer first!
+        self.results.clear()
+        
         return self.simple_cmd("Export")
 
     def save_result(self, frame_type, data):
@@ -239,9 +318,11 @@ class TLSaccess(object):
         self.results[frame_type] = data
 
     def get_result(self, frame_type):
-        """Allows access to the result cache. Note: in a future release results may
-         only be saved if the callback was None. Should wrap this in a try-except
-         because frame_type may not exist."""
+        """
+        Allows access to the result cache. Note: in a future release results may
+        only be saved if the callback was None. Should wrap this in a try-except
+        because frame_type may not exist.
+        """
         try:
             return self.results[frame_type]
         except: 
@@ -256,9 +337,9 @@ class TLSaccess(object):
     # Other internal methods
 
     def _kill_subscriber_thread(self):
-        """Terminates the subscriber thread by sending it the 'QUIT' message,
+        """
+        Terminates the subscriber thread by sending it the 'QUIT' message,
         closing the control pipe, and joining on the thread.
-
         """
         if self._sub_task:
             pipe = self._ctx.socket(zmq.REQ)
@@ -305,7 +386,7 @@ class TLSaccess(object):
             return self.subscribe("TIME_ARRAY", cb_fun)
 
         # check to see if key exists
-        if not frame_type in self.array_names:
+        if not frame_type in self.array_names and frame_type != "OK_STATUS":
             return (False, "'%s' is not a valid frame type." % frame_type)
 
         if cb_fun is not None:
@@ -431,6 +512,15 @@ class TLSaccess(object):
             y=self.results['Y_ARRAY']
             z=self.results['Z_ARRAY']
             I=self.results['I_ARRAY']
+            lenx = len(x)
+            leny = len(y)
+            lenz = len(z)
+            leni = len(I)
+            if (lenx != leny) or (leny != lenx) or (lenz != lenx) or (leni != lenx):
+                print("ERROR: data not correct lengths:")
+                print("x=%d, y=%d, z=%d, i=%d" % (lenx, leny, lenz, leni))
+                return
+
             for i in range(len(x)):
                 fout.write("%f %f %f %f\n" % (x[i], y[i], z[i], I[i]))
             fout.close()
@@ -438,6 +528,7 @@ class TLSaccess(object):
             print("Not all data is available. This requires that the interface be subscribed")
             print("to each of X_ARRAY, Y_ARRAY, Z_ARRAY and I_ARRAY")
             print("Try subscribing to the arrays, then run export_data() again (no need to rerun the scan)")
+            print("Currently Keys are: ", keys)
 
     def export_csv_results(self, filename):
         """
@@ -557,17 +648,21 @@ class TLSaccess(object):
                         if sock == subsock:
                             msg = subsock.recv_multipart()
                             key = msg[0]
-                            #print "pubsock activity"
+                            if key in "OK_STATUS":
+                                numpy_array = self.tls_access.parse_OKStatus(msg)
+                            elif len(msg) > 1:
+                                if key in self.tls_access.array_names:
+                                    numpy_array = msgpack.unpackb(msg[1], object_hook=msgpack_numpy.decode)
 
-                            if len(msg) > 1:
-                                numpy_array = msgpack.unpackb(msg[1], object_hook=msgpack_numpy.decode)
-                                if key in self._callbacks:
-                                    mci = self._callbacks[key]
-                                    if mci is not None:
-                                        mci(key, numpy_array)
-                                # Might want to only save if callback is None
-                                # for now do it unconditionally
-                                self.tls_access.save_result(key, numpy_array)
+                            if key in self._callbacks:
+                                mci = self._callbacks[key]
+                                if mci is not None:
+                                    mci(key, numpy_array)
+
+                            # Might want to only save if callback is None
+                            # for now do it unconditionally
+                            self.tls_access.save_result(key, numpy_array)
+
                 pipe.close()
                 self.subsock.close()
 
@@ -583,8 +678,5 @@ class TLSaccess(object):
                 print("TLSaccess: Ending subscriber thread.")
 
 
-
-def mycb(a, b):
-    print("\nGOT frame ", a, " of length ", len(b), " of type ", type(b))
 
 
