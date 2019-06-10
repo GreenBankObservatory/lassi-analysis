@@ -1,9 +1,18 @@
 import time
 import os
 import sys
+import logging
+import logging.config
 from datetime import datetime
 
-from pyTLS import *
+import runTLSLogging
+
+from pyTLS import TLSaccess
+
+# Initialize the logging configuration
+logging.config.dictConfig(runTLSLogging.config)
+logger = logging.getLogger(__name__)
+
 
 def runScans(a):
     inScan = False
