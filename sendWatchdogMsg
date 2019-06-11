@@ -1,0 +1,2 @@
+cat errorMsg.out | mail -s "LASSI Watchdog Warning" pmargani jbrandt aseymour
+
