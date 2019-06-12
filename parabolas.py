@@ -14,7 +14,7 @@ from mpl_toolkits.mplot3d import axes3d, Axes3D
 
 from rotate import *
 
-def parabola(xdata, ydata, focus, v1x, v1y, v2, heavy=True):
+def parabola(xdata, ydata, focus, v1x, v1y, v2, heavy=False):
     if heavy:
         return parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2)
     else:
@@ -133,7 +133,7 @@ def findTheBumps():
 
     return bumps
 
-def fitLeicaScan(fn, numpy=True, N=None, rFilter=False):
+def fitLeicaScan(fn, numpy=True, N=None, rFilter=False, weights=None):
 
     if N is None:
         N = 512
