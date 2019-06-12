@@ -12,7 +12,7 @@ import numpy as np
 import opticspy
 
 from processPTX import processPTX, processNewPTX
-from main import smoothGPUs, smoothXYZGpu
+from main import smoothGPUs, smoothXYZGpu #, getWeightsFromInitialSmoothing
 from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace
 from zernikeIndexing import noll2asAnsi, printZs
 from simulateSignal import addCenterBump, zernikeFour
@@ -68,7 +68,8 @@ def processLeicaScan(fpath,
 
     # removes headers, does basic rotations, etc.
     print "Processing PTX file ..."
-    xOffset = -8.
+    # xOffset = -8.
+    xOffset = -6.
     yOffset = 50.0
     if rot is None:
         rot = 0.
@@ -89,6 +90,13 @@ def processLeicaScan(fpath,
     print "Smoothing data ..."
     smoothedFiles = smooth(processedPath, N=N)
 
+    weights = None
+    # if useFittingWeights:
+    #   fn = smoothedFiles[0]
+    #   assert fn[-5:] == 'x.csv'
+    #   fn = fn[:-6]
+    #   weights = getWeightsFromInitialSmoothing(fn, processedPath)
+
     e = time.time()
     print "Elapsed minutes: %5.2f" % ((e - s) / 60.)
     
@@ -103,7 +111,8 @@ def processLeicaScan(fpath,
     diff, x, y = fitLeicaScan(fn,
                               numpy=False,
                               N=N,
-                              rFilter=False)
+                              rFilter=False,
+                              weights=weights)
 
     e = time.time()
     print "Elapsed minutes: %5.2f" % ((e - s) / 60.)
@@ -152,6 +161,9 @@ def processLeicaScanPair(filename1,
         fn2 = "%s.processed.npz" % os.path.basename(filename2)
         print "Loading processed data from file:", fn2
         xs2, ys2, diff2 = loadProcessedData(fn2)
+        imagePlot(np.log(np.abs(np.diff(diff1))), "first scan log")
+        imagePlot(np.log(np.abs(np.diff(diff2))), "second scan log")
+
     else:
         # we need to process each scan
         # WARNING: each scan takes about 10 minutes    
@@ -188,9 +200,12 @@ def processLeicaScanPair(filename1,
     diffDataLog = np.log(np.abs(diffData))
     imagePlot(diffDataLog, "Surface Deformations Log")
 
+    print "Mean of diffs: ", np.nanmean(diffData)
+    print "Std of diffs: ", np.nanstd(diffData)
+
     # find the zernike
     if not fitZernikies:
-        return diffData
+        return (xs1, ys1, xs2, ys2), diffData
 
     print "Fitting difference to zernikies ..."
 
