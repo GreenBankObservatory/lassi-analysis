@@ -11,17 +11,19 @@ from copy import copy
 import numpy as np
 import opticspy
 
-from processPTX import processPTX, processNewPTX
-from main import smoothGPUs, smoothXYZGpu #, getWeightsFromInitialSmoothing
+from processPTX import processPTX, processNewPTX, aggregateXYZ
+from main import smoothGPUs, smoothXYZGpu, splitXYZ, cart2sph, sph2cart
+from main import loadLeicaDataFromGpus
 from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace
 from zernikeIndexing import noll2asAnsi, printZs
 from simulateSignal import addCenterBump, zernikeFour
 from simulateSignal import zernikeFive, gaussian
+from plotting import sampleXYZData
 
 # where is the code we'll be running?
 GPU_PATH = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
 
-def smooth(fpath, N=512):
+def smooth(fpath, N=512, spherical=False):
 
     assert os.path.isfile(fpath)
 
@@ -31,7 +33,11 @@ def smooth(fpath, N=512):
     # our output will be same file name, but with appendages
     outfile = os.path.basename(fpath)
 
-    smoothGPUs(GPU_PATH, abspath, outfile, N)
+    smoothGPUs(GPU_PATH,
+               abspath,
+               outfile,
+               N,
+               spherical=spherical)
 
     # make sure the output is where it should be
     outfiles = []
@@ -40,14 +46,119 @@ def smooth(fpath, N=512):
         dimPath = os.path.join(GPU_PATH, dimFile)
         outfiles.append(dimPath)
         assert os.path.isfile(dimPath)
+        print "GPUs created file: ", dimPath
 
     return outfiles
+
+def writeGPUoutput(gpuPath, fn, dim, data):
+
+    fn = "%s.%s.csv" % (fn, dim)
+    fpath = os.path.join(gpuPath, fn)
+    # here we make sure each element gets its own line
+    # with as much precision as what I think the GPU is doing
+    print "writeGPUoutput to ", fpath
+    np.savetxt(fpath, data, fmt="%.18f")
+    return fpath
+
+def smoothWithWeights(fpath, xyz, N=512):
+    """
+    Here we need to smooth twice so that we can determine
+    the variance needed to compute our weights.  We also
+    need to handle the coordinate transformations ourselves,
+    rathern then in the GPUs, 
+    since the variance calculations are done in spherical.
+    """
+
+    # first just do the normal smoothing, but don't let
+    # GPUs do the coordinate transforms
+
+    # convert to shperical
+    print "Converting to spherical ..."
+    x, y, z = splitXYZ(xyz)
+    s = 1.0
+    print "working with %f percent of data" % s
+    x, y, z = sampleXYZData(x, y, z, s)
+    r, el, az = cart2sph(x, y, z)
+    sph = aggregateXYZ(r, az, el)
+
+    # write this to the file format expected by the GPUs,
+    # using 'sph' to denote the coord system
+    assert fpath[-4:] == '.csv'
+    outf = fpath[:-4] + ".sph.csv"
+    print "Saving spherical to file: ", outf
+    np.savetxt(outf, sph, delimiter=",")    
+
+    # TBF: GPU code is still labeling the output files
+    # as [x,y,z] even though we are in spherical
+    smoothSphFiles = smooth(outf, spherical=True)
+
+    # retrieve the radial values for the variance calculation
+    rs, azs, els = loadLeicaDataFromGpus(fpath)
+
+    # convert these back to cartesian, since this is what
+    # we'll need for the subsequent fittings
+    xs, ys, zs = sph2cart(els, azs, rs)
+    smoothedFiles = []
+    for data, dim in [(xs, 'x'), (ys, 'y'), (zs, 'z')]:
+        fn = writeGPUoutput(GPU_PATH, data, dim)
+        smoothedFiles.append(fn)
+
+    # write them to files as if the GPUs created them:
+
+    # now we need to smooth again, but this time using
+    # our radial values SQUARED.  So write this to file
+    sph2 = aggregateXYZ(r**2, az, el)
+    outf2 = fpath + ".sph2.csv"
+    np.savetxt(outf2, sph2, delimiter=",")    
+
+    smoothSphFiles2 = smooth(outf2, spherical=True)
+
+    # retrieve the radial values for the variance calculation
+    r2s, azs, els = loadLeicaDataFromGpus(fpath)
+
+    # now we can calculate the variance!
+    # make sure small negative numerical errors are dealt with
+    sigma2 = np.abs(r2s - (rs**2))
+
+    # not normalized weights
+    Ws_Not_Norm= 1/sigma2
+
+    # make sure NaNs induced by zeros in sigma2 are dealt with
+    Ws_Not_Norm[sigma2 == 0.0] = 0.0
+
+    # normalize weights, making sure Nans in sum are dealt with
+    ws = (Ws_Not_Norm) / np.sum(Ws_Not_Norm[np.logical_not(np.isnan(sigma2))])
+
+    return smoothFiles, ws
+
+def OLDsmoothWithWeights(fpath, N=512):
+    """
+    Here we need to smooth twice so that we can determine
+    the variance needed to compute our weights.
+    """
+
+    # our first smoothing is what we usually do,
+    # but we need to leave result in spherical coordinates
+    # so we can calculate the variance
+    smoothedFiles = smooth(fpath, N=N, leaveInSpherical=True)
+
+    # these files are what we'll be returning, but we
+    # also need to read them in so we can compute the variance
+    fn = smoothedFiles[0]
+    assert fn[-5:] == 'x.csv'
+    fn = fn[:-6]
+    rs, azs, els = loadLeicaDataFromGPUs(fn)
+
+    # OK, now we need to smooth the r^2 data, so we'll be doing
+
+    return smoothedFiles
 
 def processLeicaScan(fpath,
                      N=512,
                      rot=None,
                      sampleSize=None,
                      parabolaFit=None,
+                     useFittingWeights=False,
                      simSignal=None):
     """
     High level function for processing leica data:
@@ -73,14 +184,19 @@ def processLeicaScan(fpath,
     yOffset = 50.0
     if rot is None:
         rot = 0.
-    processNewPTX(fpath,
-                  rot=rot,
-                  rFilter=True,
-                  iFilter=False,
-                  parabolaFit=parabolaFit,
-                  simSignal=simSignal,
-                  sampleSize=sampleSize) #xOffset=xOffset, yOffset=yOffset)
     processedPath = fpath + ".csv"
+    if useFittingWeights:    
+        # TBF: for now read the data from the CSV file
+        print "Skipping processing and loading previous values"
+        xyz = np.loadtxt(processedPath, delimiter=',')
+    else:
+        xyz = processNewPTX(fpath,
+                    rot=rot,
+                    rFilter=True,
+                    iFilter=False,
+                    parabolaFit=parabolaFit,
+                    simSignal=simSignal,
+                    sampleSize=sampleSize) #xOffset=xOffset, yOffset=yOffset)
 
     e = time.time()
     print "Elapsed minutes: %5.2f" % ((e - s) / 60.)
@@ -88,10 +204,14 @@ def processLeicaScan(fpath,
     # reduces our data via GPUs
     s = time.time()
     print "Smoothing data ..."
-    smoothedFiles = smooth(processedPath, N=N)
+
 
     weights = None
-    # if useFittingWeights:
+    if useFittingWeights:
+        smoothedFiles, weights = smoothWithWeights(processedPath, xyz, N=N)
+    else:  
+        smoothedFiles = smooth(fpath, xyz, N=N)
+
     #   fn = smoothedFiles[0]
     #   assert fn[-5:] == 'x.csv'
     #   fn = fn[:-6]
@@ -112,6 +232,7 @@ def processLeicaScan(fpath,
                               numpy=False,
                               N=N,
                               rFilter=False,
+                              inSpherical=useFittingWeights,
                               weights=weights)
 
     e = time.time()

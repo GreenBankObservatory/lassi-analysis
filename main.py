@@ -1111,8 +1111,16 @@ def testSmoothXYZ():
     xs, ys, zs = smoothXYZDask(xx, yy, zz, xx.shape[0], sigX=1, sigY=1)
     print zs
 
-def smoothGPUs(gpuPath, inFile, outFile, n, verbose=False, noCos=False, sigAzEl=None):
+def smoothGPUs(gpuPath,
+               inFile,
+               outFile,
+               n,
+               verbose=False,
+               noCos=False,
+               spherical=False,
+               sigAzEl=None):
     "Ssh's to RH6 machine to run gpu code"
+
 
     # the sigAz and sigEl will always be identical
     if sigAzEl is None:
@@ -1125,6 +1133,12 @@ def smoothGPUs(gpuPath, inFile, outFile, n, verbose=False, noCos=False, sigAzEl=
     #     cmd += " --sigEl %1.5f " % sigEl
     if noCos:
         cmd += " --no-cos"
+
+    # spherical option means whether GPUs will be
+    # doing spherical coord transform or not
+    if spherical:
+        cmd += " --no-xyz-to-spherical --no-spherical-to-xyz"
+
     print "system cmd: ", cmd
     os.system(cmd)
 

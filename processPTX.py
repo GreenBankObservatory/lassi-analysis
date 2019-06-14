@@ -537,6 +537,8 @@ def processNewPTX(fpath,
     outf = fpath + ".csv"
     np.savetxt(outf, xyz, delimiter=",")
 
+    return xyz
+
 def addCenterBump(x, y, z, rScale=10., zScale=0.05):
 
     # add a bump to the center bit
