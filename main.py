@@ -15,6 +15,12 @@ from dask import config
 from dask.diagnostics import ProgressBar, Profiler, ResourceProfiler, CacheProfiler
 from dask.diagnostics import visualize
 
+from processPTX import splitXYZ
+
+from plotting import *
+
+from parabolas import fitLeicaScan
+
 # config.set(scheduler='distributed')  # overwrite default with multiprocessing scheduler
 
 def process(fn, n, outputName, noise=False):
@@ -123,6 +129,102 @@ def process(fn, n, outputName, noise=False):
     # np.savez(outputName, x=xss, y=yss, z=zss)
     # np.savez(outputName, x=xs, y=ys, z=zs)
 
+def smoothWithWeights(fpath, N=None, useWeights=True):
+    """
+    tests idea of producing weights from smoothing
+    and applying them in the fitting
+    """
+    if N is None:
+        N=512
+
+    print "Loading data from file ..."
+    data = np.loadtxt(fpath, delimiter=',')
+    x = data[:,0]
+    y = data[:,1]
+    z = data[:,2]
+
+    # work with a sample of the data
+    down = 0.1
+    seed = 1971
+    print "Downsampling data by %f" % down
+    x, y, z = sampleXYZData(x, y, z, down, seed=seed)
+
+    scatter3dPlot(x, y, z, "downsampled by %f" % down)
+
+    print "Converting to spherical coords ..."
+    # r, az, el = cart2sph(x, y, z)
+    r, el, az = cart2sph(x, y, z)
+
+    print "smoothing data ..."
+    azLoc, elLoc, rSmooth = smoothDask(az, el, r, N)
+    print "smoothing squared data ..."
+    azLoc, elLoc, rSmooth2 = smoothDask(az, el, r**2, N)
+
+    nrsmooth2 = rSmooth2[np.logical_not(np.isnan(rSmooth2))]
+
+    print "num pos rsmooth2", len(nrsmooth2[nrsmooth2 > 0.])
+    print "num neg rsmooth2", len(nrsmooth2[nrsmooth2 < 0.])   
+
+
+    # TEacher says we can cheet
+    sigmat = rSmooth2 - (rSmooth**2)
+    mask = sigmat < 0.
+    print sigmat[mask], rSmooth2[mask], rSmooth[mask]**2
+
+    sigma2 = np.abs(rSmooth2 - (rSmooth**2))
+
+
+    print "Size of sigma2 vs. num zeros", sigma2.shape, len(sigma2[sigma2 == 0.0])
+
+    nsigma2 = sigma2[np.logical_not(np.isnan(sigma2))]
+
+    print "num pos sigma2", len(nsigma2[nsigma2 > 0.])
+    print "num neg sigma2", len(nsigma2[nsigma2 < 0.])
+
+    surface3dPlot(azLoc, elLoc, sigma2, "sigma squared")
+
+
+    print "plotting ..."
+    # fig = plt.figure()
+    # ax = Axes3D(fig)
+    # ax.plot_surface(azLoc, elLoc, rSmooth)
+    # plt.show()
+    surface3dPlot(azLoc, elLoc, rSmooth, "Spherical smoothed")
+
+    # plt.imshow(rSmooth, interpolation="nearest", origin="upper")
+    # plt.colorbar()
+    # plt.show()
+    imagePlot(rSmooth, "R smoothed")
+    imagePlot(rSmooth2, "R**2 smoothed")
+
+    # back to x, y, z
+    print "converting back to cartesian ..."
+    # xs, ys, zs = sph2cart(azLoc, elLoc, rSmooth)
+    xs, ys, zs = sph2cart(elLoc, azLoc, rSmooth)
+
+    scatter3dPlot(xs.flatten(), ys.flatten(), zs.flatten(), "smoothed xyz")
+
+    # return xs, ys, zs, sigma2
+    Ws_Not_Norm= 1/sigma2
+
+    # make sure NaNs induced by zeros in sigma2 are dealt with
+    Ws_Not_Norm[sigma2 == 0.0] = 0.0
+
+
+    #ws = (1/sigma2) / np.sum(1/sigma2[np.logical_not(np.isnan(sigma2))])
+    ws = (Ws_Not_Norm) / np.sum(Ws_Not_Norm[np.logical_not(np.isnan(sigma2))])
+ 
+    print "weights", ws, np.isnan(ws).all()
+
+    if useWeights:
+        xs, ys, diffs = fitLeicaScan(None, xyz=(xs, ys, zs), weights=ws)
+    else:    
+        print "Not actually using the weights we calculated!"
+        xs, ys, diffs = fitLeicaScan(None, xyz=(xs, ys, zs))
+
+    return xs, ys, diffs, sigma2, ws
+    
+    
 def getCenterData(x, y, z, n, m):
 
     start = n / m
@@ -246,6 +348,7 @@ def zernikeFit(z):
 
 def getWeight(az, el, azLoc, elLoc, sigAz, sigEl, j, k):
     return 2*np.pi*np.exp((-(np.cos(elLoc[j,k])**2)*(az-azLoc[j,k])**2/(2.*sigAz**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 )))
+    # return 2*np.pi*np.exp((-(np.cos(elLoc[j,k])**2)*(az-azLoc[j,k])**2/(2.*((r/a)*sigAz)**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 )))
 
 def getWeightXYZ(x, y, xLoc, yLoc, sigX, sigY, j, k):
     #return 2*np.pi*np.exp((az-azLoc[j,k])**2/(2.*sigAz**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 ))
@@ -1024,6 +1127,57 @@ def smoothGPUs(gpuPath, inFile, outFile, n, verbose=False, noCos=False, sigAzEl=
         cmd += " --no-cos"
     print "system cmd: ", cmd
     os.system(cmd)
+
+# def smoothProcessedFile(fpath, N=512, squared=False):
+#     "Smooths processed file contents via GPUs, optionally squaring"
+
+#     assert os.path.isfile(fpath)
+
+#     # if squared we need to first square this data, then
+#     # write it to a new file for processing
+#     if squared:
+#         # open the file: wich was written with np.savetxt
+#         xyz = np.loadtxt(fpath, delimiter=",")
+#         x, y, z = splitXYZ(xyz)
+
+#         print "Converting to spherical coords ..."
+#         r, az, el = cart2sph(x, y, z)
+
+#         # now square the data!
+#         r2 = r**2
+
+#         # now write it back to file
+#         sph = aggregateXYZ(r, az, el)
+#         np.savetxt(sph, delimiter=",")
+#     # we need to specify the aboslute path of our inputs
+#     abspath = os.path.abspath(fpath)
+
+#     # our output will be same file name, but with appendages
+#     outfile = os.path.basename(fpath)
+
+#     smoothGPUs(GPU_PATH, abspath, outfile, N)
+
+#     # make sure the output is where it should be
+#     outfiles = []
+#     for dim in ['x', 'y', 'z']:
+#         dimFile = "%s.%s.csv" % (outfile, dim)
+#         dimPath = os.path.join(GPU_PATH, dimFile)
+#         outfiles.append(dimPath)
+#         assert os.path.isfile(dimPath)
+
+#     return outfiles
+
+# def getWeightsFromInitialSmoothing(smoothedFileBase, processedPath):
+#     """
+#     Calculated weights via: 
+#        * w = 1/sigma**2 / sum(1/sigma**2)
+#        * sigma**2 = <z**2> - <z>**2
+#        * <> == smoothing
+#     """
+
+#     # we need to reload the processed data so we can
+#     # square it then smooth it (<z**2>)
+#     smoothSquaredProcessedFile(fpath)
 
 def testSmoothGPUs():
 

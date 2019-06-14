@@ -83,6 +83,12 @@ def fitParabolaNew(L, f, v1x, v1y, v2, xTheta, yTheta):
     coeffs = [f, v1x, v1y, v2, xTheta, yTheta]
     return fitParabola(coeffs, L[0], L[1], L[2])
 
+
+def fitParabolaWithWeights(coeffs, x, y, z, weights):
+    
+    z = fitParabola(coeffs, x, y, z)
+    return z*weights
+
 def fitParabola(coeffs, x, y, z):
     
     
@@ -133,16 +139,29 @@ def findTheBumps():
 
     return bumps
 
-def fitLeicaScan(fn, numpy=True, N=None, rFilter=False, weights=None):
+def fitLeicaScan(fn,
+                 numpy=True,
+                 N=None,
+                 rFilter=False,
+                 xyz=None,
+                 weights=None):
 
     if N is None:
         N = 512
 
     # load the data: it might be two different formats, depending
     # on whether it was done in python (numpy) or with GPUs
-    orgData, cleanData = loadLeicaData(fn, n=N, numpy=numpy)
-    x0, y0, z0 = orgData
-    x, y, z = cleanData
+    if xyz is None:
+        orgData, cleanData = loadLeicaData(fn, n=N, numpy=numpy)
+        x0, y0, z0 = orgData
+        x, y, z = cleanData
+    else:
+        x0, y0, z0 = xyz
+        x = x0[np.logical_not(np.isnan(x0))];
+        y = y0[np.logical_not(np.isnan(y0))];
+        z = z0[np.logical_not(np.isnan(z0))];
+
+
     scatter3dPlot(x, y, z, "Sample of Leica Data", sample=10.0)
 
     print "x range:", np.min(x), np.max(x)
@@ -165,7 +184,10 @@ def fitLeicaScan(fn, numpy=True, N=None, rFilter=False, weights=None):
     xTheta = 0. #-np.pi / 2.
     yTheta = 0.
     guess = [f, v1x, v1y, v2, 0., 0.]
-    r = fitLeicaData(x, y, z, guess)
+    if weights is not None:
+        weights = weights[np.logical_not(np.isnan(weights))];
+
+    r = fitLeicaData(x, y, z, guess, weights=weights)
 
     # plot fitted data
     c = r.x
@@ -196,7 +218,7 @@ def imagePlot(z, title):
     fig.colorbar(cax)
     plt.title(title)
 
-def fitLeicaData(x, y, z, guess):
+def fitLeicaData(x, y, z, guess, weights=None):
     print "fit leica boss!"
     #guess = [f, v1x, v1y, v2, 0., 0.]
     inf = np.inf
@@ -211,9 +233,19 @@ def fitLeicaData(x, y, z, guess):
     # f_scale = .01
     f_scale = 1.0
     print "fitLeicaData with robust, soft_l1, f_scale %f" % f_scale
-    r = least_squares(fitParabola,
+
+    if weights is None:
+        method = fitParabola
+        args = (x .flatten(), y.flatten(), z.flatten())
+    else:
+        print "Using weights for fit!"
+        method = fitParabolaWithWeights
+        args = (x .flatten(), y.flatten(), z.flatten(), weights.flatten())
+        
+    r = least_squares(method,
                       guess,
-                      args=(x .flatten(), y.flatten(), z.flatten()),
+                      # args=(x .flatten(), y.flatten(), z.flatten()),
+                      args=args,
                       bounds=bounds,
                       # method='lm',
                       max_nfev=1000000,
