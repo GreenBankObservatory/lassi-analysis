@@ -11,6 +11,7 @@ import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 
 #from findBumps import PrimeX, PrimeY, PrimeZ
+from utils import sph2cart, cart2sph
 
 from rotate import *
 
@@ -144,7 +145,10 @@ def fitLeicaScan(fn,
                  N=None,
                  rFilter=False,
                  xyz=None,
+                 inSpherical=False,
                  weights=None):
+
+    # TBF: ignore weights for now!
 
     if N is None:
         N = 512
@@ -155,6 +159,13 @@ def fitLeicaScan(fn,
         orgData, cleanData = loadLeicaData(fn, n=N, numpy=numpy)
         x0, y0, z0 = orgData
         x, y, z = cleanData
+        if inSpherical:
+            # we need to convert this data to cartesian:
+            # x0, y0, z0 == r, az, el
+            print "converting inputs from spherical to cartesian"
+            x0, y0, z0 = sph2cart(y0, z0, x0)
+            x, y, z = sph2cart(y, z, x)
+
     else:
         x0, y0, z0 = xyz
         x = x0[np.logical_not(np.isnan(x0))];
@@ -179,13 +190,26 @@ def fitLeicaScan(fn,
         x, y, z = radialFilter(x, y, z, xOffset, yOffset, radius)
         scatter3dPlot(x, y, z, "Leica Data Radial Filtered")
 
+    # assemble initial guess
     f = 60.
     v1x = v1y = v2 = 0
     xTheta = 0. #-np.pi / 2.
     yTheta = 0.
     guess = [f, v1x, v1y, v2, 0., 0.]
+
     if weights is not None:
-        weights = weights[np.logical_not(np.isnan(weights))];
+        print "Weights: ", weights.shape, weights
+        print "z0: ", z0.shape, z0
+        # asure correct dimensions
+        z0.shape = (N, N)
+        weights.shape = (N, N)
+        print "filtering out nans in xyz data from weights"
+        # this will flatten the weights
+        weights = weights[np.logical_not(np.isnan(z0))];
+        print "replacing nans in weights by zeros"
+        weights[np.isnan(weights)] = 0.
+
+    print "fitLeicaData xyz.shape: ", x.shape, y.shape, z.shape
 
     r = fitLeicaData(x, y, z, guess, weights=weights)
 
