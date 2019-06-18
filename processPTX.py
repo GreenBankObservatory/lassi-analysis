@@ -509,6 +509,8 @@ def splitXYZ(xyz):
 
 def processNewPTX(fpath,
                   rot=None,
+                  xOffset=None,
+                  yOffset=None,
                   sampleSize=None,
                   simSignal=None,
                   iFilter=False,
@@ -520,6 +522,8 @@ def processNewPTX(fpath,
     
     xyz = processNewPTXData(ls,
                             rot=rot,
+                            xOffset=xOffset,
+                            yOffset=yOffset,
                             sampleSize=sampleSize,
                             simSignal=simSignal,
                             parabolaFit=parabolaFit,
