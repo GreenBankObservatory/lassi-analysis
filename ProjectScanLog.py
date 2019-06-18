@@ -3,8 +3,12 @@
 import os
 import logging
 import pprint
+from datetime import datetime, timedelta
 
 from astropy.io import fits
+from astropy.time import Time
+from astropy import units
+from astropy.coordinates import Angle
 
 #logger = logging.getLogger(__name__)
 
@@ -28,6 +32,7 @@ class ProjectScanLog:
         self.projPath = projPath
 
         self.scans = {}
+        self.scanTimes = {}
 
     def open(self):
         "Reads ScanLog.fits and creates simple map of scans and devices"
@@ -41,10 +46,18 @@ class ProjectScanLog:
 
         scanInfo = hdus[1].data
 
+        start = end = None
+
         for _, scanNum, filepath in scanInfo:
 
             if scanNum not in self.scans:
                 self.scans[scanNum] = {}
+                startDt = endDt = None
+                self.scanTimes[scanNum] = {
+                    'start': startDt,
+                    'end': endDt,
+                    'durSecs': None
+                }    
 
             # skip the 'SCAN STARTING' and 'SCAN FINISHED' rows
             if 'SCAN' not in filepath:
@@ -54,6 +67,52 @@ class ProjectScanLog:
                 device = fileParts[2]
                 filename = fileParts[3]
                 self.scans[scanNum][device] = filename
+            else:
+                # convert these lines to start stop times:
+                # SCAN STARTING AT 58559  2:43:28
+                if 'STARTING' in filepath:
+                    try:
+                        startDt = self.stringToDt(filepath)
+                    except:
+                        startDt = None
+                        print "error formating: ", filepath
+                        continue    
+                    self.scanTimes[scanNum]['start'] = startDt 
+                if 'FINISHED' in filepath:
+                    try:
+                        endDt = self.stringToDt(filepath)
+                    except:
+                        endDt = None
+                        print "error formating: ", filepath
+                        continue    
+                    self.scanTimes[scanNum]['end'] = endDt
+                if startDt is not None and endDt is not None:
+                    self.scanTimes[scanNum]['durSecs'] = (endDt - startDt).seconds
+
+    def stringToDt(self, string):
+        "'SCAN STARTING AT 58559  2:43:28' -> datetime object"
+
+        # print "string", string
+        assert 'STARTING' in string or 'FINISHED' in string
+
+        mjdTimeStr = ' '.join(string.split(' ')[3:])
+        mjd = int(mjdTimeStr.split(' ')[0])
+        timeStr = mjdTimeStr.split(' ')[-1]
+
+        # mjd to datetime
+        date = self.mjd2utc(mjd)
+
+        fmt = "%Y-%m-%d %H:%M:%S"
+        dtfmt = "%Y-%m-%d"
+        dtStr = date.strftime(dtfmt) + " " + timeStr
+        # print dtStr
+        return datetime.strptime(dtStr, fmt)
+
+    def mjd2utc(self, mjd):
+        "Converts MJD values to UTC datetime objects"
+        t = Time(mjd, format='mjd')
+        t.format = 'datetime'
+        return t.value
 
     def getScanFilename(self, scanNum):
         "Returns the shared filename (timestamp) for all FITS files"
