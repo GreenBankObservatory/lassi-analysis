@@ -1121,6 +1121,9 @@ def smoothGPUs(gpuPath,
                sigAzEl=None):
     "Ssh's to RH6 machine to run gpu code"
 
+    # catch mutually exclusive options
+    if noCos and spherical:
+        raise "noCos and spherical are mutally exclusive options"
 
     # the sigAz and sigEl will always be identical
     if sigAzEl is None:
@@ -1137,7 +1140,7 @@ def smoothGPUs(gpuPath,
     # spherical option means whether GPUs will be
     # doing spherical coord transform or not
     if spherical:
-        cmd += " --no-xyz-to-spherical --no-spherical-to-xyz"
+        cmd += " --no-conv"
 
     print "system cmd: ", cmd
     os.system(cmd)
