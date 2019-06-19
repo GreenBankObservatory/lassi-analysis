@@ -22,11 +22,12 @@ from simulateSignal import addCenterBump, zernikeFour
 from simulateSignal import zernikeFive, gaussian
 from plotting import sampleXYZData, scatter3dPlot
 from utils import sph2cart, cart2sph
-
 from weightSmooth import weightSmooth
+import settings
 
 # where is the code we'll be running?
-GPU_PATH = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
+# GPU_PATH = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
+GPU_PATH = settings.GPU_PATH
 
 def smooth(fpath, N=512, spherical=False):
 

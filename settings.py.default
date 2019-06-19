@@ -1,0 +1,2 @@
+# copy this to settings.py and edit for this sandbox
+GPU_PATH="/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/"

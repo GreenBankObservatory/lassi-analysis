@@ -12,6 +12,8 @@ data coming out of the Leica scanner we'll be using for the LASSI project.
    * cd lassi-analysis
    * ./createEnv
    * source <username>_lassi_env/bin/activate
+   * cp settings.py.default settings.py
+   * edit settings.py
 
 ## Running the notebook
 

@@ -21,6 +21,10 @@ from plotting import *
 
 from parabolas import fitLeicaScan
 
+import settings
+
+GPU_PATH = settings.GPU_PATH
+
 # config.set(scheduler='distributed')  # overwrite default with multiprocessing scheduler
 
 def process(fn, n, outputName, noise=False):
@@ -665,7 +669,8 @@ def smoothXYZGpu(x, y, z, n, sigXY=None, filename=None):
 
     # call the GPU code
     # where is the code we'll be running?
-    gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
+    # gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
+    gpuPath = GPU_PATH
     outFile = fn
     smoothGPUs(gpuPath, inFile, outFile, n, noCos=True, sigAzEl=sigXY)
 
@@ -1198,7 +1203,8 @@ def smoothGPUs(gpuPath,
 
 def testSmoothGPUs():
 
-    gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
+    # gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
+    gpuPath = GPU_PATH
     abspath = os.path.abspath(os.path.curdir)
     inFile = "Test1_STA14_Bump1_High-02_METERS.ptx.csv"
     fpath1 = os.path.join(abspath, "data", inFile)
