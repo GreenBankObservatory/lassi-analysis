@@ -688,6 +688,13 @@ def radialFilter(x, y, z, xOffset, yOffset, radius):
     zr = np.array(zr)        
     return xr, yr, zr
 
+def radialMask(x, y, z, xOffset, yOffset, radius):
+    r = np.sqrt((x-xOffset)**2 + (y-yOffset)**2)
+    x[r > radius] = np.nan
+    y[r > radius] = np.nan
+    z[r > radius] = np.nan
+    return x, y, z
+    
 def main():
     #tryFits()
     fn = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/randomSampleScan10.csv"
