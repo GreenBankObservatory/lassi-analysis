@@ -54,7 +54,7 @@ def zernikeFour(x, y, xOffset, yOffset, amplitude=None):
     if amplitude is None:
         amplitude = 0.0017 / (np.sqrt(6) * (np.nanmax(x)**2))
     z = amplitude * np.sqrt(6) * (xc**2 - yc**2)
-    print "z4 with amplitude %f produces" % amplitude
+    print "z4 with amplitude", amplitude
     print "mean: %f, min: %f, max: %f" % (np.mean(z), np.nanmin(z), np.nanmax(z))
     return z
 
