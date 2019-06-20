@@ -1133,8 +1133,13 @@ def smoothGPUs(gpuPath,
     # the sigAz and sigEl will always be identical
     if sigAzEl is None:
         sigAzEl = 0.001
+    
+    # get ssh credentials and target
+    user = os.getlogin()
+    host = settings.GPU_HOST
 
-    cmd = "runGpuSmooth %s %s %s %d %1.5f" % (gpuPath, inFile, outFile, n, sigAzEl)
+    cmd = "runGpuSmooth %s %s %s %s %s %d %1.5f" % (gpuPath, user, host, inFile, outFile, n, sigAzEl)
+    # cmd = "runGpuSmooth %s %s %s %d %1.5f" % (gpuPath, inFile, outFile, n, sigAzEl)
     # if sigAz is not None:
     #     cmd += " --sigAz %1.5f " % sigAz
     # if sigEl is not None:

@@ -1,2 +1,7 @@
 # copy this to settings.py and edit for this sandbox
+
+# Where is the gpu smoothing code installed?
 GPU_PATH="/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/"
+
+# Where will the gpu smoothing code be running?
+GPU_HOST="vegas-hpc10"
