@@ -21,7 +21,7 @@ from zernikeIndexing import noll2asAnsi, printZs
 from simulateSignal import addCenterBump, zernikeFour
 from simulateSignal import zernikeFive, gaussian
 from plotting import sampleXYZData, scatter3dPlot
-from utils import sph2cart, cart2sph
+from utils import sph2cart, cart2sph, log, difflog
 from weightSmooth import weightSmooth
 import settings
 
@@ -491,7 +491,7 @@ def simulateSignal(sigFn,
 
     # use the name of the signal scan to determine
     # where to find the smoothed results
-    GPU_PATH = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
+    # GPU_PATH = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
     sigFn2 = "%s.ptx.csv" % sigFn
     sigPath = os.path.join(GPU_PATH, sigFn2)
 
@@ -568,7 +568,8 @@ def simulateSignal(sigFn,
 
     else:
         print "sigType not recognized: ", sigType
-        
+        diffSigS = diffSig
+
     # regrid to get into evenly spaced x y
     regridFn = "%s.%s.regridded" % (sigFn, sigType)
     xSigr, ySigr, diffsSigS = smoothXYZGpu(xSig,
@@ -578,14 +579,14 @@ def simulateSignal(sigFn,
                                            filename=regridFn)
 
     diffsSigS.shape = (N, N)
-    imagePlot(diffsSigS, 'sig + sim regridded')
+    imagePlot(difflog(diffsSigS), 'sig + sim regridded')
 
     
     # now load the reference scan
     from lassiAnalysis import loadProcessedData
     refFn2 = "%s.ptx.processed.npz" % refFn
     xsRef, ysRef, diffsRef = loadProcessedData(refFn2)
-    imagePlot(np.log(np.abs(diffsRef)), "%s: ref scan" % refFn)
+    imagePlot(difflog(diffsRef), "%s: ref scan" % refFn)
     
     diffsRef.shape = (N, N)
     diffData = diffsSigS - diffsRef
@@ -593,6 +594,9 @@ def simulateSignal(sigFn,
     imagePlot(diffData, "Surface Deformations")    
     imagePlot(diffDataLog, "Surface Deformations Log")
 
+    print "Mean: ", np.nanmean(diffData)
+    print "Std; ", np.nanstd(diffData)
+    
     return diffData
 
 def main():
