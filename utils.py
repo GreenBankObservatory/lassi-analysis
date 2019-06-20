@@ -60,3 +60,15 @@ def splitXYZ(xyz):
     z = np.array(z) 
     y = np.array(y)    
     return x, y, z
+
+def log(x):
+    "short cut to numpy log"
+    return np.log(np.abs(x))
+
+def difflog(x):
+    "short cut to tnumpy log and diff"
+    return np.log(np.abs(np.diff(x)))
+
+def log10(x):
+    "short cup to numpy log10"
+    return np.log10(np.abs(x))
