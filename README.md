@@ -14,6 +14,7 @@ data coming out of the Leica scanner we'll be using for the LASSI project.
    * source <username>_lassi_env/bin/activate
    * cp settings.py.default settings.py
    * edit settings.py
+   * ./runUnitTests
 
 ## Running the notebook
 
@@ -22,3 +23,9 @@ data coming out of the Leica scanner we'll be using for the LASSI project.
    * ./runNotebook
    * if your browser doesn't open up automatically, go to  http://<host>:<port>
    * open any of the notebooks you'd like to run   
+
+## Documentation
+
+This code base is the product of research, where adherence to software engineering best practices has not always been followed.  Therefore, there's not a lot of great documentation.  There is though, a high level road map in docs/processLeicaScan.odt.
+
+Also, a type of high-level integration test can be found in Scan9vs11-Z-UnitTest.ipynb.  Run this notebook and make sure the final results match the expected results.
