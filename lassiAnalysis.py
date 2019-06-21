@@ -398,8 +398,8 @@ def processLeicaScanPair(filename1,
     else:
         # we need to process each scan
         # WARNING: each scan takes about 10 minutes    
-        xs1, ys1, diff1 = processLeicaScan(filename1, rot=rot, parabolaFit=parabolaFit)
-        xs2, ys2, diff2 = processLeicaScan(filename2, rot=rot, parabolaFit=parabolaFit)
+        xs1, ys1, diff1, weights1 = processLeicaScan(filename1, rot=rot, parabolaFit=parabolaFit)
+        xs2, ys2, diff2, weights2 = processLeicaScan(filename2, rot=rot, parabolaFit=parabolaFit)
 
     print "Finding difference between scans ..."
     N = 512
