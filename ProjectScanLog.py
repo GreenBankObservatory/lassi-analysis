@@ -30,9 +30,16 @@ class ProjectScanLog:
     def __init__(self, projPath):
 
         self.projPath = projPath
+        self.project = os.path.basename(projPath)
 
         self.scans = {}
         self.scanTimes = {}
+
+        self.projStartDts = None
+        self.projEndDts = None
+
+        self.projStartDt = None
+        self.projEndDt = None
 
     def open(self):
         "Reads ScanLog.fits and creates simple map of scans and devices"
@@ -88,6 +95,16 @@ class ProjectScanLog:
                     self.scanTimes[scanNum]['end'] = endDt
                 if startDt is not None and endDt is not None:
                     self.scanTimes[scanNum]['durSecs'] = (endDt - startDt).seconds
+
+        # now try to figure out what the project date range is
+        startDts = [ts['start'] for _, ts in self.scanTimes.items() if ts['start'] is not None]
+        endDts = [ts['end'] for _, ts in self.scanTimes.items() if ts['end'] is not None]
+        self.projStartDts = startDts
+        self.projEndDts = endDts
+        if len(startDts) > 0:
+            self.projStartDt = min(startDts)
+        if len(endDts) > 0:    
+            self.projEndDt = max(endDts)
 
     def stringToDt(self, string):
         "'SCAN STARTING AT 58559  2:43:28' -> datetime object"
