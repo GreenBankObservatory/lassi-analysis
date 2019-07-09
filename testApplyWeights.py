@@ -18,7 +18,7 @@ def log10(x):
     return np.log10(np.abs(x))
 
 def testApplyWeights(smoothFile, weightFile):
-    print "testApplyWeights: ", smoothFile, weightFile
+    print("testApplyWeights: ", smoothFile, weightFile)
 
     N = 512
 
@@ -65,9 +65,9 @@ def testApplyWeights(smoothFile, weightFile):
     sigma2 = np.nansum(diffSqMn)
 
     # print "sum of diff", np.nansum(diff)
-    print "sum of weights", sumWs
-    print "sigmaWeight: ", np.sqrt(sigmaWeight2)
-    print "sigma", np.sqrt(sigma2)
+    print("sum of weights", sumWs)
+    print("sigmaWeight: ", np.sqrt(sigmaWeight2))
+    print("sigma", np.sqrt(sigma2))
 
     # imagePlot(sigmaWeight2, "sigma weight squared")
     # imagePlot(sigma2, "sigma squared")
@@ -85,9 +85,9 @@ def testApplyWeights(smoothFile, weightFile):
     diffw[wr < 1.0] = np.nan
     imagePlot(difflog(diffw), "diffw log")
 
-    print "Comparing RMS: "
-    print "orginal diff; mean, std:", np.nanmean(diff), np.nanstd(diff)
-    print "masked  diff; mean, std:", np.nanmean(diffw), np.nanstd(diffw)
+    print("Comparing RMS: ")
+    print("orginal diff; mean, std:", np.nanmean(diff), np.nanstd(diff))
+    print("masked  diff; mean, std:", np.nanmean(diffw), np.nanstd(diffw))
 
     scatter3dPlot(xf.flatten(), yf.flatten(), diffw.flatten(), "diffw")
     surface3dPlot(xf, yf, diffw, "diffw")
@@ -107,9 +107,9 @@ def testApplyWeights(smoothFile, weightFile):
     xfCnt = copy(xf[xstr:xend, ystr:yend])
     yfCnt = copy(yf[xstr:xend, ystr:yend])
 
-    print "Comparing RMS of center region: "
-    print "orginal diff; mean, std:", np.nanmean(diffCnt), np.nanstd(diffCnt)
-    print "masked  diff; mean, std:", np.nanmean(diffwCnt), np.nanstd(diffwCnt)
+    print("Comparing RMS of center region: ")
+    print("orginal diff; mean, std:", np.nanmean(diffCnt), np.nanstd(diffCnt))
+    print("masked  diff; mean, std:", np.nanmean(diffwCnt), np.nanstd(diffwCnt))
 
     scatter3dPlot(xfCnt.flatten(), yfCnt.flatten(), diffCnt.flatten(), "diff cntr")
     surface3dPlot(xfCnt, yfCnt, diffCnt, "diff cnt")
@@ -127,8 +127,8 @@ def testApplyWeights(smoothFile, weightFile):
     sigma2 = np.nansum(diffSqMn)
 
     # print "sum of diff", np.nansum(diff)
-    print "sigmaWeight: ", np.sqrt(sigmaWeight2)
-    print "sigma", np.sqrt(sigma2)
+    print("sigmaWeight: ", np.sqrt(sigmaWeight2))
+    print("sigma", np.sqrt(sigma2))
 
     return xs, ys, zs, xf, yf, diff, diffw, ws, wr
 
@@ -161,7 +161,7 @@ def reprocessScanPair(fn1, weightsFn1, fn2, weightsFn2):
     diff = diffs2 - diffs1
     imagePlot(log(diff), "log two scan diff")
 
-    print "mean, std: ", np.nanmean(diff), np.nanstd(diff)
+    print("mean, std: ", np.nanmean(diff), np.nanstd(diff))
     return diff
 
 

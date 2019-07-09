@@ -34,22 +34,22 @@ def main():
         f = getLatestFile(path)
         if f is not None:
             fn, dt = f
-            print fn, dt
+            print(fn, dt)
         else:
-            print "Could not find any files!", path
+            print("Could not find any files!", path)
             continue
         now = datetime.now()
-        print "compare to: ", now
+        print("compare to: ", now)
         td = now - dt
         ageMins = td.seconds / 60.        
-        print "No new file for %f minutes" % ageMins
+        print("No new file for %f minutes" % ageMins)
         if ageMins > tolMins:
             msg = """
             WARNING:
             Scanner may be hung up - no new files in path %s for
             the last %f minutes.  Last file to be written: %s
             """ % (path, ageMins, fn)
-            print msg
+            print(msg)
             with open("errorMsg.out", 'w') as f:
                 f.write(msg)
             os.system('sendWatchdogMsg')    

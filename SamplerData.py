@@ -56,7 +56,7 @@ class SamplerData:
         "returns the x, y data, where x is the MJD date, and y is the data from the sampler2log file specified by the column names and their conversions"
 
         if self.debug:
-            print "getting data for: ", dates, columns, expressions
+            print("getting data for: ", dates, columns, expressions)
        
 
         # set the FITS file columns whose data we will retrieve
@@ -64,9 +64,9 @@ class SamplerData:
             if col >= len(self.columnNames):
                 raise "column indicies must be for: ", self.columnNames
         if self.debug:        
-            print "data for column names: "
+            print("data for column names: ")
             for i in range(len(columns)):
-                print self.columnNames[columns[i]]
+                print(self.columnNames[columns[i]])
 
         # set the conversions used
         for i in range(len(columns)):    
@@ -240,7 +240,7 @@ class SamplerData:
     
     def FindDirectories(self, sampler):
         if self.debug:
-            print "Sampler: ", sampler
+            print("Sampler: ", sampler)
         self.logName = sampler
         targetDirectories = [ directory + '/' + sampler
                               for directory in self.roots ]
@@ -270,8 +270,8 @@ def main():
     exprs = ('X','Y1')
 
     data = sd.GetPlotData(dates,cols,exprs)
-    print data
-    print "x vs y: ", len(data[0]), len(data[1])
+    print(data)
+    print("x vs y: ", len(data[0]), len(data[1]))
 
 if __name__ == '__main__':
     main()
@@ -370,7 +370,7 @@ def writeWindData():
         # check for negative wind speeds
         windMin = min(windSpeed[timeIndex[i]-m/2:timeIndex[i]+m/2])
         if deltaT > 1.1 or windMin < 0.0:
-            print i, deltaT, windMin
+            print(i, deltaT, windMin)
             windSpeed_median[i] = -1.0
             windSpeed_median20[i] = -1.0
             windSpeed_median2010[i] = -1.0

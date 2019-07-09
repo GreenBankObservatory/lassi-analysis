@@ -21,18 +21,18 @@ def fitZernikies(data):
                                           numZsFit,
                                           remain2D=1,
                                           barchart=1)
-    print "fitlist: ", fitlist
+    print("fitlist: ", fitlist)
     C1.listcoefficient()
     C1.zernikemap()
 
-    print "Converting from Noll to Active Surface ANSI Zernikies ..."
+    print("Converting from Noll to Active Surface ANSI Zernikies ...")
     # and now convert this to active surface zernike convention
     # why does the fitlist start with a zero? for Z0??  Anyways, avoid it
     nollZs = fitlist[1:(numZsFit+1)]
     asAnsiZs = noll2asAnsi(nollZs)
-    print "nolZs"
+    print("nolZs")
     printZs(nollZs)
-    print "active surface Zs"
+    print("active surface Zs")
     printZs(asAnsiZs)
 
     return fitlist, asAnsiZs

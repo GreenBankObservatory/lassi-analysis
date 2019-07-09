@@ -22,8 +22,8 @@ def testLeastsq():
     r = least_squares(errfun, x0, args=(xdata, ydata))
     #print x
     #print success
-    print r.success
-    print r.x
+    print(r.success)
+    print(r.x)
 
     return xdata, ydata, r.x, r.success
 

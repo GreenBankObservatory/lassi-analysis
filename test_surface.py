@@ -20,9 +20,9 @@ def spherical_surf(l1, radius=None, offset=None, scale=None):
     if scale is None:
         scale = 1.0
 
-    print "Radius: ", R
-    print "Offset: ", offset
-    print "Scale: ", scale
+    print("Radius: ", R)
+    print("Offset: ", offset)
+    print("Scale: ", scale)
 
     l1 = l1  #surface matrix length
     # theta = __np__.linspace(0, 2*__np__.pi, l1)

@@ -15,7 +15,7 @@ ansiZs = [   0,
     21, 22, 23, 24, 25, 26, 27,
   28, 29, 30, 31, 32, 33, 34, 35]
 
-assert ansiZs == range(36)  
+assert ansiZs == list(range(36))
 
 # active surface reveres how it traverses the pyramid!
 asAnsiZs = [  0,
@@ -50,7 +50,7 @@ def printZs(zs):
     end = 1
     cnt = 0
     while end <= lenZs:
-       print zs[start:end]
+       print(zs[start:end])
        row += 1
        rowLen += 1
        start = end
@@ -110,9 +110,9 @@ def noll2asAnsi(zs):
 def testAnsi2ActiveAnsi():
     zs = range(0,36)
     zs2 = ansi2activeAnsi(zs)
-    print "ansi: "
+    print("ansi: ")
     printZs(zs)
-    print "active ansi: "
+    print("active ansi: ")
     printZs(zs2)
     assert zs2 == asAnsiZs 
 
@@ -121,9 +121,9 @@ def testNoll2ansi():
     #noll = ansi2noll(ansi)
     noll = range(1,37)
     ansi = noll2ansi(noll)
-    print "ansi: "
+    print("ansi: ")
     printZs(ansi)
-    print "noll: "
+    print("noll: ")
     printZs(noll)
     assert ansi == nollZs
 

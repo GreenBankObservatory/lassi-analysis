@@ -61,7 +61,7 @@ fi
 # Done with initial checks, can begin script
 
 # Create the venv
-safe_cmd "virtualenv -p python2.7 $venv_name"
+safe_cmd "python3.7 -m venv $venv_name"
 # Enter the venv
 safe_cmd "source $venv_name/bin/activate"
 

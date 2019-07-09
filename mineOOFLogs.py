@@ -12,14 +12,14 @@ def parseLog(path, f):
         ls = f.readlines()
 
     if len(ls) < 2:
-        print "Not enough lines in", fpath
+        print("Not enough lines in", fpath)
         return None
 
     # first line should look like:
     # Starting oofshell Fri Sep 28 10:42:25 EDT 2018
     l1 = ls[0]
     if ' '.join(l1.split(' ')[:2]) != 'Starting oofshell':
-        print "Unexpected first liine: ", l1
+        print("Unexpected first liine: ", l1)
         return None
     # see if we can parse the time
     ts = l1.split(' ')[3:]
@@ -32,8 +32,8 @@ def parseLog(path, f):
     try:
         startDt = datetime.strptime(timeStr, fmt)
     except:
-        print "Could not parse date from line", l1
-        print timeStr
+        print("Could not parse date from line", l1)
+        print(timeStr)
         return None
 
     # last two lines should look like:
@@ -42,13 +42,13 @@ def parseLog(path, f):
     # example path:
     # /home/sandboxes/monctrl/workspace/poof/release_18.2/test/TPTCSOOF_080921/OOF/s19-1-db-000/Solutions/Plots/s19-1-plot12fits.png
     if ls[-1] != "DONE\n":
-        print "Unexpected last line", ls[-1]
+        print("Unexpected last line", ls[-1])
         return None
 
     ls2 = ls[-2]
     exp = ' '.join(ls2.split(' ')[:3])
     if exp != "Wrote file =":
-        print "Unexpected next to last line: ", ls2
+        print("Unexpected next to last line: ", ls2)
         return None
 
     # remove carriage return from filename
@@ -61,7 +61,7 @@ def parseLog(path, f):
 
     # get creation time of this file
     if not os.path.isfile(fn):
-        print "Could not find file", fn
+        print("Could not find file", fn)
         return None
 
     mtime = os.path.getmtime(fn)
@@ -83,22 +83,22 @@ def mineOOFLogs(path):
     # our log files match the patter oof-<username>-<timestamp>.out
     fs = [f for f in fs if f[:3] == 'oof' and f[-3:] == 'out']
 
-    print "Num logs in path", path, len(fs)
+    print("Num logs in path", path, len(fs))
 
     # parse logs
     secs = []
     for i, f in enumerate(fs):
-        print i, f
+        print(i, f)
         td = parseLog(path, f)
         if td is not None:
             secs.append(td)
 
     # report results
-    print "Computed elapsed time (secs) for %d OOFs" % len(secs)
-    print "min: %7.2f, max: %7.2f, mean: %7.2f, std: %7.2f" % (np.min(secs),
+    print("Computed elapsed time (secs) for %d OOFs" % len(secs))
+    print("min: %7.2f, max: %7.2f, mean: %7.2f, std: %7.2f" % (np.min(secs),
                                                                np.max(secs),
                                                                np.mean(secs),
-                                                               np.std(secs))
+                                                               np.std(secs)))
 
 def main():
     path = "/home/oof/logs"

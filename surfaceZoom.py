@@ -82,7 +82,7 @@ def analyzeZooms(data, dataLog):
         plt.text(x, y, "%e" % means[i])
 
     for title, mean, std, n, stdn in rs:
-        print "%s: mean=%e std=%e N=%e stdN=%e" % (title, mean, std, n, stdn)
+        print("%s: mean=%e std=%e N=%e stdN=%e" % (title, mean, std, n, stdn))
 
     return rs    
 
@@ -107,6 +107,6 @@ def calculateVertexDisplacements(data, dataLog):
         disp = (meanSrf - meanPnl) * 1e6
         dispSig = np.sqrt(stdNpnl**2 + stdNsrf**2) * 1e6
 
-        print "%s: disp(microm)=%e stdN=%e" % (titles[i], disp, dispSig)
+        print("%s: disp(microm)=%e stdN=%e" % (titles[i], disp, dispSig))
         i += 1
 

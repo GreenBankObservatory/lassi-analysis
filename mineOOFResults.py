@@ -6,18 +6,18 @@ import matplotlib.pylab as plt
 import pyfits
 
 def findOOFDirs(path):
-    print "Finding OOF dirs in", path
+    print("Finding OOF dirs in", path)
     dirs = []
     for thisDir, childDirs, filenames in os.walk(path):
         if 'OOF' in childDirs:
             dirs.append(thisDir)
-    print "done"        
+    print("done")        
     return dirs        
 
 def getAllZernikeResults(oofDirs):
     zs = []
     for i, oofDir in enumerate(oofDirs):
-        print "%d of %d oofDirs" % (i, len(oofDirs))
+        print("%d of %d oofDirs" % (i, len(oofDirs)))
         z = getZernikeResultsFromOOFDir(oofDir)
         if len(z) > 0:
             zs.extend(z)
@@ -46,7 +46,7 @@ def getZernikeResults(solutionDirPath):
     expPath = os.path.join(solutionDirPath, expFile)
 
     if not os.path.isfile(expPath):
-        print "No results in ", expPath
+        print("No results in ", expPath)
         return None
 
     # read the file like GFM does
@@ -85,7 +85,7 @@ def analyzeZ(name, zs):
     stdV = np.std(zs)
     rng = (meanV - (2*stdV), meanV + (2*stdV))
 
-    print "%10s: len=%5d, min=% 8.2f, max=% 8.2f, mean=% 8.2f, std=% 8.2f, rng=(% 8.2f, %8.2f)" % (name, len(zs), minV, maxV, meanV, stdV, rng[0], rng[1])
+    print("%10s: len=%5d, min=% 8.2f, max=% 8.2f, mean=% 8.2f, std=% 8.2f, rng=(% 8.2f, %8.2f)" % (name, len(zs), minV, maxV, meanV, stdV, rng[0], rng[1]))
 
     # make some histograms - but get rid of outliers
     outHi = meanV + (2*stdV)
@@ -130,7 +130,7 @@ def findOofs():
     saveObj(values, "oofValues")
 
     # compute stats
-    print "Stats from %d results" % (len(zss))
+    print("Stats from %d results" % (len(zss)))
     keys = sorted(values.keys())
     for k in keys:
         v = values[k]
@@ -140,7 +140,7 @@ def findOofs():
         minV = np.min(v)
         stdV = np.std(v)
         rng = (meanV - stdV, meanV + stdV)
-        print "%10s: len=%5d, min=% 8.2f, max=% 8.2f, mean=% 8.2f, std=% 8.2f, rng=(% 8.2f, %8.2f)" % (k, len(v), minV, maxV, meanV, stdV, rng[0], rng[1])
+        print("%10s: len=%5d, min=% 8.2f, max=% 8.2f, mean=% 8.2f, std=% 8.2f, rng=(% 8.2f, %8.2f)" % (k, len(v), minV, maxV, meanV, stdV, rng[0], rng[1]))
 
 
 if __name__ == "__main__":

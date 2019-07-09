@@ -87,14 +87,14 @@ def runOneScan(a):
     self.logger("exporting data after a quick sleep")
     time.sleep(5)
     a.export_data()
-    print "Result keys: ", a.get_results().keys()
+    print("Result keys: ", a.get_results().keys())
     keys = a.get_results().keys()
     while len(keys) < 5:
-        print "not enough keys: ", keys
+        print("not enough keys: ", keys)
         time.sleep(1)
         keys = a.get_results().keys()
-    print "We have all our keys now: ", keys
-    print "exporting to file"
+    print("We have all our keys now: ", keys)
+    print("exporting to file")
     a.export_ptx_results("/tmp/delme2.ptx")    
 
 

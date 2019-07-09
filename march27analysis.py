@@ -48,11 +48,11 @@ def plotWindSpeeds(sDt, eDt):
 
     
     # print analysis
-    print "Wind Speeds (m/s)"
-    print "UTC: %s - %s" % (sDt, eDt)
-    print "Minutes: ", (sDt - eDt).seconds / 60.
-    print "Min: %f, Max: %f" % (np.min(vels), np.max(vels))
-    print "Mean: %f, Std: %f" % (np.mean(vels), np.std(vels))
+    print("Wind Speeds (m/s)")
+    print("UTC: %s - %s" % (sDt, eDt))
+    print("Minutes: ", (sDt - eDt).seconds / 60.)
+    print("Min: %f, Max: %f" % (np.min(vels), np.max(vels)))
+    print("Mean: %f, Std: %f" % (np.mean(vels), np.std(vels)))
 
 def summarizeCleanedData():
     scanNums = sorted(march27scans.keys())    
@@ -70,10 +70,10 @@ def summarizeCleanedData():
         if not os.path.isfile(fn):
             continue
 
-        print ""
-        print "*"*80
+        print("")
+        print("*"*80)
         typ = march27scans[scanNum]['type']
-        print "Scan: %d, %s" % (scanNum, typ)
+        print("Scan: %d, %s" % (scanNum, typ))
 
         xs, ys, diffs = loadProcessedData(fn)
         imagePlot(np.log(np.abs(np.diff(diffs))),
@@ -82,8 +82,8 @@ def summarizeCleanedData():
         nextScanNum = scanNum + 1
         if nextScanNum in scanNums:
             sDt, eDt = getStartEndTimes(scanNum, nextScanNum)    
-            print "Time (EST) between scan %d and %d:" % (scanNum, nextScanNum)
-            print "%s - %s" % (sDt, eDt)
+            print("Time (EST) between scan %d and %d:" % (scanNum, nextScanNum))
+            print("%s - %s" % (sDt, eDt))
             plotWindSpeeds(dt2utc(sDt), dt2utc(eDt))
 
 def main():

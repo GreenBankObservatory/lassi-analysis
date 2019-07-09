@@ -146,7 +146,7 @@ def fitScanOrg(fn):
     #tt = [1., 2., 3. , 4., 5., 6., 7., 8., 9.]
     #L = np.array([tt, tt, tt])
     L = np.transpose(L)
-    print "shape L: ", L.shape
+    print("shape L: ", L.shape)
     xy = L
     xyPrime = np.transpose(xy)
 
@@ -163,7 +163,7 @@ def fitScanOrg(fn):
     #lsq = least_squares(Func, b, args=(xyPrime))
 
     #print "fit: ", fit, success
-    print lsq
+    print(lsq)
 
     #fittedData = Func(lsq.x, xyPrime)
     fittedData = None
@@ -178,9 +178,9 @@ def test1():
     b = (0., 0., 0., 60., min(x), min(x), min(x))
     maxfev = L.size * 200
 
-    print "Func:"
+    print("Func:")
     r = Func(b, xyPrime)
-    print r
+    print(r)
 
     #lsq = leastsq(Func, b, args=(xyPrime), maxfev=maxfev, full_output=True)
     #lsq = leastsq(Func, b, args=(xyPrime), maxfev=maxfev)
@@ -191,13 +191,13 @@ def test1():
     exp = np.array([14400., 14158., 13912., 13662., 13408., 13150., 12888., 12622., 12352., 12078.])
     assert (r == exp).all()
   
-    print "Primes:"
-    print "PrimeX:"
-    print PrimeX(b[:3], xyPrime)
+    print("Primes:")
+    print("PrimeX:")
+    print(PrimeX(b[:3], xyPrime))
 
 def test2():
 
-    print "test2"
+    print("test2")
     #x = np.array(range(100)) * .5
     #y = np.array(range(100, 200)) * .1
     #z = np.array(range(200, 300)) * .01
@@ -211,29 +211,29 @@ def test2():
     #maxfev = L.size * 200
     maxfev = 512*512*3 * 200
 
-    print "testing with", b
-    print xyPrime
+    print("testing with", b)
+    print(xyPrime)
     r = Func(b, xyPrime)
-    print r
+    print(r)
 
     exp = np.array([14400., 14397.34, 14394.16, 14390.46, 14386.24, 14381.5, 14376.24, 14370.46,
  14364.16, 14357.34])
     assert np.min(np.abs(r - exp)) < 1e-10
 
-    print "Primes:"
-    print PrimeX(b[:3], xyPrime)
-    print PrimeY(b[:3], xyPrime)
-    print PrimeZ(b[:3], xyPrime)
+    print("Primes:")
+    print(PrimeX(b[:3], xyPrime))
+    print(PrimeY(b[:3], xyPrime))
+    print(PrimeZ(b[:3], xyPrime))
 
-    print "Least Squares: "
+    print("Least Squares: ")
     lsq = leastsq(Func, b, args=(xyPrime), maxfev=maxfev)
     #lsq = least_squares(Func, b, args=(xyPrime))
-    print lsq
+    print(lsq)
     fit = lsq[0]
     matlabFit = np.array([0, -7.6577, 1.4819, .0001, -1.0566, -0.1675, 15.5614])
 
     for i in range(len(fit)):
-        print i, fit[i], matlabFit[i], fit[i] - matlabFit[i]
+        print(i, fit[i], matlabFit[i], fit[i] - matlabFit[i])
 
 def fitScan(fn):
     "Load Leica scanner data, and fit it."
@@ -283,8 +283,8 @@ def fitScan(fn):
                       ftol=1e-15,
                       xtol=1e-15)
 
-    print "answer: ", r.x
-    print "success? ", r.success
+    print("answer: ", r.x)
+    print("success? ", r.success)
 
     # get the parabola from the original data, but the new fitted coefficients
     c = r.x

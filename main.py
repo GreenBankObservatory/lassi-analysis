@@ -34,16 +34,16 @@ def process(fn, n, outputName, noise=False):
     # 100: 8 mins
     # n = 20
 
-    print "importing CSV data ..."
+    print("importing CSV data ...")
     x, y, z = importCsv(fn)
 
-    print x.shape, y.shape, z.shape
+    print(x.shape, y.shape, z.shape)
 
-    print x[0], y[0], z[0]
-    print type(x[0])
-    print type(x)
+    print(x[0], y[0], z[0])
+    print(type(x[0]))
+    print(type(x))
 
-    print "Converting to spherical coords ..."
+    print("Converting to spherical coords ...")
     r, az, el = cart2sph(x, y, z)
 
 
@@ -52,13 +52,13 @@ def process(fn, n, outputName, noise=False):
     # print "unwrapping az values ..."
     # az = unwrap(az)
 
-    print "smoothing data ..."
+    print("smoothing data ...")
     azLoc, elLoc, rSmooth = smooth(az, el, r, n)
 
-    print "azLoc", azLoc
-    print "elLoc", elLoc
+    print("azLoc", azLoc)
+    print("elLoc", elLoc)
     if noise:
-        print "adding noise to radial values ..."
+        print("adding noise to radial values ...")
         rSmooth = rSmooth + 1*np.random.randn(n,n)
 
     #print rSmooth
@@ -67,7 +67,7 @@ def process(fn, n, outputName, noise=False):
     # ax = Axes3D(fig)
 
     # plots!
-    print "plotting ..."
+    print("plotting ...")
     fig = plt.figure()
     ax = Axes3D(fig)
     ax.plot_surface(azLoc, elLoc, rSmooth)
@@ -79,25 +79,25 @@ def process(fn, n, outputName, noise=False):
 
 
     # back to x, y, z
-    print "converting back to cartesian ..."
+    print("converting back to cartesian ...")
     xs, ys, zs = sph2cart(azLoc, elLoc, rSmooth)
 
     # save for later analysis
     np.savez("smoothXYZ%d" % n, x=xs, y=ys, z=zs)
 
-    print "plotting x y z ..."
+    print("plotting x y z ...")
     fig = plt.figure()
     ax = Axes3D(fig)
     ax.plot_surface(xs, ys, zs)
     plt.show()
 
-    print "plotting x y z as scatter to see spacing"
+    print("plotting x y z as scatter to see spacing")
     fig = plt.figure()
     ax = Axes3D(fig)
     ax.scatter(xs, ys, zs)
     plt.show()
 
-    print "smoothing x y z"
+    print("smoothing x y z")
     sxs, sys, szs = interpXYZ(xs, ys, zs, n)
 
     # print "zernikes of xyz surface"
@@ -126,7 +126,7 @@ def process(fn, n, outputName, noise=False):
     # zss[np.isnan(zs)] = 0.
     zs[np.isnan(zs)] = 0.
 
-    print "zernikes of smoothed xyz"
+    print("zernikes of smoothed xyz")
     zernikeFit(zss)
 
     # save processing results
@@ -141,7 +141,7 @@ def smoothWithWeights(fpath, N=None, useWeights=True):
     if N is None:
         N=512
 
-    print "Loading data from file ..."
+    print("Loading data from file ...")
     data = np.loadtxt(fpath, delimiter=',')
     x = data[:,0]
     y = data[:,1]
@@ -150,45 +150,45 @@ def smoothWithWeights(fpath, N=None, useWeights=True):
     # work with a sample of the data
     down = 0.1
     seed = 1971
-    print "Downsampling data by %f" % down
+    print("Downsampling data by %f" % down)
     x, y, z = sampleXYZData(x, y, z, down, seed=seed)
 
     scatter3dPlot(x, y, z, "downsampled by %f" % down)
 
-    print "Converting to spherical coords ..."
+    print("Converting to spherical coords ...")
     # r, az, el = cart2sph(x, y, z)
     r, el, az = cart2sph(x, y, z)
 
-    print "smoothing data ..."
+    print("smoothing data ...")
     azLoc, elLoc, rSmooth = smoothDask(az, el, r, N)
-    print "smoothing squared data ..."
+    print("smoothing squared data ...")
     azLoc, elLoc, rSmooth2 = smoothDask(az, el, r**2, N)
 
     nrsmooth2 = rSmooth2[np.logical_not(np.isnan(rSmooth2))]
 
-    print "num pos rsmooth2", len(nrsmooth2[nrsmooth2 > 0.])
-    print "num neg rsmooth2", len(nrsmooth2[nrsmooth2 < 0.])   
+    print("num pos rsmooth2", len(nrsmooth2[nrsmooth2 > 0.]))
+    print("num neg rsmooth2", len(nrsmooth2[nrsmooth2 < 0.]))   
 
 
     # TEacher says we can cheet
     sigmat = rSmooth2 - (rSmooth**2)
     mask = sigmat < 0.
-    print sigmat[mask], rSmooth2[mask], rSmooth[mask]**2
+    print(sigmat[mask], rSmooth2[mask], rSmooth[mask]**2)
 
     sigma2 = np.abs(rSmooth2 - (rSmooth**2))
 
 
-    print "Size of sigma2 vs. num zeros", sigma2.shape, len(sigma2[sigma2 == 0.0])
+    print("Size of sigma2 vs. num zeros", sigma2.shape, len(sigma2[sigma2 == 0.0]))
 
     nsigma2 = sigma2[np.logical_not(np.isnan(sigma2))]
 
-    print "num pos sigma2", len(nsigma2[nsigma2 > 0.])
-    print "num neg sigma2", len(nsigma2[nsigma2 < 0.])
+    print("num pos sigma2", len(nsigma2[nsigma2 > 0.]))
+    print("num neg sigma2", len(nsigma2[nsigma2 < 0.]))
 
     surface3dPlot(azLoc, elLoc, sigma2, "sigma squared")
 
 
-    print "plotting ..."
+    print("plotting ...")
     # fig = plt.figure()
     # ax = Axes3D(fig)
     # ax.plot_surface(azLoc, elLoc, rSmooth)
@@ -202,7 +202,7 @@ def smoothWithWeights(fpath, N=None, useWeights=True):
     imagePlot(rSmooth2, "R**2 smoothed")
 
     # back to x, y, z
-    print "converting back to cartesian ..."
+    print("converting back to cartesian ...")
     # xs, ys, zs = sph2cart(azLoc, elLoc, rSmooth)
     xs, ys, zs = sph2cart(elLoc, azLoc, rSmooth)
 
@@ -218,12 +218,12 @@ def smoothWithWeights(fpath, N=None, useWeights=True):
     #ws = (1/sigma2) / np.sum(1/sigma2[np.logical_not(np.isnan(sigma2))])
     ws = (Ws_Not_Norm) / np.sum(Ws_Not_Norm[np.logical_not(np.isnan(sigma2))])
  
-    print "weights", ws, np.isnan(ws).all()
+    print("weights", ws, np.isnan(ws).all())
 
     if useWeights:
         xs, ys, diffs = fitLeicaScan(None, xyz=(xs, ys, zs), weights=ws)
     else:    
-        print "Not actually using the weights we calculated!"
+        print("Not actually using the weights we calculated!")
         xs, ys, diffs = fitLeicaScan(None, xyz=(xs, ys, zs))
 
     return xs, ys, diffs, sigma2, ws
@@ -286,7 +286,7 @@ def interpXYZ(x, y, z, n, xrange=None, yrange=None, checkLevels=False, center=Fa
     cond = [not b for b in np.isnan(z2f)]
     z3 = np.extract(cond, z2f)
 
-    print "Removed %d NaNs from %d data points" % (len(x2f) - len(x3), len(x2f))
+    print("Removed %d NaNs from %d data points" % (len(x2f) - len(x3), len(x2f)))
 
     assert len(x3) == len(y3)
     assert len(y3) == len(z3)
@@ -327,11 +327,11 @@ def interpXYZ(x, y, z, n, xrange=None, yrange=None, checkLevels=False, center=Fa
     if checkLevels:
         lgtMax = znew > 2.*np.nanmax(z)
         if lgtMax.any():
-            print "Replacing values greater then original with NaNs"
+            print("Replacing values greater then original with NaNs")
             znew[lgtMax] = np.nan
         lstMin = znew < np.nanmin(z)/2.
         if lstMin.any():
-            print "Replacing values less then original with NaNs"
+            print("Replacing values less then original with NaNs")
             znew[lstMin] = np.nan    
 
     return mx, my, znew
@@ -342,7 +342,7 @@ def zernikeFit(z):
                                           12,
                                           remain2D=1,
                                           barchart=1)
-    print "fitlist: ", fitlist
+    print("fitlist: ", fitlist)
     C1.listcoefficient()
     C1.zernikemap()
     # this works but takes forever!
@@ -384,9 +384,9 @@ def smoothXYZNew(x, y, z, n, sigX=None, sigY=None):
 
 
     zSm = np.ndarray(shape=(n,n))
-    print "starting smoothing"
+    print("starting smoothing")
     for j in range(n):
-        print "J:", j
+        print("J:", j)
         for k in range(n):
             w=2*np.pi*np.exp( (- (x - xLoc[j,k])**2 /( 2.*sigX**2 )-(y-yLoc[j,k])**2 /(2.*sigY**2 )))
             norm=sum(w)
@@ -588,9 +588,9 @@ def smoothXYZ(x, y, z, n, sigX=None, sigY=None):
     # init our smoothing result
     zSm = np.ndarray(shape=(n,n))
 
-    print "Starting smoothing"
+    print("Starting smoothing")
     for j in range(n):
-        print "J:", j
+        print("J:", j)
         for k in range(n):
             # rSms.append(rrr)
             w=2*np.pi*np.exp((-(x-xLoc[j,k])**2 /( 2.*sigX**2 )-(y-yLoc[j,k])**2 /(2.*sigY**2 )))
@@ -605,9 +605,9 @@ def smoothXYZ(x, y, z, n, sigX=None, sigY=None):
                 v = sum(z * w)
                 zSm[j,k] = v
 
-    print "xLoc", xLoc
-    print "yLoc", yLoc
-    print "zSm", zSm
+    print("xLoc", xLoc)
+    print("yLoc", yLoc)
+    print("zSm", zSm)
     return (xLoc, yLoc, zSm)
 
 def loadLeicaDataFromGpus(fn):
@@ -713,7 +713,7 @@ def smoothXYZDask(x, y, z, n, sigX=None, sigY=None):
     # init our smoothing result
     zSm = np.ndarray(shape=(n,n))
     zSms = []
-    print "Starting smoothing"
+    print("Starting smoothing")
     for j in range(n):
         #print "J:", j
         rr =delayed(daskWeightXYZ)(n, x, y, z, xLoc, yLoc, sigX, sigY, j)
@@ -760,19 +760,19 @@ def cart2sph(x, y, z):
     lats = np.array([l.value for l in lats])
     lngs = np.array([l.value for l in lngs])
 
-    print "min/max lats (radians)", lats.min(), lats.max()
-    print "lngs range (radians)", -np.pi/2, np.pi/2
-    print "min/max lngs (radians)", lngs.min(), lngs.max()
-    print "lats range (radians)", 0, 2*np.pi
+    print("min/max lats (radians)", lats.min(), lats.max())
+    print("lngs range (radians)", -np.pi/2, np.pi/2)
+    print("min/max lngs (radians)", lngs.min(), lngs.max())
+    print("lats range (radians)", 0, 2*np.pi)
 
     return rs, lats, lngs
 
 def sph2cart(az, el, r):
 
-    print "min/max az (radians)", az.min(), az.max()
-    print "el range (radians)", -np.pi/2, np.pi/2
-    print "min/max el (radians)", el.min(), el.max()
-    print "az range (radians)", 0, 2*np.pi
+    print("min/max az (radians)", az.min(), az.max())
+    print("el range (radians)", -np.pi/2, np.pi/2)
+    print("min/max el (radians)", el.min(), el.max())
+    print("az range (radians)", 0, 2*np.pi)
 
 
     xs, ys, zs = spherical_to_cartesian(r, az, el)
@@ -832,14 +832,14 @@ def processDiffSimple(fn1, fn2):
     # Here we are assuming the x, y dims are the same
     zDiff = z1 - z2
 
-    print zDiff
+    print(zDiff)
 
-    print "plotting surface diff ..."
+    print("plotting surface diff ...")
     plt.imshow(zDiff, interpolation="nearest", origin="upper")
     plt.colorbar()
     plt.show()
 
-    print "Zernikie's for surface diffs:"
+    print("Zernikie's for surface diffs:")
     fits, c = zernikeFit(zDiff)
 
 def testTransforms():
@@ -856,11 +856,11 @@ def identityTest(x, y, z):
 
     r, lat, lng = cartesian_to_spherical(x, y, z)
 
-    print r, lat, lng
+    print(r, lat, lng)
 
     xs, ys, zs = spherical_to_cartesian(r, lat, lng)
 
-    print xs, ys, zs
+    print(xs, ys, zs)
 
 def multi(i, j):
     return i*j
@@ -885,16 +885,16 @@ def testDask():
             # ks[i][j] = v
             kss.append((i, j, v))
     kss = delayed(identity)(kss)
-    print kss
+    print(kss)
 
     kss = kss.compute(scheduler='processes')
             
-    print kss
+    print(kss)
 
     for i, j, v in kss:
         ks[i][j] = v
 
-    print ks
+    print(ks)
 
 def plotXYZ(x, y, z):
     fig = plt.figure()
@@ -942,9 +942,9 @@ def testInterp():
     y = y[xmask]
     z = z[xmask]
 
-    print x
-    print y
-    print z
+    print(x)
+    print(y)
+    print(z)
 
     plotXYZ(x, y, z)
 
@@ -993,7 +993,7 @@ def addCenterBump(x, y, z, rScale=10, zScale=0.25):
         if xi > xStart and xi < xEnd and yi > yStart and yi < yEnd:
             cnt +=1 
             z[i] = zi + (zScale*zi)
-    print "Added bump to %d pnts" % cnt
+    print("Added bump to %d pnts" % cnt)
 
     return z
 
@@ -1004,7 +1004,7 @@ def smoothSpherical(fn, n, sigAz=None, sigEl=None, addBump=False):
     # 100: 8 mins
     # n = 20
 
-    print "importing CSV data ..."
+    print("importing CSV data ...")
     x, y, z = importCsv(fn)
 
     if addBump:
@@ -1036,19 +1036,19 @@ def smoothSpherical(fn, n, sigAz=None, sigEl=None, addBump=False):
             if xi > xStart and xi < xEnd and yi > yStart and yi < yEnd:
                 cnt +=1 
                 z[i] = zi + (0.25*zi)
-        print "Added bump to %d pnts" % cnt
+        print("Added bump to %d pnts" % cnt)
 
-    print "Converting to spherical coords ..."
+    print("Converting to spherical coords ...")
     r, az, el = cart2sph(x, y, z)
 
 
 
-    print "smoothing data ..."
+    print("smoothing data ...")
     azLoc, elLoc, rSmooth = smoothDask(az, el, r, n, sigAz=sigAz, sigEl=sigEl)
 
 
     # back to x, y, z
-    print "converting back to cartesian ..."
+    print("converting back to cartesian ...")
     xs, ys, zs = sph2cart(azLoc, elLoc, rSmooth)
 
     fns = fn + ".smoothed"
@@ -1114,7 +1114,7 @@ def testSmoothXYZ():
     xx, yy = np.meshgrid(x, y)
     zz = np.zeros(xx.shape)
     xs, ys, zs = smoothXYZDask(xx, yy, zz, xx.shape[0], sigX=1, sigY=1)
-    print zs
+    print(zs)
 
 def smoothGPUs(gpuPath,
                inFile,
@@ -1152,7 +1152,7 @@ def smoothGPUs(gpuPath,
     if spherical:
         cmd += " --no-conv"
 
-    print "system cmd: ", cmd
+    print("system cmd: ", cmd)
     os.system(cmd)
 
 # def smoothProcessedFile(fpath, N=512, squared=False):
