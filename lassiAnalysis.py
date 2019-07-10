@@ -281,8 +281,8 @@ def processLeicaScan(fpath,
     # removes headers, does basic rotations, etc.
     print("Processing PTX file ...")
     if xOffset is None:
-        # xOffset = -8.
-        xOffset = -6.
+        xOffset = -8.
+        #xOffset = -6.
     if yOffset is None:    
         yOffset = 50.0
     if rot is None:
