@@ -65,6 +65,76 @@ def zernikeFive(x, y, xOffset, yOffset, amplitude=1.0, scale=1.0):
     print("mean: %f, min: %f, max: %f" % (np.mean(z5), np.nanmin(z5), np.nanmax(z5)))
     return z5
 
+def zernikeSix(x, y, xOffset, yOffset, amplitude=1.0):
+    """
+    Following opticspy convention:
+    https://github.com/Sterncat/opticspy/blob/master/opticspy/interferometer_zenike.py
+    """
+
+    xc = x + xOffset
+    yc = y + yOffset
+    z = amplitude * 2*np.sqrt(6) * xc*yc
+    print("z6 with amplitude", amplitude)
+    print("mean: %f, min: %f, max: %f" % (np.mean(z), np.nanmin(z), np.nanmax(z)))
+    return z
+
+def zernikeSeven(x, y, xOffset, yOffset, amplitude=1.0):
+    """
+    Following opticspy convention:
+    https://github.com/Sterncat/opticspy/blob/master/opticspy/interferometer_zenike.py
+    """
+
+    xc = x + xOffset
+    yc = y + yOffset
+    rho = np.sqrt((xc)**2 + (yc)**2)
+    z = amplitude * np.sqrt(8)*yc*(3*rho**2 - 2)
+    print("z7 with amplitude", amplitude)
+    print("mean: %f, min: %f, max: %f" % (np.mean(z), np.nanmin(z), np.nanmax(z)))
+    return z
+
+def zernikeEight(x, y, xOffset, yOffset, amplitude=1.0):
+    """
+    Following opticspy convention:
+    https://github.com/Sterncat/opticspy/blob/master/opticspy/interferometer_zenike.py
+    """
+
+    xc = x + xOffset
+    yc = y + yOffset
+    rho = np.sqrt((xc)**2 + (yc)**2)
+    z = amplitude * np.sqrt(8)*xc*(3*rho**2 - 2)
+    print("z8 with amplitude", amplitude)
+    print("mean: %f, min: %f, max: %f" % (np.mean(z), np.nanmin(z), np.nanmax(z)))
+    return z
+
+def zernikeNine(x, y, xOffset, yOffset, amplitude=1.0):
+    """
+    Following opticspy convention:
+    https://github.com/Sterncat/opticspy/blob/master/opticspy/interferometer_zenike.py
+    """
+
+    xc = x + xOffset
+    yc = y + yOffset
+    rho = np.sqrt((xc)**2 + (yc)**2)
+    z = amplitude * np.sqrt(8)*yc*(3*xc**2 - yc**2)
+    print("z9 with amplitude", amplitude)
+    print("mean: %f, min: %f, max: %f" % (np.mean(z), np.nanmin(z), np.nanmax(z)))
+    return z
+
+def zernikeTen(x, y, xOffset, yOffset, amplitude=1.0):
+    """
+    Following opticspy convention:
+    https://github.com/Sterncat/opticspy/blob/master/opticspy/interferometer_zenike.py
+    """
+
+    xc = x + xOffset
+    yc = y + yOffset
+    rho = np.sqrt((xc)**2 + (yc)**2)
+    z = amplitude * np.sqrt(8)*xc*(xc**2 - 3*yc**2)
+    print("z10 with amplitude", amplitude)
+    print("mean: %f, min: %f, max: %f" % (np.mean(z), np.nanmin(z), np.nanmax(z)))
+    return z
+
+
 def gaussian(x, y, amplitude, xOffset, yOffset, width):
     # https://en.wikipedia.org/wiki/Gaussian_function#Two-dimensional_Gaussian_function
     print("Applying 2D guassian of amplitude: %f and width: %f" % (amplitude, width))
