@@ -1,5 +1,6 @@
 import numpy as np
 
+import opticspy
 
 def addCenterBump(x, y, z, rScale=10., zScale=0.05):
 
@@ -134,6 +135,28 @@ def zernikeTen(x, y, xOffset, yOffset, amplitude=1.0):
     print("mean: %f, min: %f, max: %f" % (np.mean(z), np.nanmin(z), np.nanmax(z)))
     return z
 
+def zernikePoly(x, y, xOffset, yOffset, amplitude=np.zeros(38, dtype=np.float)):
+    """
+
+    Wrapper around opticspy.interferometer_zenike.__zernikepolar__
+    """
+
+    if len(amplitude) != 38:
+        raise ValueError('amplitude must have 38 items.')
+
+    xcn = (x - xOffset)/np.nanmax(x - xOffset)
+    ycn = (y - yOffset)/np.nanmax(y - yOffset)
+
+    # Flip x and y when evaluating the radius and angle.
+    rcn = np.sqrt(xcn**2 + ycn**2)
+    ucn = np.arctan2(ycn, xcn)
+
+    z = opticspy.interferometer_zenike.__zernikepolar__(amplitude, rcn, ucn)
+
+    print("Zernike polynomials with amplitudes", amplitude)
+    print("Their linear combination has mean: {0:.2e}, min: {1:.2e}, max: {2:.2e}".format(np.mean(z), np.nanmin(z), np.nanmax(z)))
+
+    return z
 
 def gaussian(x, y, amplitude, xOffset, yOffset, width):
     # https://en.wikipedia.org/wiki/Gaussian_function#Two-dimensional_Gaussian_function
