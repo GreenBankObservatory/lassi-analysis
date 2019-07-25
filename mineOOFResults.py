@@ -1,9 +1,9 @@
 import os
 import pickle
 import numpy as np
-
 import matplotlib.pylab as plt
-import pyfits
+
+from astropy.io import fits
 
 def findOOFDirs(path):
     print("Finding OOF dirs in", path)
@@ -11,7 +11,7 @@ def findOOFDirs(path):
     for thisDir, childDirs, filenames in os.walk(path):
         if 'OOF' in childDirs:
             dirs.append(thisDir)
-    print("done")        
+    print("done")
     return dirs        
 
 def getAllZernikeResults(oofDirs):
@@ -42,7 +42,8 @@ def getZernikeResultsFromOOFDir(oofDir):
 def getZernikeResults(solutionDirPath):
 
     order = 5
-    expFile = "Solutions/z%d/tzernike.fits" % order    
+    #expFile = "Solutions/z%d/tzernike.fits" % order
+    expFile = "Solutions/z{0:d}/tzernike_abs_dz.fits".format(order)
     expPath = os.path.join(solutionDirPath, expFile)
 
     if not os.path.isfile(expPath):
@@ -50,7 +51,7 @@ def getZernikeResults(solutionDirPath):
         return None
 
     # read the file like GFM does
-    hdulist = pyfits.open(expPath)
+    hdulist = fits.open(expPath)
     extData = hdulist[1].data
     extColumnNames = extData.names
     extColumnDefs  = extData.formats
@@ -127,7 +128,7 @@ def findOofs():
             values[k].append(v)
             
     # save to a pickle file for later analysis
-    saveObj(values, "oofValues")
+    saveObj(values, "oofValuesAbs")
 
     # compute stats
     print("Stats from %d results" % (len(zss)))
