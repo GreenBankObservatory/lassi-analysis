@@ -2,21 +2,25 @@
 This is a very high level module for integrating other modules and 
 analyzing a single scan of Leica data once it's available.
 """
+
 import os
 import time
+import numpy as np
 from copy import copy
 from shutil import copyfile
-
+from scipy.interpolate import griddata
 # import matplotlib
 # matplotlib.use('agg')
-import numpy as np
+
 import opticspy
+
+from astropy.stats import sigma_clip
 
 from processPTX import processPTX, processNewPTX, aggregateXYZ
 from main import smoothGPUs, smoothXYZGpu, splitXYZ
 from main import loadLeicaDataFromGpus
-from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace
-#from parabolas import loadLeicaDataFromGpus
+from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
+                      newParabola, rotateData
 from zernikeIndexing import noll2asAnsi, printZs
 from simulateSignal import addCenterBump, zernikeFour
 from simulateSignal import zernikeFive, gaussian
@@ -374,6 +378,104 @@ def loadProcessedData(filename):
     d = np.load(filename)
     return d["xs"], d["ys"], d["diffs"]
 
+def maskLeicaData(filename, n=512):
+    """
+    Given a GPU smoothed file, it will try and find bumps in the surface and mask them.
+
+    :param filename: file with the GPU smoothed data.
+    :param n: number of samples in the GPU smoothed data. Default n=512.
+    """
+
+    orgData, cleanData = loadLeicaData(filename, n=n, numpy=False)
+    
+    xf = cleanData[0]
+    yf = cleanData[1]
+    zf = cleanData[2]
+
+    # Assemble initial guess.
+    f = 60.
+    v1x = 0.
+    v1y = 0.
+    v2 = 0.
+    xTheta = 0.
+    yTheta = 0.
+    guess = [f, v1x, v1y, v2, xTheta, yTheta]
+
+    # Fit a parabola to the data.
+    fitresult = fitLeicaData(xf, yf, zf, guess, weights=None)
+    
+    # Subtract the fitted parabola from the data.
+    # The difference should be flat.
+    c = fitresult.x
+    newX, newY, newZ = newParabola(orgData[0], orgData[1], orgData[2], c[0], c[1], c[2], c[3], c[4], c[5])
+    newX.shape = newY.shape = newZ.shape = (n, n)
+    xrr, yrr, zrr = rotateData(orgData[0], orgData[1], orgData[2], c[4], c[5])
+    xrr.shape = yrr.shape = zrr.shape = (n, n)
+    diff = zrr - newZ
+    
+    mask = (((xrr - 2.)**2 + (yrr - 50.)**2) < 45**2)
+    mdiff = np.ma.masked_where(~mask, diff)
+    # Mask any pixels which deviate from the noise.
+    # This should mask out retroreflectors, misaligned panels and sub-scans where the TLS moved due to wind.
+    mcdiff = sigma_clip(mdiff)
+    
+    # Apply the mask to the original data and repeat once more.
+    # In the end also fit a parabola to each row in the data, and mask outliers.
+    # This allows to find more subtle features in the data.
+    xf = np.ma.masked_where(mcdiff.mask, orgData[0])
+    yf = np.ma.masked_where(mcdiff.mask, orgData[1])
+    zf = np.ma.masked_where(mcdiff.mask, orgData[2])
+
+    f = 60.
+    v1x = 0.
+    v1y = 0.
+    v2 = 0.
+    xTheta = 0.
+    yTheta = 0.
+    guess = [f, v1x, v1y, v2, xTheta, yTheta]
+
+    masked_fitresult = fitLeicaData(xf.compressed(), yf.compressed(), zf.compressed(),
+                                       guess, weights=None)
+    
+    c = masked_fitresult.x
+    newXm, newYm, newZm = newParabola(orgData[0], orgData[1], orgData[2], c[0], c[1], c[2], c[3], c[4], c[5])
+    newXm.shape = newYm.shape = newZm.shape = (n, n)
+    xrrm, yrrm, zrrm = rotateData(orgData[0], orgData[1], orgData[2], c[4], c[5])
+    xrrm.shape = yrrm.shape = zrrm.shape = (n, n)
+    masked_diff = zrrm - newZm
+    mask = (((xrr - 2.)**2 + (yrr - 50.)**2) < 45**2)
+    masked_diff = np.ma.masked_where(~mask, masked_diff)
+    mcdiff2 = masked_diff
+    
+    # Final mask.
+    map_mask = np.zeros((n,n), dtype=bool)
+
+    x = np.linspace(0,n,n)
+
+    # Loop over rows fitting a parabola and masking any pixels that deviate from noise.
+    for i in range(0,n):
+
+        y = mcdiff2[i]
+
+        if len(x[~y.mask]) > 3:
+
+            poly_c = np.polyfit(x[~y.mask], y[~y.mask], 2)
+            poly_f = np.poly1d(poly_c)
+
+            res = np.ma.masked_invalid(y - poly_f(x))
+            res_sc = sigma_clip(res)
+
+            map_mask[i] = res_sc.mask
+
+        else:
+
+            map_mask[i] = True
+            
+    return (np.ma.masked_where(map_mask, orgData[0]), 
+            np.ma.masked_where(map_mask, orgData[1]),
+            np.ma.masked_where(map_mask, orgData[2]),
+            np.ma.masked_where(map_mask, orgData[2] - newZm))
+
 def processLeicaScanPair(filename1,
                          filename2,
                          processed=False,
@@ -468,6 +570,36 @@ def processLeicaScanPair(filename1,
     printZs(asAnsiZs)
 
     return (xs1, ys1, xs2, ys2), diffData
+
+def regridXYZ(x, y, z, n=512., verbose=False):
+    """
+    Regrids the XYZ data to a regularly sampled grid.
+
+    :param x: vector with the x coordinates.
+    :param y: vector with the y coordinates.
+    :param z: vector with the z coordinates.
+    :param n: number of samples in the grid.
+    :param verbose: verbose output?
+    """
+    
+    xmin = np.nanmin(x)
+    xmax = np.nanmax(x)
+    ymin = np.nanmin(y)
+    ymax = np.nanmax(y)
+    if verbose:
+        print("Limits: ", xmin, xmax, ymin, ymax)
+    dx = (xmax - xmin)/n
+    dy = (ymax - ymin)/n
+    grid_xy = np.mgrid[xmin:xmax:dx,
+                       ymin:ymax:dy]
+    if verbose:
+        print("New grid shape: ", grid_xy[0].shape)
+
+    reg_z = griddata(np.array([x[~np.isnan(z)].flatten(),y[~np.isnan(z)].flatten()]).T, 
+                     z[~np.isnan(z)].flatten(), 
+                     (grid_xy[0], grid_xy[1]), method='linear', fill_value=np.nan)
+    
+    return grid_xy[0], grid_xy[1], reg_z.T
 
 def simulateSignal(sigFn,
                    refFn,
