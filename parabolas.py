@@ -242,36 +242,40 @@ def imagePlot(z, title):
     fig.colorbar(cax)
     plt.title(title)
 
-def fitLeicaData(x, y, z, guess, weights=None):
-    print("fit leica boss!")
-    #guess = [f, v1x, v1y, v2, 0., 0.]
+def fitLeicaData(x, y, z, guess, weights=None, verbose=False):
+
+    if verbose:
+        print("fit leica boss!")
+    
+    # Set boundaries for the fit parameters.
     inf = np.inf
     pi2 = 2*np.pi
     b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
     b2 = [inf, inf, inf, inf, pi2, pi2]
     bounds = (b1, b2)
+
     # robust fit: weights outliers outside of f_scale less
     loss = "soft_l1"
     # 0.05 is a good educated guess from Andrew
     # f_scale = .05
     # f_scale = .01
     f_scale = 1.0
-    print("fitLeicaData with robust, soft_l1, f_scale %f" % f_scale)
+    if verbose:
+        print("fitLeicaData with robust, soft_l1, f_scale %f" % f_scale)
 
     if weights is None:
         method = fitParabola
         args = (x .flatten(), y.flatten(), z.flatten())
     else:
-        print("Using weights for fit!")
+        if verbose:
+            print("Using weights for fit!")
         method = fitParabolaWithWeights
         args = (x .flatten(), y.flatten(), z.flatten(), weights.flatten())
         
     r = least_squares(method,
                       guess,
-                      # args=(x .flatten(), y.flatten(), z.flatten()),
                       args=args,
                       bounds=bounds,
-                      # method='lm',
                       max_nfev=1000000,
                       loss=loss,
                       f_scale=f_scale,
