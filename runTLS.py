@@ -76,15 +76,21 @@ def runOneScan(a):
 
 
     a.start_scan()
+    status = a.get_status()
+    scanNum = status.scan_number
+    print "Running scan with scan number: ", scanNum
+
     time.sleep(3)
     state = "unknown"
     while state != "Ready":
         status = a.get_status()
         state = status.state
+        print "State: ", state
+        print datetime.now()
         time.sleep(1)
     # print "sleeping for 60 secs "
     # time.sleep(60)
-    self.logger("exporting data after a quick sleep")
+    logger.debug("exporting data after a quick sleep")
     time.sleep(5)
     a.export_data()
     print "Result keys: ", a.get_results().keys()
@@ -94,8 +100,10 @@ def runOneScan(a):
         time.sleep(1)
         keys = a.get_results().keys()
     print "We have all our keys now: ", keys
-    print "exporting to file"
-    a.export_ptx_results("/tmp/delme2.ptx")    
+
+    filename = "/tmp/test-%d.ptx" % scanNum
+    print "exporting to file", filename
+    a.export_ptx_results(filename)    
 
 
 def thisCB(key, data):
@@ -111,14 +119,16 @@ def main():
         a.cntrl_exit()
         sys.exit(1)
 
-    a.subscribe(frame_type="X_ARRAY", cb_fun=thisCB)
-    a.subscribe(frame_type="Y_ARRAY", cb_fun=thisCB)
-    a.subscribe(frame_type="Z_ARRAY", cb_fun=thisCB)
-    a.subscribe(frame_type="I_ARRAY", cb_fun=thisCB)
-    a.subscribe(frame_type="TIME_ARRAY", cb_fun=thisCB)
+    # for latest version, this is no longer necessary
+    #a.subscribe(frame_type="X_ARRAY", cb_fun=thisCB)
+    #a.subscribe(frame_type="Y_ARRAY", cb_fun=thisCB)
+    #a.subscribe(frame_type="Z_ARRAY", cb_fun=thisCB)
+    #a.subscribe(frame_type="I_ARRAY", cb_fun=thisCB)
+    #a.subscribe(frame_type="TIME_ARRAY", cb_fun=thisCB)
 
     # reconfigure? why not
-    proj = "11jun2019_24hrTests"
+    #proj = "11jun2019_24hrTests"
+    proj = "14aug2019_test"
     res = "63mm@100m"
     #res = "31mm@100m"
     sensitivity = "Normal"
@@ -127,6 +137,9 @@ def main():
     cntr_el = 45
     az_fov = 180
     el_fov = 90
+    # make this a short scan
+    #az_fov = 30
+    #el_fov = 30
     msg = "Proj: %s, Resolution: %s, Sensitivity: %s, Scan Mode: %s, cntr_az: %f, cntr_el: %f, az_fov: %f, el_fov: %f" % (proj, res, sensitivity, scan_mode, cntr_az, cntr_el, az_fov, el_fov)
     logger.debug(msg)
     #logger.debug("Configuring to: delme, 31mm@100m, Normal, Speed, 352, 0, 180, 180")
@@ -138,7 +151,7 @@ def main():
     #a.configure_scanner("delme", "31mm@100m", "Normal", "Speed", 352, 0, 5, 5)
     try:
         logger.debug("Running Scans!")
-        runScans(a)
+        runOneScan(a)
     except KeyboardInterrupt:
         a.cntrl_exit()
     finally:
