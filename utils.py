@@ -102,3 +102,11 @@ def circular_mask(shape, centre, radius, angle_range):
     anglemask = theta <= (tmax-tmin)
 
     return circmask*anglemask
+
+def midPoint(x):
+    """
+    Returns the midpoint of an array:
+    (max(x) - min(x))/2 + min(x)
+    """
+
+    return (np.nanmax(x) - np.nanmin(x))/2. + np.nanmin(x)
