@@ -378,12 +378,13 @@ def loadProcessedData(filename):
     d = np.load(filename)
     return d["xs"], d["ys"], d["diffs"]
 
-def maskLeicaData(filename, n=512):
+def maskLeicaData(filename, n=512, **kwargs):
     """
     Given a GPU smoothed file, it will try and find bumps in the surface and mask them.
 
     :param filename: file with the GPU smoothed data.
     :param n: number of samples in the GPU smoothed data. Default n=512.
+    :param kwargs: keyword arguments passed to astropy.stats.sigma_clip.
     """
 
     orgData, cleanData = loadLeicaData(filename, n=n, numpy=False)
@@ -463,7 +464,7 @@ def maskLeicaData(filename, n=512):
             poly_f = np.poly1d(poly_c)
 
             res = np.ma.masked_invalid(y - poly_f(x))
-            res_sc = sigma_clip(res)
+            res_sc = sigma_clip(res, **kwargs)
 
             map_mask[i] = res_sc.mask
 
