@@ -135,7 +135,7 @@ def zernikeTen(x, y, xOffset, yOffset, amplitude=1.0):
     print("mean: %f, min: %f, max: %f" % (np.mean(z), np.nanmin(z), np.nanmax(z)))
     return z
 
-def zernikePoly(x, y, xOffset, yOffset, amplitude=np.zeros(38, dtype=np.float)):
+def zernikePoly(x, y, xOffset, yOffset, amplitude=np.zeros(38, dtype=np.float), verbose=False):
     """
 
     Wrapper around opticspy.interferometer_zenike.__zernikepolar__
@@ -153,8 +153,9 @@ def zernikePoly(x, y, xOffset, yOffset, amplitude=np.zeros(38, dtype=np.float)):
 
     z = opticspy.interferometer_zenike.__zernikepolar__(amplitude, rcn, ucn)
 
-    print("Zernike polynomials with amplitudes", amplitude)
-    print("Their linear combination has mean: {0:.2e}, min: {1:.2e}, max: {2:.2e}".format(np.mean(z), np.nanmin(z), np.nanmax(z)))
+    if verbose:
+        print("Zernike polynomials with amplitudes", amplitude)
+        print("Their linear combination has mean: {0:.2e}, min: {1:.2e}, max: {2:.2e}".format(np.mean(z), np.nanmin(z), np.nanmax(z)))
 
     return z
 
