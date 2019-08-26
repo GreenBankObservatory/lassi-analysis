@@ -471,11 +471,18 @@ def maskLeicaData(filename, n=512, **kwargs):
         else:
 
             map_mask[i] = True
-            
-    return (np.ma.masked_where(map_mask, orgData[0]), 
-            np.ma.masked_where(map_mask, orgData[1]),
-            np.ma.masked_where(map_mask, orgData[2]),
-            np.ma.masked_where(map_mask, orgData[2] - newZm))
+
+    origMaskedData = (np.ma.masked_where(map_mask, orgData[0]),
+                      np.ma.masked_where(map_mask, orgData[1]),
+                      np.ma.masked_where(map_mask, orgData[2]))
+
+    rotatedData = (xrrm, yrrm, zrrm)
+
+    outData = {'origMasked': origMaskedData,
+               'rotated': rotatedData,
+               'fitResidual': np.ma.masked_where(map_mask, orgData[2] - newZm)}
+
+    return outData 
 
 def processLeicaScanPair(filename1,
                          filename2,
