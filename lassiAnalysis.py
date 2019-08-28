@@ -20,7 +20,7 @@ from processPTX import processPTX, processNewPTX, aggregateXYZ
 from main import smoothGPUs, smoothXYZGpu, splitXYZ
 from main import loadLeicaDataFromGpus
 from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
-                      newParabola, rotateData
+                      newParabola, rotateData, parabola
 from zernikeIndexing import noll2asAnsi, printZs
 from simulateSignal import addCenterBump, zernikeFour
 from simulateSignal import zernikeFive, gaussian
@@ -472,15 +472,22 @@ def maskLeicaData(filename, n=512, **kwargs):
 
             map_mask[i] = True
 
+    # Prepare output
     origMaskedData = (np.ma.masked_where(map_mask, orgData[0]),
                       np.ma.masked_where(map_mask, orgData[1]),
                       np.ma.masked_where(map_mask, orgData[2]))
 
     rotatedData = (xrrm, yrrm, zrrm)
 
+    fitResidual = np.ma.masked_where(map_mask, orgData[2] - newZm)
+
+    parabolaFit = (newXm, newYm, newZm) 
+
     outData = {'origMasked': origMaskedData,
                'rotated': rotatedData,
-               'fitResidual': np.ma.masked_where(map_mask, orgData[2] - newZm)}
+               'fitResidual': fitResidual,
+               'parabolaFit': parabolaFit,
+               'parabolaFitCoeffs': c}
 
     return outData 
 
@@ -579,7 +586,7 @@ def processLeicaScanPair(filename1,
 
     return (xs1, ys1, xs2, ys2), diffData
 
-def regridXYZ(x, y, z, n=512., verbose=False):
+def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False, ymax=False):
     """
     Regrids the XYZ data to a regularly sampled grid.
 
@@ -590,19 +597,30 @@ def regridXYZ(x, y, z, n=512., verbose=False):
     :param verbose: verbose output?
     """
     
-    xmin = np.nanmin(x)
-    xmax = np.nanmax(x)
-    ymin = np.nanmin(y)
-    ymax = np.nanmax(y)
+    # Set the grid limits.
+    if not xmin:
+        xmin = np.nanmin(x)
+    if not xmax:
+        xmax = np.nanmax(x)
+    if not ymin:
+        ymin = np.nanmin(y)
+    if not ymax:
+        ymax = np.nanmax(y)
+
     if verbose:
         print("Limits: ", xmin, xmax, ymin, ymax)
+
+    # Set the grid spacing.
     dx = (xmax - xmin)/n
     dy = (ymax - ymin)/n
+    
+    # Make the grid.
     grid_xy = np.mgrid[xmin:xmax:dx,
                        ymin:ymax:dy]
     if verbose:
         print("New grid shape: ", grid_xy[0].shape)
 
+    # Regrid the data.
     reg_z = griddata(np.array([x[~np.isnan(z)].flatten(),y[~np.isnan(z)].flatten()]).T, 
                      z[~np.isnan(z)].flatten(), 
                      (grid_xy[0], grid_xy[1]), method='linear', fill_value=np.nan)
