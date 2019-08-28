@@ -2,7 +2,7 @@ import numpy as np
 
 def windowData(x, y, z, N):
 
-    print "windowing by: ", N
+    print("windowing by: ", N)
     #print "x: "
     #print x
     #print "y: "
@@ -52,7 +52,7 @@ def windowData(x, y, z, N):
 
 def windowDataOld(x, y, z, N):
 
-    print "windowing by: ", N
+    print("windowing by: ", N)
     #print "x: "
     #print x
     #print "y: "
@@ -89,7 +89,7 @@ def windowDataOld(x, y, z, N):
             #print "xw: ", xw
             #print "yw: ", yw
             zw = list(set(list(xw[0])).intersection(set(list(yw[0]))))
-            print "zw: ", zw
+            print("zw: ", zw)
             ws[wi] = (rng, (x[xw], y[yw], z[zw]))
             #ws[wi] = (rng, (xysf, z[zw]))
             wi += 1
@@ -193,10 +193,10 @@ def mainTest():
 
     xm, ym = np.meshgrid(xs, ys)
 
-    print "xm: "
-    print xm
-    print "ym: "
-    print ym
+    print("xm: ")
+    print(xm)
+    print("ym: ")
+    print(ym)
 
     zs = xm * ym
     
@@ -208,23 +208,23 @@ def mainTest():
     n = 3
     xLoc, yLoc, zsmooth = smooth(xm.flatten(), ym.flatten(), zs.flatten(), n, sigAz=1., sigEl=1.)
 
-    print "data: "
-    print zs
+    print("data: ")
+    print(zs)
 
-    print "smoothed to: "
-    print zsmooth
+    print("smoothed to: ")
+    print(zsmooth)
 
     ws = windowData(xm.flatten(), ym.flatten(), zs.flatten(), n+1)
-    print ws.keys()
+    print(ws.keys())
     for k, v in ws.items():
         ixy, rng, values = v
         _, zzz = values
-        print rng, np.mean(zzz)
+        print(rng, np.mean(zzz))
 
     zWinSmooth = smoothWin(ws, sigAz=1.0, sigEl=1.0)    
 
-    print "zWinSmooth: "
-    print zWinSmooth
+    print("zWinSmooth: ")
+    print(zWinSmooth)
 
 def main():
 
@@ -239,11 +239,11 @@ def main():
     n = 10
     xLoc, yLoc, zsmooth = smooth(xm.flatten(), ym.flatten(), zs.flatten(), n, sigAz=1., sigEl=1.)
 
-    print "smoothed to: "
-    print zsmooth
+    print("smoothed to: ")
+    print(zsmooth)
 
     ws = windowData(xm.flatten(), ym.flatten(), zs.flatten(), n+1)
-    print ws.keys()
+    print(ws.keys())
     for k, v in ws.items():
         ixy, rng, values = v
         _, zzz = values
@@ -251,9 +251,9 @@ def main():
 
     zWinSmooth = smoothWin(ws, sigAz=1.0, sigEl=1.0)    
 
-    print "zWinSmooth: "
+    print("zWinSmooth: ")
     zWinSmooth.shape = (n, n)
-    print zWinSmooth
+    print(zWinSmooth)
 
 if __name__=='__main__':
     main()

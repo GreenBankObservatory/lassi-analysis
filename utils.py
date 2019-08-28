@@ -13,10 +13,10 @@ def cart2sph(x, y, z, verbose=True):
     lngs = np.array([l.value for l in lngs])
 
     if verbose:
-        print "min/max lats (radians)", lats.min(), lats.max()
-        print "lats supposed range (radians)", -np.pi/2, np.pi/2
-        print "min/max lngs (radians)", lngs.min(), lngs.max()
-        print "lngs supposed range (radians)", 0, 2*np.pi
+        print("min/max lats (radians)", lats.min(), lats.max())
+        print("lats supposed range (radians)", -np.pi/2, np.pi/2)
+        print("min/max lngs (radians)", lngs.min(), lngs.max())
+        print("lngs supposed range (radians)", 0, 2*np.pi)
 
     return rs, lats, lngs
 
@@ -24,11 +24,11 @@ def sph2cart(az, el, r, verbose=True):
     "Wrapper around astropy's spherical_to_cartesian"
 
     if verbose:
-        print "min/max az (radians)", np.nanmin(az), np.nanmax(az)
-        print "az supposed range (radians)", -np.pi/2, np.pi/2
-        print "min/max el (radians)", np.nanmin(el), np.nanmax(el)
-        print "el supposed range (radians)", 0, 2*np.pi
-        print "radial ranges", np.nanmin(r), np.nanmax(r)
+        print("min/max az (radians)", np.nanmin(az), np.nanmax(az))
+        print("az supposed range (radians)", -np.pi/2, np.pi/2)
+        print("min/max el (radians)", np.nanmin(el), np.nanmax(el))
+        print("el supposed range (radians)", 0, 2*np.pi)
+        print("radial ranges", np.nanmin(r), np.nanmax(r))
 
     xs, ys, zs = spherical_to_cartesian(r, az, el)
 
@@ -72,3 +72,41 @@ def difflog(x):
 def log10(x):
     "short cup to numpy log10"
     return np.log10(np.abs(x))
+
+def circular_mask(shape, centre, radius, angle_range):
+    """
+    Return a boolean mask for a circular sector. The start/stop angles in  
+    `angle_range` should be given in clockwise order and in degrees.
+    Centre and radius are in pixels.
+    """
+
+    x,y = np.ogrid[:shape[0],:shape[1]]
+    cx,cy = centre
+    tmin,tmax = np.deg2rad(angle_range)
+
+    # ensure stop angle > start angle
+    if tmax < tmin:
+        tmax += 2*np.pi
+
+    # convert cartesian --> polar coordinates
+    r2 = (x-cx)*(x-cx) + (y-cy)*(y-cy)
+    theta = np.arctan2(x-cx, y-cy) - tmin
+
+    # wrap angles between 0 and 2*pi
+    theta %= (2*np.pi)
+
+    # circular mask
+    circmask = r2 <= radius*radius
+
+    # angular mask
+    anglemask = theta <= (tmax-tmin)
+
+    return circmask*anglemask
+
+def midPoint(x):
+    """
+    Returns the midpoint of an array:
+    (max(x) - min(x))/2 + min(x)
+    """
+
+    return (np.nanmax(x) - np.nanmin(x))/2. + np.nanmin(x)

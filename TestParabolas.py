@@ -33,8 +33,8 @@ class TestParabolas(unittest.TestCase):
         for i, d in enumerate(diff):
             #print i, d, tol, d < tol
             if d >= tol:
-                print "Fail: "
-                print i, d, tol, d < tol
+                print("Fail: ")
+                print(i, d, tol, d < tol)
              
             self.assertTrue(d < tol)
 

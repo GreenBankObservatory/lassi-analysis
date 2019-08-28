@@ -10,7 +10,7 @@ def processGO(fpath):
     info = {}
 
     if not os.path.isfile(fpath):
-        print "WARNING: no GO Fits at: ", fpath
+        print("WARNING: no GO Fits at: ", fpath)
         return info
 
     hs = fits.open(fpath)
@@ -31,10 +31,10 @@ def processGO(fpath):
         if key in hd:
             info[key] = hd[key]
         else:
-            print "Header missing key in ", key, fpath    
+            print("Header missing key in ", key, fpath)    
 
     if info == {}:
-        print "WARNING: no info found in GO FITS", fpath
+        print("WARNING: no info found in GO FITS", fpath)
 
     return info            
 
@@ -43,7 +43,7 @@ def processProject(path, projDir):
     proj = ProjectScanLog(projPath)
     proj.open()
     if proj.scans == {}:
-        print "Nothing to process in ", projPath
+        print("Nothing to process in ", projPath)
         return
 
     goInfos = []
@@ -61,7 +61,7 @@ def processProject(path, projDir):
                 goInfo['DURSECS'] = proj.scanTimes[scanNum]['durSecs']
             goInfos.append(goInfo)
         else:
-            print "scanNum does not have a GO FITS", scanNum
+            print("scanNum does not have a GO FITS", scanNum)
             continue
 
     return proj, goInfos
@@ -103,7 +103,7 @@ def getOOFProjInfo(project, goInfo):
         # oofScans.append((scanNum, rx, startDt, endDt))
         if oofGroup is None:
             # start the new group!
-            print "new group for: ", project.projPath
+            print("new group for: ", project.projPath)
             oofGroup = []
         oofGroup.append((scanNum, rx, startDt, endDt))    
 
@@ -120,9 +120,9 @@ def mineAstridProcedures(path):
     # projDirs = ['AGBT17B_101_07']
     # projDirs = ['AGBT18B_383_04']
     # projDirs = ['AGBT17B_325_39']
-    print "Found %d Projects" % len(projDirs)
+    print("Found %d Projects" % len(projDirs))
     for i, projDir in enumerate(projDirs):
-        print "Project: %d %s" % (i, projDir)
+        print("Project: %d %s" % (i, projDir))
         proc = processProject(path, projDir)
         if proc is not None:
             proj, goInfo = proc
@@ -136,7 +136,7 @@ def mineAstridProcedures(path):
     rxOofDurs = {}
     gapProjs = noGapProjs = 0
     for proj, projOofInfo in oofProjInfos:
-        print "for project:"
+        print("for project:")
         # print projOofInfo
         if len(projOofInfo) > 1:
             gapProjs += 1
@@ -148,14 +148,14 @@ def mineAstridProcedures(path):
                 sn1, rx, _, gapStartDt = thisGroup[-1]
                 sn2, _, gapEndDt, _ = nextGroup[0]
                 gaps.append((rx, gapStartDt, gapEndDt))
-                print gapStartDt, gapEndDt
+                print(gapStartDt, gapEndDt)
                 gapDurHrs = (gapEndDt - gapStartDt).seconds/(60.*60.)    
-                print "gap (hrs): ", rx, sn1, sn2, gapDurHrs
+                print("gap (hrs): ", rx, sn1, sn2, gapDurHrs)
                 if rx not in rxOofGaps:
                     rxOofGaps[rx] = []
                 rxOofGaps[rx].append(gapDurHrs)    
         elif len(projOofInfo) == 1:
-            print projOofInfo
+            print(projOofInfo)
             noGapProjs += 1
             group = projOofInfo[0][-1]
             sn, rx, startDt, endDt = group
@@ -164,35 +164,35 @@ def mineAstridProcedures(path):
             durHrs = (proj.projEndDt - endDt).seconds/(60.*60.) 
             rxOofDurs[rx].append(durHrs)  
 
-    print ""
-    print "Num gap Projs vs. no gap projs: ", gapProjs, noGapProjs
-    print ""
-    print "Gaps (hrs) between OOF scan groups (> 1 hr):"
-    print "%20s %7s %7s %7s %7s %7s" % ("Rx", "#projs", "Min", "Max", "Mean", "STD")
+    print("")
+    print("Num gap Projs vs. no gap projs: ", gapProjs, noGapProjs)
+    print("")
+    print("Gaps (hrs) between OOF scan groups (> 1 hr):")
+    print("%20s %7s %7s %7s %7s %7s" % ("Rx", "#projs", "Min", "Max", "Mean", "STD"))
     for rx, durs in rxOofGaps.items():
         # print "rx gaps: ", rx, np.min(durs), np.max(durs), np.mean(durs), np.std(durs)
         # now filter out suspicious outliers:
         fdurs = [d for d in durs if d > 1.0]
         if len(fdurs) > 0:
-            print "%20s %7d %7.2f %7.2f %7.2f %7.2f" % (rx,
+            print("%20s %7d %7.2f %7.2f %7.2f %7.2f" % (rx,
                                                    len(fdurs),     
                                                    np.min(fdurs),
                                                    np.max(fdurs),
                                                    np.mean(fdurs),
-                                                   np.std(fdurs))
+                                                   np.std(fdurs)))
 
-    print ""
-    print "Time (hrs) between OOF scan groups and end of project (> 1 hr):"
-    print "%20s %7s %7s %7s %7s %7s" % ("Rx", "#projs", "Min", "Max", "Mean", "STD")
+    print("")
+    print("Time (hrs) between OOF scan groups and end of project (> 1 hr):")
+    print("%20s %7s %7s %7s %7s %7s" % ("Rx", "#projs", "Min", "Max", "Mean", "STD"))
     for rx, durs in rxOofDurs.items():
         fdurs = [d for d in durs if d > 1.0]
         if len(fdurs) > 0:
-            print "%20s %7d %7.2f %7.2f %7.2f %7.2f" % (rx,
+            print("%20s %7d %7.2f %7.2f %7.2f %7.2f" % (rx,
                                                         len(fdurs),
                                                    np.min(fdurs),
                                                    np.max(fdurs),
                                                    np.mean(fdurs),
-                                                   np.std(fdurs))
+                                                   np.std(fdurs)))
 
     # mine data
     oofData = {}
@@ -221,31 +221,31 @@ def mineAstridProcedures(path):
 
                 
     # report results
-    print ""
-    print "All Times in Seconds:"  
-    print ""
-    print "OOF Results: "
-    print "%20s %8s %9s %9s %9s" % ("RX", "# scans", "total", "mean", "std")
+    print("")
+    print("All Times in Seconds:")  
+    print("")
+    print("OOF Results: ")
+    print("%20s %8s %9s %9s %9s" % ("RX", "# scans", "total", "mean", "std"))
     for rx, info in oofData.items():
         # print rx, info
         durSecs = [i[2] for i in info]
-        print "%20s %8d %9.2f %9.2f %9.2f" % (rx, len(durSecs), np.sum(durSecs), np.mean(durSecs), np.std(durSecs))                    
+        print("%20s %8d %9.2f %9.2f %9.2f" % (rx, len(durSecs), np.sum(durSecs), np.mean(durSecs), np.std(durSecs)))                    
 
-    print ""
-    print "POINTING Results: "
-    print "%20s %8s %9s %9s %9s" % ("RX", "# scans", "total", "mean", "std")
+    print("")
+    print("POINTING Results: ")
+    print("%20s %8s %9s %9s %9s" % ("RX", "# scans", "total", "mean", "std"))
     for rx, info in pntData.items():
         # print rx, info
         durSecs = [i[2] for i in info]
-        print "%20s %8d %9.2f %9.2f %9.2f" % (rx, len(durSecs), np.sum(durSecs), np.mean(durSecs), np.std(durSecs))                    
+        print("%20s %8d %9.2f %9.2f %9.2f" % (rx, len(durSecs), np.sum(durSecs), np.mean(durSecs), np.std(durSecs)))                    
 
-    print ""
-    print "FOCUS Results: "
-    print "%20s %8s %9s %9s %9s" % ("RX", "# scans", "total", "mean", "std")
+    print("")
+    print("FOCUS Results: ")
+    print("%20s %8s %9s %9s %9s" % ("RX", "# scans", "total", "mean", "std"))
     for rx, info in fcsData.items():
         # print rx, info
         durSecs = [i[2] for i in info]
-        print "%20s %8d %9.2f %9.2f %9.2f" % (rx, len(durSecs), np.sum(durSecs), np.mean(durSecs), np.std(durSecs))                    
+        print("%20s %8d %9.2f %9.2f %9.2f" % (rx, len(durSecs), np.sum(durSecs), np.mean(durSecs), np.std(durSecs)))                    
 
 def main():
     path = "/home/gbtdata"

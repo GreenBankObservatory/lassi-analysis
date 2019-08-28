@@ -18,7 +18,7 @@ def surface3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
 
     # plot all the data, or just some?
     if sample is not None:
-        print "Plotting %5.2f percent of data" % sample
+        print("Plotting %5.2f percent of data" % sample)
         x, y, z = sampleXYZData(x, y, z, sample)
 
     ax.plot_surface(x, y, z)
@@ -34,9 +34,9 @@ def scatter3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
 
     # plot all the data, or just some?
     if sample is not None:
-        print "Plotting %5.2f percent of data" % sample
+        print("Plotting %5.2f percent of data" % sample)
         x, y, z = sampleXYZData(x, y, z, sample)
-        print "Now length of data is %d" % len(x)
+        print("Now length of data is %d" % len(x))
 
 
     fig = plt.figure()

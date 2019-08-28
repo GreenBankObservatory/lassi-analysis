@@ -43,33 +43,33 @@ def parseScanFilename(fn):
         scanNum = int(fn[:idx])
         dt = datetime.strptime(fn[idx+1:-4], "%Y-%m-%d_%H:%M:%S")
     except:
-        print "ERROR parsing scan", fn
+        print("ERROR parsing scan", fn)
         scanNum = dt = None    
     return scanNum, dt
 
 def processScanPair(scan1, scan2, path):
 
     
-    print "Processing: "
-    print scan1
-    print scan2
+    print("Processing: ")
+    print(scan1)
+    print(scan2)
 
     scanNum1, dt1, fn1 = scan1 #parseScanFilename(fn1)
     scanNum2, dt2, fn2 = scan2 #parseScanFilename(fn2)
 
-    print "Scans: %d vs %d" % (scanNum1, scanNum2)
-    print "Times: %s vs %s" % (dt1, dt2)
+    print("Scans: %d vs %d" % (scanNum1, scanNum2))
+    print("Times: %s vs %s" % (dt1, dt2))
 
     if scanNum1 >= scanNum2:
-        print "WARNING: Scans are not incrementing:", scanNum1, scanNum2
+        print("WARNING: Scans are not incrementing:", scanNum1, scanNum2)
     if dt2 > dt1:
-        print "WARNING: Timestamps are reversed!!!"
+        print("WARNING: Timestamps are reversed!!!")
 
-    print ""
+    print("")
 
 def processScan(path, filename, scanNum, dt):
 
-    print "Processing: ", scanNum, dt, filename
+    print("Processing: ", scanNum, dt, filename)
     fpath = os.path.join(path, filename)
 
     # processLeicaScan(fpath, rot=-10.)

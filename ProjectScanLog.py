@@ -14,9 +14,9 @@ from astropy.coordinates import Angle
 
 class CheapLogging:
     def error(self, msg):
-        print "ERROR", msg
+        print("ERROR", msg)
     def debug(self, msg):
-        print "DEBUG", msg
+        print("DEBUG", msg)
 
 logger = CheapLogging()        
         
@@ -82,7 +82,7 @@ class ProjectScanLog:
                         startDt = self.stringToDt(filepath)
                     except:
                         startDt = None
-                        print "error formating: ", filepath
+                        print("error formating: ", filepath)
                         continue    
                     self.scanTimes[scanNum]['start'] = startDt 
                 if 'FINISHED' in filepath:
@@ -90,7 +90,7 @@ class ProjectScanLog:
                         endDt = self.stringToDt(filepath)
                     except:
                         endDt = None
-                        print "error formating: ", filepath
+                        print("error formating: ", filepath)
                         continue    
                     self.scanTimes[scanNum]['end'] = endDt
                 if startDt is not None and endDt is not None:

@@ -1,1 +1,1 @@
-jupyter notebook --ip=colossus.gb.nrao.edu --port=9012 --NotebookApp.token='' --NotebookApp.password=''
+jupyter notebook --ip=galileo.gb.nrao.edu --port=9015 --NotebookApp.token='' --NotebookApp.password=''

@@ -2,21 +2,25 @@
 This is a very high level module for integrating other modules and 
 analyzing a single scan of Leica data once it's available.
 """
+
 import os
 import time
+import numpy as np
 from copy import copy
 from shutil import copyfile
-
+from scipy.interpolate import griddata
 # import matplotlib
 # matplotlib.use('agg')
-import numpy as np
+
 import opticspy
+
+from astropy.stats import sigma_clip
 
 from processPTX import processPTX, processNewPTX, aggregateXYZ
 from main import smoothGPUs, smoothXYZGpu, splitXYZ
 from main import loadLeicaDataFromGpus
-from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace
-#from parabolas import loadLeicaDataFromGpus
+from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
+                      newParabola, rotateData, parabola
 from zernikeIndexing import noll2asAnsi, printZs
 from simulateSignal import addCenterBump, zernikeFour
 from simulateSignal import zernikeFive, gaussian
@@ -52,7 +56,7 @@ def smooth(fpath, N=512, spherical=False):
         dimPath = os.path.join(GPU_PATH, dimFile)
         outfiles.append(dimPath)
         assert os.path.isfile(dimPath)
-        print "GPUs created file: ", dimPath
+        print("GPUs created file: ", dimPath)
 
     return outfiles
 
@@ -62,7 +66,7 @@ def writeGPUoutput(gpuPath, fn, dim, data, cp2ext=None):
     fpath = os.path.join(gpuPath, fn)
     # here we make sure each element gets its own line
     # with as much precision as what I think the GPU is doing
-    print "writeGPUoutput to ", fpath
+    print("writeGPUoutput to ", fpath)
     if cp2ext is not None and os.path.isfile(fpath):
         # avoid overwriting this file by copying to a location with 
         # this extension
@@ -95,15 +99,15 @@ def smoothWithWeights(fpath, xyz, N=512):
     yOrg = copy(y)
     zOrg = copy(z)
 
-    print "Converting to spherical ..."
+    print("Converting to spherical ...")
     r, el, az = cart2sph(x, y, z)
 
     scatter3dPlot(el, az, r, "el az r of sample of data")
 
-    print "input data ranges: "
-    print "r: ", np.nanmin(r), np.nanmax(r), len(r)
-    print "el: ", np.nanmin(el), np.nanmax(el), len(el)
-    print "az: ", np.nanmin(az), np.nanmax(az), len(az)
+    print("input data ranges: ")
+    print("r: ", np.nanmin(r), np.nanmax(r), len(r))
+    print("el: ", np.nanmin(el), np.nanmax(el), len(el))
+    print("az: ", np.nanmin(az), np.nanmax(az), len(az))
 
     sph = aggregateXYZ(r, az, el)
 
@@ -111,12 +115,12 @@ def smoothWithWeights(fpath, xyz, N=512):
     # using 'sph' to denote the coord system
     assert fpath[-4:] == '.csv'
     outf = fpath[:-4] + ".sph.csv"
-    print "Saving spherical to file: ", outf
+    print("Saving spherical to file: ", outf)
     np.savetxt(outf, sph, delimiter=",")    
 
     # TBF: GPU code is still labeling the output files
     # as [x,y,z] even though we are in spherical
-    print "Smoothing R ..."
+    print("Smoothing R ...")
     smoothSphFiles = smooth(outf, spherical=True)
 
     # print "Identity Test!"
@@ -133,7 +137,7 @@ def smoothWithWeights(fpath, xyz, N=512):
  
     basename = os.path.basename(outf)
     gpuSphPath = os.path.join(GPU_PATH, basename)
-    print "loading GPU data from", gpuSphPath
+    print("loading GPU data from", gpuSphPath)
 
     # retrieve the radial values for the variance calculation
     rs, azs, els = loadLeicaDataFromGpus(gpuSphPath)
@@ -152,7 +156,7 @@ def smoothWithWeights(fpath, xyz, N=512):
 
     # convert these back to cartesian, since this is what
     # we'll need for the subsequent fittings
-    print "converting this spherical data to xyz ..."
+    print("converting this spherical data to xyz ...")
     xs, ys, zs = sph2cart(els, azs, rs)
 
     scatter3dPlot(xs, ys, zs, "smoothed xyz data")
@@ -162,7 +166,7 @@ def smoothWithWeights(fpath, xyz, N=512):
         # write them to files as if the GPUs created them:
         fn = writeGPUoutput(GPU_PATH, basename, dim, data, cp2ext=ext)
         smoothedFiles.append(fn)
-    print "cartesian smoothed files: ", smoothedFiles    
+    print("cartesian smoothed files: ", smoothedFiles)    
 
     # print "Identity Test Again!"
     # print "xs vs xOrg", xs.shape, xOrg.shape, xs, xOrg
@@ -188,7 +192,7 @@ def smoothWithWeights(fpath, xyz, N=512):
 
     scatter3dPlot(el, az, r**2, "az el r^2")
 
-    print "Smoothing R^2 ..."
+    print("Smoothing R^2 ...")
     smoothSphFiles2 = smooth(outf2, spherical=True)
     # smoothSphFiles = [
     #     "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/Clean9.ptx.sph2.csv.x.csv",
@@ -199,7 +203,7 @@ def smoothWithWeights(fpath, xyz, N=512):
     # retrieve the radial values for the variance calculation
     basename2 = os.path.basename(outf2)
     gpuSphPath2 = os.path.join(GPU_PATH, basename2)
-    print "loading GPU data from", gpuSphPath2
+    print("loading GPU data from", gpuSphPath2)
 
     r2s, azs, els = loadLeicaDataFromGpus(gpuSphPath2)
 
@@ -209,7 +213,7 @@ def smoothWithWeights(fpath, xyz, N=512):
     # make sure small negative numerical errors are dealt with
     sigma2 = np.abs(r2s - (rs**2))
 
-    print "sigma squared: ", sigma2.shape, np.nanmin(sigma2), np.nanmax(sigma2), np.nanmean(sigma2), np.nanstd(sigma2)
+    print("sigma squared: ", sigma2.shape, np.nanmin(sigma2), np.nanmax(sigma2), np.nanmean(sigma2), np.nanstd(sigma2))
 
     # not normalized weights
     Ws_Not_Norm= 1/sigma2
@@ -220,7 +224,7 @@ def smoothWithWeights(fpath, xyz, N=512):
     # normalize weights, making sure Nans in sum are dealt with
     ws = (Ws_Not_Norm) / np.sum(Ws_Not_Norm[np.logical_not(np.isnan(sigma2))])
 
-    print "Computed weights: ", ws.shape, ws
+    print("Computed weights: ", ws.shape, ws)
 
     sigma2.shape = (N, N)
     imagePlot(sigma2, "sigma^2")
@@ -279,10 +283,10 @@ def processLeicaScan(fpath,
     s = time.time()
 
     # removes headers, does basic rotations, etc.
-    print "Processing PTX file ..."
+    print("Processing PTX file ...")
     if xOffset is None:
-        # xOffset = -8.
-        xOffset = -6.
+        xOffset = -8.
+        #xOffset = -6.
     if yOffset is None:    
         yOffset = 50.0
     if rot is None:
@@ -305,11 +309,11 @@ def processLeicaScan(fpath,
                     sampleSize=sampleSize) #xOffset=xOffset, yOffset=yOffset)
 
     e = time.time()
-    print "Elapsed minutes: %5.2f" % ((e - s) / 60.)
+    print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
 
     # reduces our data via GPUs
     s = time.time()
-    print "Smoothing data ..."
+    print("Smoothing data ...")
 
     weights = None
     if useFittingWeights:
@@ -324,17 +328,17 @@ def processLeicaScan(fpath,
     #   weights = getWeightsFromInitialSmoothing(fn, processedPath)
 
     e = time.time()
-    print "Elapsed minutes: %5.2f" % ((e - s) / 60.)
+    print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
     
     # now fit this data to a rotated parabola.
     # this function just takes the first part of our outputs
     # and figures out the rest
     s = time.time()
-    print "Fitting paraboloa ..."
+    print("Fitting paraboloa ...")
     fn = smoothedFiles[0]
     assert fn[-5:] == 'x.csv'
     fn = fn[:-6]
-    print "Fitting data found in files:", fn
+    print("Fitting data found in files:", fn)
     # print "NOT USING WEIGHTS!"
     wc = copy(weights)
     # weights = None
@@ -346,15 +350,15 @@ def processLeicaScan(fpath,
                               weights=weights)
 
     e = time.time()
-    print "Elapsed minutes: %5.2f" % ((e - s) / 60.)
+    print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
 
     s = time.time()
-    print "Regriding data ..."
+    print("Regriding data ...")
     filename = "%s.regrid" % fileBasename
     xs, ys, diffs = smoothXYZGpu(x, y, diff, N, filename=filename)
 
     e = time.time()
-    print "Elapsed minutes: %5.2f" % ((e - s) / 60.)
+    print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
 
     xs.shape = ys.shape = diffs.shape = (N, N)
 
@@ -374,6 +378,119 @@ def loadProcessedData(filename):
     d = np.load(filename)
     return d["xs"], d["ys"], d["diffs"]
 
+def maskLeicaData(filename, n=512, **kwargs):
+    """
+    Given a GPU smoothed file, it will try and find bumps in the surface and mask them.
+
+    :param filename: file with the GPU smoothed data.
+    :param n: number of samples in the GPU smoothed data. Default n=512.
+    :param kwargs: keyword arguments passed to astropy.stats.sigma_clip.
+    """
+
+    orgData, cleanData = loadLeicaData(filename, n=n, numpy=False)
+    
+    xf = cleanData[0]
+    yf = cleanData[1]
+    zf = cleanData[2]
+
+    # Assemble initial guess.
+    f = 60.
+    v1x = 0.
+    v1y = 0.
+    v2 = 0.
+    xTheta = 0.
+    yTheta = 0.
+    guess = [f, v1x, v1y, v2, xTheta, yTheta]
+
+    # Fit a parabola to the data.
+    fitresult = fitLeicaData(xf, yf, zf, guess, weights=None)
+    
+    # Subtract the fitted parabola from the data.
+    # The difference should be flat.
+    c = fitresult.x
+    newX, newY, newZ = newParabola(orgData[0], orgData[1], orgData[2], c[0], c[1], c[2], c[3], c[4], c[5])
+    newX.shape = newY.shape = newZ.shape = (n, n)
+    xrr, yrr, zrr = rotateData(orgData[0], orgData[1], orgData[2], c[4], c[5])
+    xrr.shape = yrr.shape = zrr.shape = (n, n)
+    diff = zrr - newZ
+    
+    mask = (((xrr - 2.)**2 + (yrr - 50.)**2) < 45**2)
+    mdiff = np.ma.masked_where(~mask, diff)
+    # Mask any pixels which deviate from the noise.
+    # This should mask out retroreflectors, misaligned panels and sub-scans where the TLS moved due to wind.
+    mcdiff = sigma_clip(mdiff)
+    
+    # Apply the mask to the original data and repeat once more.
+    # In the end also fit a parabola to each row in the data, and mask outliers.
+    # This allows to find more subtle features in the data.
+    xf = np.ma.masked_where(mcdiff.mask, orgData[0])
+    yf = np.ma.masked_where(mcdiff.mask, orgData[1])
+    zf = np.ma.masked_where(mcdiff.mask, orgData[2])
+
+    f = 60.
+    v1x = 0.
+    v1y = 0.
+    v2 = 0.
+    xTheta = 0.
+    yTheta = 0.
+    guess = [f, v1x, v1y, v2, xTheta, yTheta]
+
+    masked_fitresult = fitLeicaData(xf.compressed(), yf.compressed(), zf.compressed(),
+                                       guess, weights=None)
+    
+    c = masked_fitresult.x
+    newXm, newYm, newZm = newParabola(orgData[0], orgData[1], orgData[2], c[0], c[1], c[2], c[3], c[4], c[5])
+    newXm.shape = newYm.shape = newZm.shape = (n, n)
+    xrrm, yrrm, zrrm = rotateData(orgData[0], orgData[1], orgData[2], c[4], c[5])
+    xrrm.shape = yrrm.shape = zrrm.shape = (n, n)
+    masked_diff = zrrm - newZm
+    mask = (((xrr - 2.)**2 + (yrr - 50.)**2) < 45**2)
+    masked_diff = np.ma.masked_where(~mask, masked_diff)
+    mcdiff2 = masked_diff
+    
+    # Final mask.
+    map_mask = np.zeros((n,n), dtype=bool)
+
+    x = np.linspace(0,n,n)
+
+    # Loop over rows fitting a parabola and masking any pixels that deviate from noise.
+    for i in range(0,n):
+
+        y = mcdiff2[i]
+
+        if len(x[~y.mask]) > 3:
+
+            poly_c = np.polyfit(x[~y.mask], y[~y.mask], 2)
+            poly_f = np.poly1d(poly_c)
+
+            res = np.ma.masked_invalid(y - poly_f(x))
+            res_sc = sigma_clip(res, **kwargs)
+
+            map_mask[i] = res_sc.mask
+
+        else:
+
+            map_mask[i] = True
+
+    # Prepare output
+    origMaskedData = (np.ma.masked_where(map_mask, orgData[0]),
+                      np.ma.masked_where(map_mask, orgData[1]),
+                      np.ma.masked_where(map_mask, orgData[2]))
+
+    rotatedData = (xrrm, yrrm, zrrm)
+
+    fitResidual = np.ma.masked_where(map_mask, orgData[2] - newZm)
+
+    parabolaFit = (newXm, newYm, newZm) 
+
+    outData = {'origMasked': origMaskedData,
+               'rotated': rotatedData,
+               'fitResidual': fitResidual,
+               'parabolaFit': parabolaFit,
+               'parabolaFitCoeffs': c}
+
+    return outData 
+
 def processLeicaScanPair(filename1,
                          filename2,
                          processed=False,
@@ -387,10 +504,10 @@ def processLeicaScanPair(filename1,
         # load results from file; these files should exist
         # here in the CWD
         fn1 = "%s.processed.npz" % os.path.basename(filename1)
-        print "Loading processed data from file:", fn1
+        print("Loading processed data from file:", fn1)
         xs1, ys1, diff1 = loadProcessedData(fn1)
         fn2 = "%s.processed.npz" % os.path.basename(filename2)
-        print "Loading processed data from file:", fn2
+        print("Loading processed data from file:", fn2)
         xs2, ys2, diff2 = loadProcessedData(fn2)
         imagePlot(np.log(np.abs(np.diff(diff1))), "first scan log")
         imagePlot(np.log(np.abs(np.diff(diff2))), "second scan log")
@@ -401,20 +518,20 @@ def processLeicaScanPair(filename1,
         xs1, ys1, diff1, weights1 = processLeicaScan(filename1, rot=rot, parabolaFit=parabolaFit)
         xs2, ys2, diff2, weights2 = processLeicaScan(filename2, rot=rot, parabolaFit=parabolaFit)
 
-    print "Finding difference between scans ..."
+    print("Finding difference between scans ...")
     N = 512
     diffData = diff1 - diff2
 
     if rFilter:
         # TBF: which x, y to use?
-        print "xs1 dims", np.min(xs1), np.max(xs1), np.min(xs1) + ((np.max(xs1) - np.min(xs1))/2)
-        print "ys1 dims", np.min(ys1), np.max(ys1), np.min(ys1) + ((np.max(ys1) - np.min(ys1))/2)
-        print "xs2 dims", np.min(xs2), np.max(xs2), np.min(xs2) + ((np.max(xs2) - np.min(xs2))/2)
-        print "ys2 dims", np.min(ys2), np.max(ys2), np.min(ys2) + ((np.max(ys2) - np.min(ys2))/2)
+        print("xs1 dims", np.min(xs1), np.max(xs1), np.min(xs1) + ((np.max(xs1) - np.min(xs1))/2))
+        print("ys1 dims", np.min(ys1), np.max(ys1), np.min(ys1) + ((np.max(ys1) - np.min(ys1))/2))
+        print("xs2 dims", np.min(xs2), np.max(xs2), np.min(xs2) + ((np.max(xs2) - np.min(xs2))/2))
+        print("ys2 dims", np.min(ys2), np.max(ys2), np.min(ys2) + ((np.max(ys2) - np.min(ys2))/2))
         rLimit = 45.5
         xOffset = np.min(xs1) + ((np.max(xs1) - np.min(xs1))/2)
         yOffset = np.min(ys1) + ((np.max(ys1) - np.min(ys1))/2)
-        print "Center (%f, %f), Removing points close to edge: radius=%f" % (xOffset, yOffset, rLimit)
+        print("Center (%f, %f), Removing points close to edge: radius=%f" % (xOffset, yOffset, rLimit))
         diffData = radialReplace(xs1.flatten(),
                                  ys1.flatten(),
                                  diffData.flatten(),
@@ -431,14 +548,14 @@ def processLeicaScanPair(filename1,
     diffDataLog = np.log(np.abs(diffData))
     imagePlot(diffDataLog, "Surface Deformations Log")
 
-    print "Mean of diffs: ", np.nanmean(diffData)
-    print "Std of diffs: ", np.nanstd(diffData)
+    print("Mean of diffs: ", np.nanmean(diffData))
+    print("Std of diffs: ", np.nanstd(diffData))
 
     # find the zernike
     if not fitZernikies:
         return (xs1, ys1, xs2, ys2), diffData
 
-    print "Fitting difference to zernikies ..."
+    print("Fitting difference to zernikies ...")
 
     # replace NaNs with zeros
     diffDataOrg = copy(diffData)
@@ -453,21 +570,62 @@ def processLeicaScanPair(filename1,
                                           numZsFit,
                                           remain2D=1,
                                           barchart=1)
-    print "fitlist: ", fitlist
+    print("fitlist: ", fitlist)
     C1.listcoefficient()
     C1.zernikemap()
 
-    print "Converting from Noll to Active Surface ANSI Zernikies ..."
+    print("Converting from Noll to Active Surface ANSI Zernikies ...")
     # and now convert this to active surface zernike convention
     # why does the fitlist start with a zero? for Z0??  Anyways, avoid it
     nollZs = fitlist[1:(numZsFit+1)]
     asAnsiZs = noll2asAnsi(nollZs)
-    print "nolZs"
+    print("nolZs")
     printZs(nollZs)
-    print "active surface Zs"
+    print("active surface Zs")
     printZs(asAnsiZs)
 
     return (xs1, ys1, xs2, ys2), diffData
+
+def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False, ymax=False):
+    """
+    Regrids the XYZ data to a regularly sampled grid.
+
+    :param x: vector with the x coordinates.
+    :param y: vector with the y coordinates.
+    :param z: vector with the z coordinates.
+    :param n: number of samples in the grid.
+    :param verbose: verbose output?
+    """
+    
+    # Set the grid limits.
+    if not xmin:
+        xmin = np.nanmin(x)
+    if not xmax:
+        xmax = np.nanmax(x)
+    if not ymin:
+        ymin = np.nanmin(y)
+    if not ymax:
+        ymax = np.nanmax(y)
+
+    if verbose:
+        print("Limits: ", xmin, xmax, ymin, ymax)
+
+    # Set the grid spacing.
+    dx = (xmax - xmin)/n
+    dy = (ymax - ymin)/n
+    
+    # Make the grid.
+    grid_xy = np.mgrid[xmin:xmax:dx,
+                       ymin:ymax:dy]
+    if verbose:
+        print("New grid shape: ", grid_xy[0].shape)
+
+    # Regrid the data.
+    reg_z = griddata(np.array([x[~np.isnan(z)].flatten(),y[~np.isnan(z)].flatten()]).T, 
+                     z[~np.isnan(z)].flatten(), 
+                     (grid_xy[0], grid_xy[1]), method='linear', fill_value=np.nan)
+    
+    return grid_xy[0], grid_xy[1], reg_z.T
 
 def simulateSignal(sigFn,
                    refFn,
@@ -567,7 +725,7 @@ def simulateSignal(sigFn,
         imagePlot(np.log(np.abs(np.diff(diffSigS))), 'diffSigS log (added gaussian)')
 
     else:
-        print "sigType not recognized: ", sigType
+        print("sigType not recognized: ", sigType)
         diffSigS = diffSig
 
     # regrid to get into evenly spaced x y
@@ -594,8 +752,8 @@ def simulateSignal(sigFn,
     imagePlot(diffData, "Surface Deformations")    
     imagePlot(diffDataLog, "Surface Deformations Log")
 
-    print "Mean: ", np.nanmean(diffData)
-    print "Std; ", np.nanstd(diffData)
+    print("Mean: ", np.nanmean(diffData))
+    print("Std; ", np.nanstd(diffData))
     
     return diffData
 

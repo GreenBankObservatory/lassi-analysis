@@ -39,7 +39,7 @@ def parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2): #, hr=104.):
     yoffset = 54. #0.
     radius = 50.
     mask = heavySide(xdata, ydata, v1x, v1y, xoffset, yoffset, radius)
-    print "Of %d elements, %d masked by heavyside" % (len(z), np.sum(mask))
+    print("Of %d elements, %d masked by heavyside" % (len(z), np.sum(mask)))
     #assert np.all(mask)
     #return z[mask]
     # z[mask] = 0.0
@@ -162,7 +162,7 @@ def fitLeicaScan(fn,
         if inSpherical:
             # we need to convert this data to cartesian:
             # x0, y0, z0 == r, az, el
-            print "converting inputs from spherical to cartesian"
+            print("converting inputs from spherical to cartesian")
             x0, y0, z0 = sph2cart(y0, z0, x0)
             x, y, z = sph2cart(y, z, x)
 
@@ -175,12 +175,12 @@ def fitLeicaScan(fn,
 
     scatter3dPlot(x, y, z, "Sample of Leica Data", sample=10.0)
 
-    print "x range:", np.min(x), np.max(x)
-    print "y range:", np.min(y), np.max(y)
+    print("x range:", np.min(x), np.max(x))
+    print("y range:", np.min(y), np.max(y))
 
 
     if np.all(np.isnan(x)) or np.all(np.isnan(y)) or np.all(np.isnan(z)):
-        print "fitLeicaScan cannot work on data with all NANs"
+        print("fitLeicaScan cannot work on data with all NANs")
         return None, None, None
 
     if rFilter:
@@ -198,24 +198,24 @@ def fitLeicaScan(fn,
     guess = [f, v1x, v1y, v2, 0., 0.]
 
     if weights is not None:
-        print "Weights: ", weights.shape, weights
-        print "z0: ", z0.shape, z0
+        print("Weights: ", weights.shape, weights)
+        print("z0: ", z0.shape, z0)
         # asure correct dimensions
         z0.shape = (N, N)
         weights.shape = (N, N)
-        print "filtering out nans in xyz data from weights"
+        print("filtering out nans in xyz data from weights")
         # this will flatten the weights
         weights = weights[np.logical_not(np.isnan(z0))];
-        print "replacing nans in weights by zeros"
+        print("replacing nans in weights by zeros")
         weights[np.isnan(weights)] = 0.
 
-    print "fitLeicaData xyz.shape: ", x.shape, y.shape, z.shape
+    print("fitLeicaData xyz.shape: ", x.shape, y.shape, z.shape)
 
     r = fitLeicaData(x, y, z, guess, weights=weights)
 
     # plot fitted data
     c = r.x
-    print "cleaned data fitted with coefficients: ", c
+    print("cleaned data fitted with coefficients: ", c)
     newX, newY, newZ = newParabola(x0, y0, z0, c[0], c[1], c[2], c[3], c[4], c[5])
     newX.shape = newY.shape = newZ.shape = (N, N)
     surface3dPlot(newX, newY, newZ, "Fitted Data")
@@ -242,36 +242,40 @@ def imagePlot(z, title):
     fig.colorbar(cax)
     plt.title(title)
 
-def fitLeicaData(x, y, z, guess, weights=None):
-    print "fit leica boss!"
-    #guess = [f, v1x, v1y, v2, 0., 0.]
+def fitLeicaData(x, y, z, guess, weights=None, verbose=False):
+
+    if verbose:
+        print("fit leica boss!")
+    
+    # Set boundaries for the fit parameters.
     inf = np.inf
     pi2 = 2*np.pi
     b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
     b2 = [inf, inf, inf, inf, pi2, pi2]
     bounds = (b1, b2)
+
     # robust fit: weights outliers outside of f_scale less
     loss = "soft_l1"
     # 0.05 is a good educated guess from Andrew
     # f_scale = .05
     # f_scale = .01
     f_scale = 1.0
-    print "fitLeicaData with robust, soft_l1, f_scale %f" % f_scale
+    if verbose:
+        print("fitLeicaData with robust, soft_l1, f_scale %f" % f_scale)
 
     if weights is None:
         method = fitParabola
         args = (x .flatten(), y.flatten(), z.flatten())
     else:
-        print "Using weights for fit!"
+        if verbose:
+            print("Using weights for fit!")
         method = fitParabolaWithWeights
         args = (x .flatten(), y.flatten(), z.flatten(), weights.flatten())
         
     r = least_squares(method,
                       guess,
-                      # args=(x .flatten(), y.flatten(), z.flatten()),
                       args=args,
                       bounds=bounds,
-                      # method='lm',
                       max_nfev=1000000,
                       loss=loss,
                       f_scale=f_scale,
@@ -356,7 +360,7 @@ def radialReplace(x, y, z, xOffset, yOffset, radius, replacement):
             cnt += 1
             z[i] = replacement
 
-    print "radialReplace replaced %d points with %s" % (cnt, replacement)
+    print("radialReplace replaced %d points with %s" % (cnt, replacement))
     # only z gets changed
     return z
 
@@ -366,7 +370,7 @@ def surface3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
 
     # plot all the data, or just some?
     if sample is not None:
-        print "Plotting %5.2f percent of data" % sample
+        print("Plotting %5.2f percent of data" % sample)
         x, y, z = sampleXYZData(x, y, z, sample)
 
     ax.plot_surface(x, y, z)
@@ -382,9 +386,9 @@ def scatter3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
 
     # plot all the data, or just some?
     if sample is not None:
-        print "Plotting %5.2f percent of data" % sample
+        print("Plotting %5.2f percent of data" % sample)
         x, y, z = sampleXYZData(x, y, z, sample)
-        print "Now length of data is %d" % len(x)
+        print("Now length of data is %d" % len(x))
 
     fig = plt.figure()
     ax = Axes3D(fig)
@@ -415,7 +419,7 @@ def fitNoRot():
     #coeffs = [focus, v1x, v1y, v2]
     coeffs = [1., 0., 0., 0.]
     r = least_squares(errfun, coeffs, args=(x2d.flatten(), y2d.flatten(), fakedata.flatten()))
-    print r
+    print(r)
 
 def fun2(coeffs, xdata, ydata):
     focus = coeffs[0]
@@ -497,10 +501,10 @@ def fitRot():
                       max_nfev=1e4,
                       ftol=1e-10,
                       xtol=1e-10)
-    print r
-    print "real:", focus, v1x, v1y, v2, rotX, rotY
-    print "guessed:", coeffs
-    print "vs:", r.x
+    print(r)
+    print("real:", focus, v1x, v1y, v2, rotX, rotY)
+    print("guessed:", coeffs)
+    print("vs:", r.x)
     #print "vs:", r[0]
     c = r.x
 
@@ -512,8 +516,8 @@ def fitRot():
 
 
     residuals = fittedData - fakedata
-    print "max residual: ", np.max(residuals)
-    print "mean residual: ", np.mean(residuals)
+    print("max residual: ", np.max(residuals))
+    print("mean residual: ", np.mean(residuals))
 
     return x2d, y2d, xrot, yrot, fakedata, fittedData, actuals, coeffs, c, z4
 
@@ -667,9 +671,9 @@ def checkFit(answer, guess, fit, diff):
         #print i, answer[i], fit[i]
         #assert d < tol
         if d > tol:
-            print "fit failed with diff: ", answer, diff
+            print("fit failed with diff: ", answer, diff)
             return False
-    print "fit passed with diff: ", answer, diff
+    print("fit passed with diff: ", answer, diff)
     return True
 
 def radialFilter(x, y, z, xOffset, yOffset, radius):
@@ -699,9 +703,9 @@ def main():
     #tryFits()
     fn = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/randomSampleScan10.csv"
     x, y, z = loadLeicaDataFromGpus(fn)
-    print x, x[np.logical_not(np.isnan(x))]
-    print y
-    print z
+    print(x, x[np.logical_not(np.isnan(x))])
+    print(y)
+    print(z)
 
 if __name__=='__main__':
     main()

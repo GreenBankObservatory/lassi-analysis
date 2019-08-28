@@ -93,10 +93,10 @@ def runOneScan(a):
     logger.debug("exporting data after a quick sleep")
     time.sleep(5)
     a.export_data()
-    print "Result keys: ", a.get_results().keys()
+    print("Result keys: ", a.get_results().keys())
     keys = a.get_results().keys()
     while len(keys) < 5:
-        print "not enough keys: ", keys
+        print("not enough keys: ", keys)
         time.sleep(1)
         keys = a.get_results().keys()
     print "We have all our keys now: ", keys

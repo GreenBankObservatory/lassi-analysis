@@ -60,12 +60,12 @@ class AsZernikeFile:
         # look for the x value first
         i1 = actHoopRib.find('[')
         if i1 == -1:
-            print "could not find first [", actHoopRib
+            print("could not find first [", actHoopRib)
             return None
 
         i2 = actHoopRib.find(']')
         if i2 == -1:
-            print "could not find first ]", actHoopRib
+            print("could not find first ]", actHoopRib)
             return None
 
         x = int(actHoopRib[i1+1:i2])
@@ -83,5 +83,5 @@ if __name__ == '__main__':
     #    print act
     ks = sorted(asz.actuators.keys())
     for k in ks:
-        print k, asz.actuators[k].phi
-    print "Found %d actuators specified" % len(asz.actuatorList)
+        print(k, asz.actuators[k].phi)
+    print("Found %d actuators specified" % len(asz.actuatorList))

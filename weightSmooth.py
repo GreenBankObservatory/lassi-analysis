@@ -33,13 +33,13 @@ def weightSmooth(fpath, xyz):
 
     basename = os.path.basename(fpath)
     gpuPath = os.path.join(GPU_PATH, basename)
-    print "loading GPU data from", gpuPath
+    print("loading GPU data from", gpuPath)
     xs, ys, zs = loadLeicaDataFromGpus(gpuPath)    
 
     scatter3dPlot(xs, ys, zs, "sample of smoothed data", sample=1.0)
 
     # we need the smoothed r, <r>, so convert this
-    print "Converting to spherical ..."
+    print("Converting to spherical ...")
     rs, els, azs = cart2sph(xs, ys, zs)
 
 
@@ -56,7 +56,7 @@ def weightSmooth(fpath, xyz):
     f2 = basename + ".rs.csv"
     basepath = os.path.dirname(fpath)     
     fpath2 = os.path.join(basepath, f2)
-    print "Saving r**2 data in xyz to file", fpath2
+    print("Saving r**2 data in xyz to file", fpath2)
     np.savetxt(fpath2, xyz2, delimiter=',')
 
     # now smooth this data
@@ -64,7 +64,7 @@ def weightSmooth(fpath, xyz):
     
     # retrieve the xyz data
     gpuPath2 = os.path.join(GPU_PATH, f2)
-    print "loading GPU data from", gpuPath2
+    print("loading GPU data from", gpuPath2)
     xs2, ys2, zs2 = loadLeicaDataFromGpus(gpuPath2)
 
     # convert back to shperical to get <r**2>
@@ -74,7 +74,7 @@ def weightSmooth(fpath, xyz):
         # make sure small negative numerical errors are dealt with
     sigma2 = np.abs(rs2 - (rs**2))
 
-    print "sigma squared: ", sigma2.shape, np.nanmin(sigma2), np.nanmax(sigma2), np.nanmean(sigma2), np.nanstd(sigma2)
+    print("sigma squared: ", sigma2.shape, np.nanmin(sigma2), np.nanmax(sigma2), np.nanmean(sigma2), np.nanstd(sigma2))
 
     # not normalized weights
     Ws_Not_Norm= 1/sigma2
@@ -85,7 +85,7 @@ def weightSmooth(fpath, xyz):
     # normalize weights, making sure Nans in sum are dealt with
     ws = (Ws_Not_Norm) / np.sum(Ws_Not_Norm[np.logical_not(np.isnan(sigma2))])
 
-    print "Computed weights: ", ws.shape, ws
+    print("Computed weights: ", ws.shape, ws)
 
     # plot weights
     sigma2.shape = (N, N)
@@ -121,6 +121,6 @@ def smooth(fpath, N=512, spherical=False):
         dimPath = os.path.join(GPU_PATH, dimFile)
         outfiles.append(dimPath)
         assert os.path.isfile(dimPath)
-        print "GPUs created file: ", dimPath
+        print("GPUs created file: ", dimPath)
 
     return outfiles

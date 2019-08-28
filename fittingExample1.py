@@ -25,7 +25,7 @@ def getHalfCircle():
     phis = np.linspace(0, pi/2.0, l1)
     thetas = np.linspace(0, 2.0*pi, l1)
     phi, theta = np.meshgrid(phis, thetas)
-    print "phi.shape: ", phi.shape
+    print("phi.shape: ", phi.shape)
     x = r*sin(phi)*cos(theta)
     y = r*sin(phi)*sin(theta)
     z = r*cos(phi)
@@ -141,15 +141,15 @@ def main():
     # Find the Zernike Coefficients:
     #fitlist,C1 = opticspy.zernike.fitting(Z,12,remain2D=1,remain3D=1,barchart=1,interferogram=1)
     fitlist,C1 = opticspy.zernike.fitting(Z,12,remain2D=1,barchart=1)
-    print "fitlist: ", fitlist
+    print("fitlist: ", fitlist)
     C1.listcoefficient()
     C1.zernikemap()
 
 
-    print "NOTE: this is using the polynomial ordering found at"
-    print "https://www.telescope-optics.net/images/zernike_noll.PNG"
-    print "The ordering used by Mathematica is:"
-    print "https://en.wikipedia.org/wiki/Zernike_polynomials#/media/File:Zernike_polynomials2.png"
+    print("NOTE: this is using the polynomial ordering found at")
+    print("https://www.telescope-optics.net/images/zernike_noll.PNG")
+    print("The ordering used by Mathematica is:")
+    print("https://en.wikipedia.org/wiki/Zernike_polynomials#/media/File:Zernike_polynomials2.png")
 
 
 if __name__ == "__main__":

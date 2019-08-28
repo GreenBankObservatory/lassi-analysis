@@ -5,7 +5,7 @@ try:
     import matplotlib.pylab as plt
     from mpl_toolkits.mplot3d import axes3d, Axes3D
 except:
-    print "No Plotting for you!"
+    print("No Plotting for you!")
 
 import numpy as np
 
@@ -36,7 +36,7 @@ def plotData(data,
         z = np.delete(z, wh[0])
         hoops = np.delete(hoops, wh[0])
         ribs = np.delete(ribs, wh[0])
-        print "Filtered min values from data, len from %d to %d" % (orgLen, len(z))
+        print("Filtered min values from data, len from %d to %d" % (orgLen, len(z)))
 
     title = "%s:%s" % (scanNumber, fieldName)
 
@@ -50,12 +50,12 @@ def plotData(data,
             act = asz.actuators[(h,r)]
             phis.append(act.phi)
         phis = np.array(phis)
-        print "Dividing z axis by phis."
+        print("Dividing z axis by phis.")
         z = z / phis
         title += ":phis"
 
     if xy:
-        print "Plotting in x and y."
+        print("Plotting in x and y.")
         # convert to x and y
         xlabel = 'x'
         ylabel = 'y'
@@ -81,14 +81,14 @@ def plotData(data,
 
     if filterDisabled:
         enabled= data.field('ENABLED')
-        print enabled
+        print(enabled)
         mask = enabled == True
-        print "mask: ", mask
+        print("mask: ", mask)
         orgLen = len(x)
         x = x[mask]
         y = y[mask]
         z = z[mask]
-        print "Removing %d disabled actuators" % (orgLen - len(z))
+        print("Removing %d disabled actuators" % (orgLen - len(z)))
 
     # now that we have the data the way we want it,
     # plot it
@@ -120,7 +120,7 @@ def plotIndicated(data, scanNumber):
     plt.title("%s:Filtered_%s" % (scanNumber, fieldName))
     
     ind = data.field(fieldName)
-    print "total indicated: ", len(ind)
+    print("total indicated: ", len(ind))
     #ind = ind[ind > -1e-4]
     # get rid of this one weird outlier
     tol = np.min(ind)
@@ -128,7 +128,7 @@ def plotIndicated(data, scanNumber):
     ind = np.delete(ind, wh[0])
     hoops = np.delete(hoops, wh[0])
     ribs = np.delete(ribs, wh[0])
-    print "filtered indicated: ", len(ind)
+    print("filtered indicated: ", len(ind))
     ax.scatter(hoops, ribs, ind)
     
     return hoops, ribs, ind
@@ -144,23 +144,23 @@ def plotZernikes(ext, title):
     # print non-zero values
     nzValues = [(i, v) for i, v in enumerate(values) if v > 0.0 ]
     if len(nzValues) > 0:
-        print "Non-zero zernikies for", title
+        print("Non-zero zernikies for", title)
         for i, v in nzValues:
-            print "%d: %5.2f" % (i, v)
+            print("%d: %5.2f" % (i, v))
 
 def plotFile(fn, filterMin=False, filterDisabled=True):
     hs = fits.open(fn)
     hdr = hs[0].header
     
     scan = hdr['SCAN']
-    print "Zeros enabled:", hdr['ZERO']
-    print "FEM enabled:", hdr['FEM']
-    print "Random enabled:", hdr['RANDOM']
-    print "Zernikes enabled:", hdr['ZERNIKE']
-    print "Thermal Zernikes enabled", hdr['THRMZERN']
+    print("Zeros enabled:", hdr['ZERO'])
+    print("FEM enabled:", hdr['FEM'])
+    print("Random enabled:", hdr['RANDOM'])
+    print("Zernikes enabled:", hdr['ZERNIKE'])
+    print("Thermal Zernikes enabled", hdr['THRMZERN'])
     
     if len(hs) < 2:
-        print "Active Surface FITS file only has Primary Header"
+        print("Active Surface FITS file only has Primary Header")
         return
 
     #if len(hs) > 1 and hs[1].name == "ZERNIKE":
@@ -172,23 +172,23 @@ def plotFile(fn, filterMin=False, filterDisabled=True):
         hdu = hs['ZERNIKE']
         plotZernikes(hdu, 'ZERNIKE')
     except KeyError:
-        print "Does not contain ZERNIKE extension"
+        print("Does not contain ZERNIKE extension")
 
     try:
         hdu = hs['THRMZERN']
         plotZernikes(hdu, 'THRMZERN')
     except KeyError:
-        print "Does not contain ZERNIKE extension"
+        print("Does not contain ZERNIKE extension")
 
     try:
         data = hs['SURFACE'].data
     except KeyError:
-        print "Does not contain SURFACE extension"
+        print("Does not contain SURFACE extension")
         return
 
     #plotData(data, scan, 'INDICATED')
-    print "The Indicated column in FITS is *actually*"
-    print "the Indicated actuator values minus their zero points"
+    print("The Indicated column in FITS is *actually*")
+    print("the Indicated actuator values minus their zero points")
     # indData = plotIndicated(data, scan)
     indData = plotData(data,
                        scan,
@@ -198,7 +198,7 @@ def plotFile(fn, filterMin=False, filterDisabled=True):
     h, r, ind = indData
     zlim = (np.min(ind), np.max(ind))
 
-    print "Plot Indicated again, but taking into account phi"
+    print("Plot Indicated again, but taking into account phi")
     h, r, indPhi = plotData(data,
                  scan,
                  'INDICATED',
@@ -207,7 +207,7 @@ def plotFile(fn, filterMin=False, filterDisabled=True):
                  filterDisabled=filterDisabled,
                  dividePhi=True)
 
-    print "Plot Indicated again, but taking into account phi, and in x, y"
+    print("Plot Indicated again, but taking into account phi, and in x, y")
     x, y, indPhi = plotData(data,
                  scan,
                  'INDICATED',
@@ -217,16 +217,16 @@ def plotFile(fn, filterMin=False, filterDisabled=True):
                  filterDisabled=filterDisabled,
                  dividePhi=True)
 
-    print "The Absolute column in FITS is *actually*"
-    print "the Indicated (readback from hardware) actuator values."
+    print("The Absolute column in FITS is *actually*")
+    print("the Indicated (readback from hardware) actuator values.")
     h, r, absd = plotData(data,
                           scan,
                           'ABSOLUTE',
                           filterDisabled=filterDisabled)
 
-    print "The Delta column in FITS is *actually*"
-    print "the difference between the commanded and indicated (actual) positions"
-    print "this will be all zeros in the simulator"
+    print("The Delta column in FITS is *actually*")
+    print("the difference between the commanded and indicated (actual) positions")
+    print("this will be all zeros in the simulator")
     delData = plotData(data, scan, 'DELTA')
 
     return h, r, x, y, ind, indPhi, absd
@@ -241,7 +241,7 @@ def surfacePlot(data, z, title):
 
     plt.title(title)
 
-    print "z: ", z
+    print("z: ", z)
     ax.scatter(hoops, ribs, z)
     
 
@@ -252,8 +252,8 @@ def plotDiffs(fn1, fn2):
 
     diff, abs1, abs2 = diffField(fn1, fn2, "SURFACE", "ABSOLUTE")
 
-    print type(diff), diff
-    print "ABSOLUTE Diff between scans: min=%f, max=%f, mean=%f " % (np.min(diff), np.max(diff), np.mean(diff))
+    print(type(diff), diff)
+    print("ABSOLUTE Diff between scans: min=%f, max=%f, mean=%f " % (np.min(diff), np.max(diff), np.mean(diff)))
     # just need the hoops and ribs, which are always the same
     hs = fits.open(fn1)
     data = hs["SURFACE"].data
@@ -292,7 +292,7 @@ def readActSrfTxt(fn):
     z = []
 
     # skip the comments in the first two lines:
-    print ls[:2]
+    print(ls[:2])
     for l in ls[2:]:
         ps = l.split(' ')
         x.append(float(ps[0]))
@@ -345,7 +345,7 @@ def plotActSrfTxt(fn):
     sigX = sigY = .1
     xLoc, yLoc, zSmooth = smoothSlow(x, y, z, N, sigEl=sigX, sigAz=sigY)
 
-    print "Smoothed data using %s x %d size grid, sigs: %f, %f" % (N, N, sigX, sigY)
+    print("Smoothed data using %s x %d size grid, sigs: %f, %f" % (N, N, sigX, sigY))
 
     f = plt.figure()
     ax = Axes3D(f)
@@ -361,20 +361,20 @@ def plotActSrfTxt(fn):
 
 def analyzeActiveSurfaceScan(path, fn, scanNum):
 
-    print "Scan: ", scanNum
+    print("Scan: ", scanNum)
     fitsPath = os.path.join(path, fn)
 
-    print "FITS: ", fitsPath
+    print("FITS: ", fitsPath)
     plotFile(fitsPath)
 
     txtFile = "asdata.%s.txt" % scanNum
     txtPath = os.path.join(path, txtFile)
 
-    print "Txt:", txtPath
+    print("Txt:", txtPath)
     if os.path.isfile(txtPath):    
         plotActSrfTxt(txtPath)
     else:
-        print "no asdata.*.txt: ", txtPath
+        print("no asdata.*.txt: ", txtPath)
 
 def analyzeActiveSurfaceScans(scanLogPath, scanNums, details=False):
 
@@ -384,7 +384,7 @@ def analyzeActiveSurfaceScans(scanLogPath, scanNums, details=False):
     
     if details:
         for scanNum in scanNums:
-            print ""
+            print("")
             f = p.getDeviceFilename(device, scanNum)
             path = os.path.join(scanLogPath, device)
             analyzeActiveSurfaceScan(path, f, scanNum)
@@ -438,7 +438,7 @@ def parseAsZernikeConf(fn):
     # skipp comments
     ls = f.readlines()
     for l in ls[7:]:
-        print l
+        print(l)
         ps = l.split(' ')
         # act[rib][hoop] x y rho theta phi rho_y theta_y phi_y
         actuatorStr = ps[0]

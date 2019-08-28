@@ -63,7 +63,7 @@ def processPTXdata(lines, rotationAboutZdegrees, searchRadius, quiet=True, sampl
     ls = lines
 
     if not quiet:
-        print "Original file num lines: ", len(ls)
+        print("Original file num lines: ", len(ls))
 
     #badLine = '0 0 0 0.500000\r\n'
     badLine = '0 0 0 0.500000\n'
@@ -73,7 +73,7 @@ def processPTXdata(lines, rotationAboutZdegrees, searchRadius, quiet=True, sampl
     #    print "'%s' vs '%s'" % (l, badLine)
 
     if not quiet:
-        print "File minus '0 0 0 0.50000' lines: ", len(ls)
+        print("File minus '0 0 0 0.50000' lines: ", len(ls))
 
     #print "beginning of file: "
     #print ls[:12]
@@ -201,7 +201,7 @@ def getRawXYZ(ls, sampleSize=None):
     numLines = len(ls)
 
     if sampleSize is not None:
-        print "Picking %d random data points from a total of %d" % (sampleSize, numLines)
+        print("Picking %d random data points from a total of %d" % (sampleSize, numLines))
         lsIdx = random.sample(range(numLines), sampleSize)
     else:
         lsIdx = range(numLines)
@@ -233,7 +233,7 @@ def getRawXYZ(ls, sampleSize=None):
         zs.append(z)
         it.append(i)
 
-    print "Skipped %d non-data lines" % numLines
+    print("Skipped %d non-data lines" % numLines)
 
     xs = np.array(xs)
     ys = np.array(ys)
@@ -334,7 +334,7 @@ def processNewPTXData(lines,
 
     radius = 47.
 
-    print "ProcessNewPTXData with: ", xOffset, yOffset, rot, radius
+    print("ProcessNewPTXData with: ", xOffset, yOffset, rot, radius)
 
     if plotTest:
         # make some plots that ensure how we are doing
@@ -344,7 +344,7 @@ def processNewPTXData(lines,
     # get the actual float values from the file contents
     x, y, z, i = getRawXYZ(lines, sampleSize=sampleSize)
 
-    print "Starting with %d lines of data" % len(x)
+    print("Starting with %d lines of data" % len(x))
 
 
     # lets first just remove all the zero data
@@ -353,28 +353,28 @@ def processNewPTXData(lines,
 
     numFilteredOut = len(x) - len(i)
     percent = (float(numFilteredOut) / float(len(x))) * 100.
-    print "Filtered out %d points of %d (%5.2f%%) intensity equal to zero" % (numFilteredOut, len(x), percent)
+    print("Filtered out %d points of %d (%5.2f%%) intensity equal to zero" % (numFilteredOut, len(x), percent))
 
     x = x[mask]
     y = y[mask]
     z = z[mask]
 
-    print "Now we have %d lines of data" % len(x)
+    print("Now we have %d lines of data" % len(x))
 
     # remove aggregious jumps in data?
     if nFilter:
         # TBF: document where our tolerance comes from
         x, y, z, mask = neighborFilter(x, y, z, 0.122)
         i = i[mask]
-        print "Now we have %d lines of data" % len(x)
+        print("Now we have %d lines of data" % len(x))
 
     # we only want the data that has a decent intesity
     meanI = np.mean(i)
     stdI = np.std(i)
-    print "Intensity: max=%5.2f, min=%5.2f, mean=%5.2f, std=%5.2f" % (np.max(i),
+    print("Intensity: max=%5.2f, min=%5.2f, mean=%5.2f, std=%5.2f" % (np.max(i),
                                                                       np.min(i),
                                                                       meanI,
-                                                                      stdI)
+                                                                      stdI))
 
     if iFilter:    
         #lowestI = meanI # - stdI
@@ -388,13 +388,13 @@ def processNewPTXData(lines,
         percent = (float(numFilteredOut) / float(len(x))) * 100.
         #print "Filtered out %d points of %d (%5.2f%%) below intensity %5.2f" % (numFilteredOut, len(x), percent, lowestI)
         #print "Filtered out %d points of %d (%5.2f%%) higher intensity %5.2f" % (numFilteredOut, len(x), percent, highest)
-        print "Filtered out %d points of %d (%5.2f%%) via intensity" % (numFilteredOut, len(x), percent)
+        print("Filtered out %d points of %d (%5.2f%%) via intensity" % (numFilteredOut, len(x), percent))
 
         x = x[mask]
         y = y[mask]
         z = z[mask]
 
-        print "Now we have %d lines of data" % len(x)
+        print("Now we have %d lines of data" % len(x))
 
     assert len(x) == len(y)
     assert len(y) == len(z)
@@ -405,8 +405,8 @@ def processNewPTXData(lines,
         orgNum = len(x)
         x, y, z =  radialFilter(x, y, z, xOffset, yOffset, radius)
         newNum = len(x)
-        print "radial limit filtered out %d points outside radius %5.2f" % ((orgNum - newNum), radius)
-        print "Now we have %d lines of data" % len(x)
+        print("radial limit filtered out %d points outside radius %5.2f" % ((orgNum - newNum), radius))
+        print("Now we have %d lines of data" % len(x))
 
     # TBF: why must we do this?  No idea, but this,
     # along with a rotation of -90. gets our data to
@@ -423,11 +423,11 @@ def processNewPTXData(lines,
     y = y[mask]
     z = z[mask]
     newNum = len(z)
-    print "z - limit filtered out %d points below %5.2f" % ((orgNum - newNum), zLimit)
+    print("z - limit filtered out %d points below %5.2f" % ((orgNum - newNum), zLimit))
 
     if simSignal is not None:
         # just now we add a bump
-        print "Adding Center Bump"
+        print("Adding Center Bump")
         z = addCenterBump(x, y, z)
 
     # x, y, z -> [(x, y, z)]
@@ -438,15 +438,15 @@ def processNewPTXData(lines,
     xyz = np.array(xyz)
 
     if rot is not None or rot != 0.0:
-        print "Rotating about Z by %5.2f degrees" % rot
+        print("Rotating about Z by %5.2f degrees" % rot)
         rotationAboutZdegrees = rot
         xyz = rotateXYaboutZ(xyz, rotationAboutZdegrees)
     
-    print "Now we have %d lines of data" % len(xyz)
+    print("Now we have %d lines of data" % len(xyz))
 
     if parabolaFit is not None:
         pTol = 0.4
-        print "Using parabola fit to filter: ", parabolaFit
+        print("Using parabola fit to filter: ", parabolaFit)
         x, y, z = splitXYZ(xyz)
         orgLenX = len(x)
         focus, v1x, v1y, v2 = parabolaFit
@@ -460,9 +460,9 @@ def processNewPTXData(lines,
         xyz = aggregateXYZ(x, y, z)
         res = res[parMask]
         numFiltered = orgLenX - len(x)
-        print "After rejecting %d outliers (> %f), residuals look like:" % (numFiltered, pTol)
-        print "mean: %f, std: %f" % (np.mean(res), np.std(res))
-        print "Now we have %d lines of data" % len(xyz)
+        print("After rejecting %d outliers (> %f), residuals look like:" % (numFiltered, pTol))
+        print("mean: %f, std: %f" % (np.mean(res), np.std(res)))
+        print("Now we have %d lines of data" % len(xyz))
         scatter3dPlot(x, y, res, "residuals from parabola fit (no outliers)", sample=0.1)
 
     if plotTest:
@@ -580,7 +580,7 @@ def addCenterBump(x, y, z, rScale=10., zScale=0.05):
             # how does that change z?
             #z[i] = np.sqrt(r**2 - xi**2 - yi**2)
 
-    print "Added bump to %d pnts of %d pnts using rscale %5.2f and zscale %5.2f" % (cnt, len(z), rScale, zScale)
+    print("Added bump to %d pnts of %d pnts using rscale %5.2f and zscale %5.2f" % (cnt, len(z), rScale, zScale))
 
     return z
 
@@ -609,7 +609,7 @@ def neighborFilter(x, y, z, tol):
     newLen = len(xnew)
     fLen = orgLen - newLen
     fPcnt = (float(fLen) / float(orgLen)) * 100.0
-    print "neighborFilter reduces %d points to %d points (%d filtered, %f %%) using tol: %f" % (orgLen, newLen, fLen, fPcnt, tol)
+    print("neighborFilter reduces %d points to %d points (%d filtered, %f %%) using tol: %f" % (orgLen, newLen, fLen, fPcnt, tol))
 
     # return the mask as well so we can filter out other things as well
     return xnew, y[mask], z[mask], mask
