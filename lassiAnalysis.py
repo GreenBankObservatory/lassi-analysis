@@ -264,7 +264,8 @@ def processLeicaScan2(fpath,
                      sampleSize=None,
                      parabolaFit=None,
                      useFittingWeights=False,
-                     simSignal=None):
+                     simSignal=None,
+                     processPTX=True):
     """
     High level function for processing leica data:
        * processes PTX file
@@ -291,19 +292,28 @@ def processLeicaScan2(fpath,
     if rot is None:
         rot = 0.
     
-    processedPath = "{}/{}.csv".format(GPU_PATH, fileBasename)
+    processedPath = fpath + ".csv"
     
-    if False:
+    if processPTX:
         print("Processing PTX file ...")
         xyz = processNewPTX(fpath,
-                    rot=rot,
-                    xOffset=xOffset,
-                    yOffset=yOffset,
-                    rFilter=True,
-                    iFilter=False,
-                    parabolaFit=parabolaFit,
-                    simSignal=simSignal,
-                    sampleSize=sampleSize) #xOffset=xOffset, yOffset=yOffset)
+                            rot=rot,
+                            xOffset=xOffset,
+                            yOffset=yOffset,
+                            rFilter=True,
+                            iFilter=False,
+                            parabolaFit=parabolaFit,
+                            simSignal=simSignal,
+                            sampleSize=sampleSize)
+
+    e = time.time()
+    print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
+
+    # Reduces our data via GPUs.
+    s = time.time()
+    print("Smoothing data ...")
+    
+    smoothedFiles = smooth(processedPath)
 
     e = time.time()
     print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
@@ -311,7 +321,8 @@ def processLeicaScan2(fpath,
     print("Masking data and fitting parabola.")
     s = time.time()
 
-    maskedData = maskLeicaData(processedPath, n=N)
+    smoothedDataPath = "{}/{}.csv".format(GPU_PATH, fileBasename)
+    maskedData = maskLeicaData(smoothedDataPath, n=N)
 
     diff = maskedData['fitResidual']
     xRot, yRot, zRot = maskedData['rotated']
@@ -322,14 +333,17 @@ def processLeicaScan2(fpath,
     print("Regriding data to a uniformly sampled grid.")
     s = time.time()
 
-    xReg,yReg,diffReg = regridXYZ(xRot, 
-                                  yRot, 
-                                  diff.filled(np.nan), 
+    # Mask with points outside the primary.
+    outMask = np.ma.masked_invalid(xRot).mask
+    
+    xReg,yReg,diffReg = regridXYZ(xRot[~outMask], 
+                                  yRot[~outMask], 
+                                  diff[~outMask], 
                                   n=N, verbose=False)
     
-    _,_,retroMask = regridXYZ(xRot, 
-                              yRot, 
-                              np.ma.masked_where(diff.mask, diff.mask.astype(float)).filled(np.nan), 
+    _,_,retroMask = regridXYZ(xRot[~outMask], 
+                              yRot[~outMask], 
+                              diff.mask.astype(float)[~outMask], 
                               n=N, verbose=False)
 
     diffRegMasked = np.ma.masked_where(retroMask, diffReg)
@@ -338,9 +352,9 @@ def processLeicaScan2(fpath,
     print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
 
     # Write the final results to disk.
-    finalFile = "%s.processedMasked" % fileBasename
+    finalFile = "%s.processed" % fileBasename
     print("Saving {} to disk".format(finalFile))
-    np.savez(finalFile, xs=xReg, ys=yReg, diffs=diffRegMasked)
+    np.savez(finalFile, xs=xReg, ys=yReg, diffs=diffRegMasked, retroMask=retroMask)
 
     return xReg, yReg, diffRegMasked
 
@@ -464,7 +478,7 @@ def processLeicaScan(fpath,
 def loadProcessedData(filename):
     "Loads the results of processLeicaScan from file"
     d = np.load(filename)
-    return d["xs"], d["ys"], d["diffs"]
+    return d["xs"], d["ys"], d["diffs"], d["retroMask"]
 
 def maskLeicaData(filename, n=512, **kwargs):
     """
@@ -560,14 +574,15 @@ def maskLeicaData(filename, n=512, **kwargs):
 
             map_mask[i] = True
 
-    # Prepare output
+    # Prepare output.
     origMaskedData = (np.ma.masked_where(map_mask, orgData[0]),
                       np.ma.masked_where(map_mask, orgData[1]),
                       np.ma.masked_where(map_mask, orgData[2]))
 
-    rotatedData = (xrrm, yrrm, zrrm)
+    rotatedData = (xrrm,
+                   yrrm,
+                   np.ma.masked_where(map_mask, zrrm))
 
-    #fitResidual = np.ma.masked_where(map_mask, orgData[2] - newZm)
     fitResidual = np.ma.masked_where(map_mask, zrrm - newZm)
 
     parabolaFit = (newXm, newYm, newZm) 
@@ -594,22 +609,25 @@ def processLeicaScanPair(filename1,
         # here in the CWD
         fn1 = "%s.processed.npz" % os.path.basename(filename1)
         print("Loading processed data from file:", fn1)
-        xs1, ys1, diff1 = loadProcessedData(fn1)
+        xs1, ys1, diff1, mask1 = loadProcessedData(fn1)
+        diff1 = np.ma.masked_where(mask1, diff1)
         fn2 = "%s.processed.npz" % os.path.basename(filename2)
         print("Loading processed data from file:", fn2)
-        xs2, ys2, diff2 = loadProcessedData(fn2)
+        xs2, ys2, diff2, mask2 = loadProcessedData(fn2)
+        diff2 = np.ma.masked_where(mask1, diff2)
         imagePlot(np.log(np.abs(np.diff(diff1))), "first scan log")
         imagePlot(np.log(np.abs(np.diff(diff2))), "second scan log")
 
     else:
         # we need to process each scan
         # WARNING: each scan takes about 10 minutes    
-        xs1, ys1, diff1, weights1 = processLeicaScan(filename1, rot=rot, parabolaFit=parabolaFit)
-        xs2, ys2, diff2, weights2 = processLeicaScan(filename2, rot=rot, parabolaFit=parabolaFit)
+        xs1, ys1, diff1 = processLeicaScan2(filename1, rot=rot, parabolaFit=parabolaFit)
+        xs2, ys2, diff2 = processLeicaScan2(filename2, rot=rot, parabolaFit=parabolaFit)
 
     print("Finding difference between scans ...")
     N = 512
     diffData = diff1 - diff2
+    retroMask = diffData.mask
 
     if rFilter:
         # TBF: which x, y to use?
@@ -629,7 +647,7 @@ def processLeicaScanPair(filename1,
                                  rLimit,
                                  np.nan)
         diffData.shape= (N, N)
-        
+        diffData = np.ma.masked_where(retroMask, diffData)
 
     # find the difference of the difference!
     diffData.shape = (N, N)
@@ -651,7 +669,7 @@ def processLeicaScanPair(filename1,
     diffData[np.isnan(diffData)] = 0.
 
     # print scaling up data for z-fit by 1000.
-    diffDataM = diffData * 1000.
+    diffDataM = diffData.filled(0) * 1000.
 
     # find the first 12 Zernike terms
     numZsFit = 36
@@ -675,7 +693,7 @@ def processLeicaScanPair(filename1,
 
     return (xs1, ys1, xs2, ys2), diffData
 
-def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False, ymax=False):
+def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False, ymax=False, method='linear'):
     """
     Regrids the XYZ data to a regularly sampled grid.
 
@@ -712,9 +730,11 @@ def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False
     # Regrid the data.
     reg_z = griddata(np.array([x[~np.isnan(z)].flatten(),y[~np.isnan(z)].flatten()]).T, 
                      z[~np.isnan(z)].flatten(), 
-                     (grid_xy[0], grid_xy[1]), method='linear', fill_value=np.nan)
-    
-    return grid_xy[0], grid_xy[1], reg_z.T
+                     (grid_xy[0], grid_xy[1]), method=method, fill_value=np.nan)
+
+    # We need to flip the reggrided data in the abscisa axis 
+    # so that it has the same orientation as the input.
+    return grid_xy[0], grid_xy[1], reg_z.T[:,::-1]
 
 def simulateSignal(sigFn,
                    refFn,
