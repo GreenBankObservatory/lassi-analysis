@@ -256,6 +256,94 @@ def OLDsmoothWithWeights(fpath, N=512):
 
     return smoothedFiles
 
+def processLeicaScan2(fpath,
+                     N=512,
+                     rot=None,
+                     xOffset=None,
+                     yOffset=None,
+                     sampleSize=None,
+                     parabolaFit=None,
+                     useFittingWeights=False,
+                     simSignal=None):
+    """
+    High level function for processing leica data:
+       * processes PTX file
+       * smoothes it by calling gpu code
+       * fits parabolas to data
+       * regrids final data
+    Final processed scan is ready for difference between
+    this and a ref or signal scan.   
+    """
+
+    assert os.path.isfile(fpath)
+
+    fileBasename = os.path.basename(fpath)
+
+    # we'll provide primitive timing reports
+    s = time.time()
+
+    # removes headers, does basic rotations, etc.
+    if xOffset is None:
+        xOffset = -8.
+        #xOffset = -6.
+    if yOffset is None:
+        yOffset = 50.0
+    if rot is None:
+        rot = 0.
+    
+    processedPath = "{}/{}.csv".format(GPU_PATH, fileBasename)
+    
+    if False:
+        print("Processing PTX file ...")
+        xyz = processNewPTX(fpath,
+                    rot=rot,
+                    xOffset=xOffset,
+                    yOffset=yOffset,
+                    rFilter=True,
+                    iFilter=False,
+                    parabolaFit=parabolaFit,
+                    simSignal=simSignal,
+                    sampleSize=sampleSize) #xOffset=xOffset, yOffset=yOffset)
+
+    e = time.time()
+    print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
+
+    print("Masking data and fitting parabola.")
+    s = time.time()
+
+    maskedData = maskLeicaData(processedPath, n=N)
+
+    diff = maskedData['fitResidual']
+    xRot, yRot, zRot = maskedData['rotated']
+
+    e = time.time()
+    print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
+
+    print("Regriding data to a uniformly sampled grid.")
+    s = time.time()
+
+    xReg,yReg,diffReg = regridXYZ(xRot, 
+                                  yRot, 
+                                  diff.filled(np.nan), 
+                                  n=N, verbose=False)
+    
+    _,_,retroMask = regridXYZ(xRot, 
+                              yRot, 
+                              np.ma.masked_where(diff.mask, diff.mask.astype(float)).filled(np.nan), 
+                              n=N, verbose=False)
+
+    diffRegMasked = np.ma.masked_where(retroMask, diffReg)
+
+    e = time.time()
+    print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
+
+    # Write the final results to disk.
+    finalFile = "%s.processedMasked" % fileBasename
+    print("Saving {} to disk".format(finalFile))
+    np.savez(finalFile, xs=xReg, ys=yReg, diffs=diffRegMasked)
+
+    return xReg, yReg, diffRegMasked
+
 def processLeicaScan(fpath,
                      N=512,
                      rot=None,
@@ -479,7 +567,8 @@ def maskLeicaData(filename, n=512, **kwargs):
 
     rotatedData = (xrrm, yrrm, zrrm)
 
-    fitResidual = np.ma.masked_where(map_mask, orgData[2] - newZm)
+    #fitResidual = np.ma.masked_where(map_mask, orgData[2] - newZm)
+    fitResidual = np.ma.masked_where(map_mask, zrrm - newZm)
 
     parabolaFit = (newXm, newYm, newZm) 
 

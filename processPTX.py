@@ -332,7 +332,7 @@ def processNewPTXData(lines,
         #yOffset = 60.0
         #yOffset = 55.0
 
-    radius = 47.
+    radius = 45.5
 
     print("ProcessNewPTXData with: ", xOffset, yOffset, rot, radius)
 
