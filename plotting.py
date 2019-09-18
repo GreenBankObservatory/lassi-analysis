@@ -4,6 +4,25 @@ import random
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 
+def barChartPlot(index, fitlist):
+    """
+    Plots a bar chart with Zernike coefficients.
+    This is used in zernikies.getZernikeCoeffs
+    """
+
+    fig = plt.figure(figsize=(9, 6), dpi=80)
+    xticklist = []
+    width = 0.6
+    for i in index:
+        xticklist.append('Z'+str(i))
+    barfigure = plt.bar(index, fitlist, width, color='#2E9AFE', edgecolor='#2E9AFE')
+    plt.xticks(index+width//2, xticklist, rotation=90)
+    plt.xlabel('Zernike polynomials', fontsize=18)
+    plt.ylabel('Coefficient', fontsize=18)
+    plt.title('Fitted Zernike polynomial coefficients', fontsize=18)
+
+#    plt.show()
+
 def imagePlot(z, title):
     fig = plt.figure()
     ax = fig.gca()
