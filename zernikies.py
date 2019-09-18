@@ -3,7 +3,7 @@ from copy import copy
 import numpy as np
 #import opticspy
 
-from plotting import barChartPlot
+from plotting import barChartPlot, zernikeResiduals2DPlot
 from zernikeIndexing import noll2asAnsi, printZs
 
 nMax = 36
@@ -170,20 +170,20 @@ def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=T
         a = np.sum(surface*zf)*2.*2./l/l/np.pi*zernikeNorm[i]
         coeffs.append(a)
 
-    if plot3D or plot2D:
-        # Compute the residuals.
-        z_new = surface - zernikePolar(coeffs, r, u)
-        z_new[mask] = 0
-
     # Plot bar chart of Zernike coefficients.
     if barChart == True:
         fitlist = coeffs[1:order+1]
         index = np.arange(1,order+1)
         barChartPlot(index, fitlist)
 
+    # Plot the residuals.
     if plot2D:
+        # Compute the residuals.
+        z_new = surface - zernikePolar(coeffs, r, u)
+        z_new[mask] = 0
         zernikeResiduals2DPlot(xx, yy, z_new)
 
+    # Print a table with the coefficients.
     if printReport:
         zernikePrint(coeffs)
 
