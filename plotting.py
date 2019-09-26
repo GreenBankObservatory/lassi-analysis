@@ -4,6 +4,12 @@ import random
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 
+def linePlot(y, title):
+    fig = plt.figure()
+    ax = fig.gca()
+    ax.plot(range(len(y)), y)
+    plt.title(title)
+    
 def imagePlot(z, title):
     fig = plt.figure()
     ax = fig.gca()
@@ -49,6 +55,30 @@ def scatter3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
         plt.xlim(xlim)
     if ylim is not None:
         plt.ylim(ylim)    
+
+def scatterPlot(x, y, title, xlim=None, ylim=None, sample=None):
+
+    # plot all the data, or just some?
+    if sample is not None:
+        # TBD
+        z = copy(y)
+        print("Plotting %5.2f percent of data" % sample)
+        x, y, z = sampleXYZData(x, y, z, sample)
+        print("Now length of data is %d" % len(x))
+
+
+    fig = plt.figure()
+    # ax = Axes3D(fig)
+    ax = fig.gca()
+    ax.scatter(x, y)
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title(title)
+    if xlim is not None:
+        plt.xlim(xlim)
+    if ylim is not None:
+        plt.ylim(ylim)    
+
 
 
 def sampleXYZData(x, y, z, samplePercentage, seed=None):
