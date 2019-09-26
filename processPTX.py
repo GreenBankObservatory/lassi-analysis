@@ -14,6 +14,20 @@ from astropy.coordinates.matrix_utilities import rotation_matrix
 
 from parabolas import scatter3dPlot, parabola
 
+def previewData(ptxFile, sample=None):
+
+    print "opening file", ptxFile
+    with open(ptxFile, 'r') as f:
+        ls = f.readlines()
+
+    print "reading data ..."
+    x, y, z, i = getRawXYZ(ls)
+    
+    print "plotting preview ..."
+    if sample is None:
+        sample = 1.0
+    scatter3dPlot(x, y, z, "preview", sample=sample)
+
 def rotateXYaboutZ(xyz, rotDegrees):
 
     # define it as cartesian
@@ -417,13 +431,13 @@ def processNewPTXData(lines,
     # dish, but with some things the radial filter didn't
     # get rid of above or below the dish
     zLimit = -80
-    mask = z > -80
+    mask = np.logical_and(z > -80, z < -10)
     orgNum = len(z)
     x = x[mask]
     y = y[mask]
     z = z[mask]
     newNum = len(z)
-    print("z - limit filtered out %d points below %5.2f" % ((orgNum - newNum), zLimit))
+    print("z - limit filtered out %d points below %5.2f and above -10" % ((orgNum - newNum), zLimit))
 
     if simSignal is not None:
         # just now we add a bump
