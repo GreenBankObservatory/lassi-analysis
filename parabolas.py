@@ -10,7 +10,6 @@ from scipy.optimize import leastsq
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 
-#from findBumps import PrimeX, PrimeY, PrimeZ
 from utils import sph2cart, cart2sph
 
 from rotate import *
@@ -23,7 +22,12 @@ def parabola(xdata, ydata, focus, v1x, v1y, v2, heavy=False):
 
 def parabolaSimple(xdata, ydata, focus, v1x, v1y, v2):
     "simply the equation for a 2-D parabola"
+    focus = 60.
     return (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 + v2
+
+def parabolaSimple_(xdata, ydata, focus):
+    "simply the equation for a 2-D parabola"
+    return (1./(4.*focus))*(xdata)**2 + (1./(4.*focus))*(ydata)**2
 
 def parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2): #, hr=104.):
     "Reject everything outside the circle our data shows up in"
@@ -111,10 +115,9 @@ def newParabola(xdata, ydata, zdata, focus, v1x, v1y, v2, rotX, rotY):
     yr = PrimeY(pry, L)
     #zr = PrimeZ(pry, L)
     
-    zdata = parabola(xr, yr, focus, v1x, v1y, v2)
+    new_zdata = parabola(xr, yr, focus, v1x, v1y, v2)
 
-    return xr, yr, zdata
-
+    return xr, yr, new_zdata
 
 def fun(coeffs, xdata, ydata):
     focus = coeffs[0]
@@ -220,10 +223,14 @@ def fitLeicaScan(fn,
     newX.shape = newY.shape = newZ.shape = (N, N)
     surface3dPlot(newX, newY, newZ, "Fitted Data")
 
-    # rotate original rotations for fitted coefficients
+    # rotate original data using fitted coefficients
     xThetaFit = r.x[4]
     yThetaFit = r.x[5]
     xrr, yrr, zrr = rotateData(x0, y0, z0, xThetaFit, yThetaFit)
+    # also apply the translations
+    xrr -= c[1]
+    yrr -= c[2]
+    zrr -= c[3]
     xrr.shape = yrr.shape = zrr.shape = (N, N)
     surface3dPlot(xrr, yrr, zrr, "Original Data (Rotated)")
 
@@ -242,17 +249,18 @@ def imagePlot(z, title):
     fig.colorbar(cax)
     plt.title(title)
 
-def fitLeicaData(x, y, z, guess, weights=None, verbose=False):
+def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfev=10000, ftol=1e-12, xtol=1e-12, verbose=False):
 
     if verbose:
         print("fit leica boss!")
     
     # Set boundaries for the fit parameters.
-    inf = np.inf
-    pi2 = 2*np.pi
-    b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
-    b2 = [inf, inf, inf, inf, pi2, pi2]
-    bounds = (b1, b2)
+    if not bounds:
+        inf = np.inf
+        pi2 = 2*np.pi
+        b1 = [0., -inf, -inf, -inf, -pi2, -pi2]
+        b2 = [inf, inf,  inf,  inf,  pi2,  pi2]
+        bounds = (b1, b2)
 
     # robust fit: weights outliers outside of f_scale less
     loss = "soft_l1"
@@ -263,24 +271,29 @@ def fitLeicaData(x, y, z, guess, weights=None, verbose=False):
     if verbose:
         print("fitLeicaData with robust, soft_l1, f_scale %f" % f_scale)
 
-    if weights is None:
-        method = fitParabola
-        args = (x .flatten(), y.flatten(), z.flatten())
+    if method is None:
+        if weights is None:
+            method = fitParabola
+            args = (x .flatten(), y.flatten(), z.flatten())
+        else:
+            if verbose:
+                print("Using weights for fit!")
+            method = fitParabolaWithWeights
+            args = (x .flatten(), y.flatten(), z.flatten(), weights.flatten())
     else:
         if verbose:
-            print("Using weights for fit!")
-        method = fitParabolaWithWeights
-        args = (x .flatten(), y.flatten(), z.flatten(), weights.flatten())
-        
+            print("Using user supplied method.")
+        args = (x .flatten(), y.flatten(), z.flatten())
+
     r = least_squares(method,
                       guess,
                       args=args,
                       bounds=bounds,
-                      max_nfev=1000000,
+                      max_nfev=100,
                       loss=loss,
                       f_scale=f_scale,
-                      ftol=1e-15,
-                      xtol=1e-15)
+                      ftol=1e-8,
+                      xtol=1e-8)
     return r
 
 def loadLeicaDataFromNumpy(fn):
