@@ -13,6 +13,8 @@ from dask.diagnostics import visualize
 from plotting import imagePlot, scatterPlot, sampleXYZData, scatter3dPlot
 from processPTX import getRawXYZ
 from main import importCsv
+from utils import cart2sph, sph2cart, aggregateXYZ
+from parabolas import loadLeicaDataFromGpus
 
 #config.set(scheduler='distributed')  # overwrite default with multiprocessing scheduler
 #config.set(scheduler='processes')  # overwrite default with multiprocessing scheduler
@@ -117,11 +119,18 @@ def demoDigitize():
     yMax = np.max(y)
 
     # what's the size of each cell?
-    xBins = np.linspace(xMin, xMax, N)
-    yBins = np.linspace(yMin, yMax, N)
+    xBins = np.linspace(xMin, xMax, N+1)
+    yBins = np.linspace(yMin, yMax, N+1)
 
     print "x: ", x
+
     print "xBins: ", xBins
+    
+    xd = xBins[1] - xBins[0]
+    print "x step size: ", xd
+    xd2 = (xMax - xMin) / float((N - 1))
+
+    print "alt. x step:", xd2
 
     xd = np.digitize(x, xBins)
     print "x digitized: ", xd
@@ -156,6 +165,7 @@ def demoDigitize():
 # N=100, 160 secs
 # N=256, 16 minutes
 def digitizeWindow(x, y, z, N):
+    "bins our data using numpy.digitize"
 
     print "len data: ", len(x), len(y), len(z)
 
@@ -172,9 +182,24 @@ def digitizeWindow(x, y, z, N):
     yMax = np.max(y)
 
     # what's the size of each cell?
+    # first, split our space up.  We use N+1 because
+    # we want N bins, and N+1 gives us the last fence post,
+    # that is, the end point of the last bin.
     xBins = np.linspace(xMin, xMax, N)
     yBins = np.linspace(yMin, yMax, N)
 
+    # however, we use this same 
+    xDelta = xBins[1] - xBins[0]
+    yDelta = yBins[1] - yBins[0]
+
+    print "org xBins", xBins
+    print "xDelta", xDelta
+
+    xBins = xBins - (xDelta/2.)
+    yBins = yBins - (yDelta/2.)
+
+    xBins = np.append(xBins, xBins[-1] + xDelta)
+    yBins = np.append(yBins, yBins[-1] + yDelta)
     #print "bins:"
     #print xBins
     #print yBins
@@ -183,6 +208,8 @@ def digitizeWindow(x, y, z, N):
     xd = np.digitize(x, xBins)
     yd = np.digitize(y, yBins)
 
+    
+
     #print "xd", xd
     #print "yd", yd
 
@@ -190,14 +217,14 @@ def digitizeWindow(x, y, z, N):
     xt = yt = 0
     bins = {}
 
-    # lbins = np.zeros((N, N))
-    lbins = np.zeros((N-1, N-1))
+    lbins = np.zeros((N, N))
+    # lbins = np.zeros((N-1, N-1))
     total = 0
     # for xi in range(1, N+1):
-    for xi in range(N-1):
+    for xi in range(N):
         print xi
         # for yi in range(1, N+1):
-        for yi in range(N-1):
+        for yi in range(N):
             #print xi, yi
             # import ipdb; ipdb.set_trace()
             #xij = [x[i] for i in range(len(x)) if xd[i] == xi and yd[i] == yi]
@@ -215,10 +242,10 @@ def digitizeWindow(x, y, z, N):
             assert np.all(np.logical_and(xThisBin >= xBins[xi], xThisBin < xBins[xi+1]))
             # lenXx2 = xThisBin[np.logical_and(xThisBin >= xBins[xi], xThisBin < xBins[xi+1])]
 
-            print "passed assertion in x for ", xi, xBins[xi], xBins[xi+1]
-            print "mean in this bin: ", np.mean(xThisBin)
-            if len(xThisBin) > 0:
-                print "mean in this bin: ", np.min(xThisBin), np.max(xThisBin),np.mean(xThisBin)
+            # print "passed assertion in x for ", xi, xBins[xi], xBins[xi+1]
+            # print "mean in this bin: ", np.mean(xThisBin)
+            # if len(xThisBin) > 0:
+            #     print "mean in this bin: ", np.min(xThisBin), np.max(xThisBin),np.mean(xThisBin)
 
             yThisBin = y[thisBin]
             zThisBin = z[thisBin]
@@ -239,8 +266,8 @@ def digitizeWindow(x, y, z, N):
     keys = sorted(bins.keys())
     for k in keys:
         v = bins[k]
-        print ""
-        print k
+        # print ""
+        # print k
         xi, yi = k
         xij, yij, zij = v
         # print "for x, y bins:", xBins[xi], yBins[yi]
@@ -250,11 +277,11 @@ def digitizeWindow(x, y, z, N):
         # else:
         #     print "for x, y bins:", xBins[xi], yBins[yi]
         #     print "for x, y bins:", xBins[xi], yBins[yi]
-        print "for x bins:", xBins[xi], xBins[xi+1]
-        print "for y bins:", yBins[yi], yBins[yi+1]
+        # print "for x bins:", xBins[xi], xBins[xi+1]
+        # print "for y bins:", yBins[yi], yBins[yi+1]
 
-        print "lengths: ", len(xij), len(yij), len(zij)
-        print "means: ", np.mean(xij), np.mean(yij), np.mean(zij)
+        # print "lengths: ", len(xij), len(yij), len(zij)
+        # print "means: ", np.mean(xij), np.mean(yij), np.mean(zij)
 
     return xBins, yBins, bins, lbins
 
@@ -276,7 +303,7 @@ def testDigitizeWindow():
 
 def demoDigitizeWindowScan(file=None, N=None):
     "Demonstrates that we can use digitize to take means and represent the dish"
-    
+
     if N is None:
         N = 30
 
@@ -289,7 +316,9 @@ def demoDigitizeWindowScan(file=None, N=None):
 
     imagePlot(lbins, "point density")
 
-    # create the x y we need for 3d plots using our bins
+    # create the x y we need for 3d plots using our bins;
+    # need this indexing option or our data looks like it 
+    # got rotated 90 degrees.
     xm, ym = np.meshgrid(xd[:-1], yd[:-1], indexing='ij')
 
     scatter3dPlot(xm, ym, lbins, "point density")
@@ -306,6 +335,263 @@ def demoDigitizeWindowScan(file=None, N=None):
     scatter3dPlot(xm, ym, zm, "means of z")
 
     scatter3dPlot(x, y, z, "original data", sample=0.1)
+
+def getWeight(az, el, azLoc, elLoc, sigAz, sigEl, j, k):
+    return 2*np.pi*np.exp((-(np.cos(elLoc[j,k])**2)*(az-azLoc[j,k])**2/(2.*sigAz**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 )))
+    # return 2*np.pi*np.exp((-(np.cos(elLoc[j,k])**2)*(az-azLoc[j,k])**2/(2.*((r/a)*sigAz)**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 )))
+
+def getWeightNoCos(az, el, azLoc, elLoc, sigAz, sigEl, j, k):
+    # return 2*np.pi*np.exp((az-azLoc[j,k])**2/(2.*sigAz**2)-(el-elLoc[j,k])**2/(2.*sigEl**2 ))
+    azTerm = (az-azLoc[j,k])**2/(2.*sigAz**2)
+    elTerm = (el-elLoc[j,k])**2/(2.*sigEl**2 )
+    # print j, k, azTerm, elTerm, azTerm - elTerm
+    return 2*np.pi*np.exp(azTerm - elTerm)
+
+
+def testSmoothDigitalWins():
+
+    # x, y, z = getDishXYZ(fpath = "Scan-9-sample.ptx.csv")
+    # N = 10
+    # xs, ys, zs = smoothDigitalWindows(x, y, z, N)
+
+    x = range(1,5)
+    y = range(1,5)
+    xm, ym = np.meshgrid(x, y)
+    z = xm * ym
+
+    N = 4
+    # xd, yd, bins, lbins = digitizeWindow(xm.flatten(), ym.flatten(), z.flatten(), N)
+    
+    # print "xd: ", xd
+    # print "lbins: ", lbins
+    # print "bins: ", bins
+
+    smoothDigitalWinsXYZ(xm.flatten(), ym.flatten(), z.flatten(), N)
+
+def testSmoothXYZvsGPUs(N=None):
+
+    if N is None:
+       N = 10
+
+    # get the data
+    fpath = "/home/sandboxes/jbrandt/Telescope27Mar2019/Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
+    x, y, z = getDishXYZ(fpath = fpath)    
+
+    # first, do our new style bin smoothing
+    xs, ys, zs = smoothDigitalWinsXYZ(x, y, z, N, sigWidth=1.0)
+
+    # [pmargani@vegas-hpc10 /home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing]$
+    # ./gpu_smooth --input /home/sandboxes/jbrandt/Telescope27Mar2019/Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv 
+    # --output Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv 
+    # --gridx 10 --gridy 10 --sigAz 1.0 --sigEl 1.0 -v --no-conv --no-cos --no-xyz-to-spherical --no-spherical-to-xyz
+
+    smoothedFn = "data/binSmoothing/Scan-9.%d.xyz.ptx.csv" % N
+    xg, yg, zg = loadLeicaDataFromGpus(smoothedFn)
+
+    # necessary for comparison
+    xst = xs.transpose()
+    yst = ys.transpose()
+    zst = zs.transpose()
+
+    # make sure all is within bonds
+    xDiff = xst.flatten() - xg
+    print "xDiff mean, std", np.nanmean(xDiff), np.nanstd(xDiff)
+    assert np.max(np.abs(xDiff)) < 1e-5
+
+    yDiff = yst.flatten() - yg
+    print "yDiff mean, std", np.nanmean(yDiff), np.nanstd(yDiff)
+    assert np.max(np.abs(yDiff)) < 1e-5
+
+    zDiff = zst.flatten() - zg
+    print "zDiff mean, std", np.nanmean(zDiff), np.nanstd(zDiff)
+    # assert np.nanmax(np.abs(zDiff)) < 2.0
+    # assert np.nanmean(np.abs(zDiff)) < 0.2
+
+    return (xg, yg, zg), (xst, yst, zst)
+
+def testSmoothBinVsGPUs(N=None):
+
+    if N is None:
+       N = 10
+
+    # get the data
+    fpath = "/home/sandboxes/jbrandt/Telescope27Mar2019/Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
+    x, y, z = getDishXYZ(fpath = fpath)    
+
+    # first, do our new style bin smoothing
+    xs, ys, zs = smoothDigitalWindows(x, y, z, N)
+
+    # [pmargani@vegas-hpc10 /home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing]$
+    # ./gpu_smooth --input /home/sandboxes/jbrandt/Telescope27Mar2019/Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv 
+    # --output Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv 
+    # --gridx 10 --gridy 10 --sigAz 1.0 --sigEl 1.0 -v --no-conv --no-cos --no-xyz-to-spherical --no-spherical-to-xyz
+
+    smoothedFn = "data/binSmoothing/Scan-9.%d.ptx.csv" % N
+    xg, yg, zg = loadLeicaDataFromGpus(smoothedFn)
+
+    # necessary for comparison
+    xst = xs.transpose()
+    yst = ys.transpose()
+    zst = zs.transpose()
+
+    # make sure all is within bonds
+    xDiff = xst.flatten() - xg
+    print "xDiff mean, std", np.nanmean(xDiff), np.nanstd(xDiff)
+    # assert np.max(np.abs(xDiff)) < 1e-5
+
+    yDiff = yst.flatten() - yg
+    print "yDiff mean, std", np.nanmean(yDiff), np.nanstd(yDiff)
+    # assert np.max(np.abs(yDiff)) < 1e-5
+
+    zDiff = zst.flatten() - zg
+    print "zDiff mean, std", np.nanmean(zDiff), np.nanstd(zDiff)
+    # assert np.nanmax(np.abs(zDiff)) < 2.0
+    # assert np.nanmean(np.abs(zDiff)) < 0.2
+
+    return (xg, yg, zg), (xst, yst, zst)
+    
+def getLocalBin(bins, i, j):
+    return bins[(i, j)]
+
+    # print "getLocalBins", i, j
+    # what are the max i and j?
+    keys = bins.keys()
+    ln = np.sqrt(len(keys))
+    x = np.array([])
+    y = np.array([])
+    z = np.array([])
+    for ii in range(i-1,i+2):
+        for jj in range(j-1, j+2):
+            if ii >= 0 and jj >= 0 and ii < ln and jj < ln:
+                # print " using: ", ii, jj
+                xi, yi, zi = bins[(ii, jj)]
+                x = np.concatenate((x, xi))
+                y = np.concatenate((y, yi))
+                z = np.concatenate((z, zi))
+    return x, y, z
+
+def smoothDigitalWinsXYZ(x, y, z, N, sigWidth=None):
+
+    print "smoothDigitalWindows", N
+
+    print "digitize ..."
+    s = time.time()
+    xd, yd, bins, lbins = digitizeWindow(x, y, z, N)
+    print "seconds: ", time.time() - s
+
+    # xLoc, yLoc = np.meshgrid(xd[:-1], yd[:-1], indexing='ij')
+    # Make sure we center each guassian in the MIDPOINT of each bin 
+    # from above.  xd, yd represent the left hand side of each bin.
+    xDelta = xd[1] - xd[0]
+    yDelta = yd[1] - yd[0]
+    xdd = xd + (xDelta/2.)
+    ydd = yd + (yDelta/2.)
+    xLoc, yLoc = np.meshgrid(xdd[:-1], ydd[:-1], indexing='ij')
+
+    print "xDelta, xd", xDelta, xd
+    print "xLoc: ", np.nanmin(xLoc), np.nanmax(xLoc), xLoc[1,0] - xLoc[0,0]
+    print "yLoc: ", np.nanmin(yLoc), np.nanmax(yLoc), yLoc[0,1] - yLoc[0,0]
+
+    # sigAz = sigEl = 0.001
+    if sigWidth is None:
+        sigAz = sigEl = 1.00
+    else:    
+        sigAz = sigEl = sigWidth
+
+    # init our smoothing result
+    zSm = np.ndarray(shape=(N,N))
+
+    s = time.time()
+    print "smooth ..."
+    for i in range(N):
+        for j in range(N):
+            # x, y, z = bins[(i, j)]
+            x, y, z = getLocalBin(bins, i, j)
+            # print i, j, x
+            # instead of passing in all the data, lats, lngs,
+            # we just pass it in the LOCAL data, az, el.
+            w = getWeightNoCos(x, y, xLoc, yLoc, sigAz, sigEl, i, j)
+            norm=sum(w)
+            if norm==0:
+                norm=1
+                zSm[i,j]=np.nan #0 #min( r )
+            else:
+                w = w / norm
+                zSm[i,j] = sum(z * w)
+
+
+    print "seconds: ", time.time() - s
+
+    print "z smoothed:", zSm
+    return xLoc, yLoc, zSm
+
+def smoothDigitalWindows(x, y, z, N, cartesian=True):
+
+    print "smoothDigitalWindows", N
+
+    if cartesian:
+        print "cart2sph ..."
+        s = time.time()
+        rs, lats, lngs = cart2sph(x, y, z, verbose=False)
+        print "seconds: ", time.time() - s
+    else:
+        rs = x
+        lats = y
+        lngs = z
+
+    print "digitize ..."
+    s = time.time()
+    latd, lngd, bins, lbins = digitizeWindow(lats, lngs, rs, N)
+    print "seconds: ", time.time() - s
+
+    latDelta = latd[1] - latd[0]
+    lngDelta = lngd[1] - lngd[0]
+    latdd = latd + (latDelta/2.)
+    lngdd = lngd + (lngDelta/2.)
+    azLoc, elLoc = np.meshgrid(latdd[:-1], lngdd[:-1], indexing='ij')
+
+    # azLoc, elLoc = np.meshgrid(latd[:-1], lngd[:-1], indexing='ij')
+
+    print "azLoc: ", np.nanmin(azLoc), np.nanmax(azLoc), azLoc[1] - azLoc[0]
+    print "elLoc: ", np.nanmin(elLoc), np.nanmax(elLoc), elLoc[1] - elLoc[0]
+
+    sigAz = sigEl = 0.001
+
+    # init our smoothing result
+    rSm = np.ndarray(shape=(N,N))
+
+    s = time.time()
+    print "smooth ..."
+    for i in range(N):
+        for j in range(N):
+            az, el, r = bins[(i, j)]
+            # instead of passing in all the data, lats, lngs,
+            # we just pass it in the LOCAL data, az, el.
+            w = getWeight(az, el, azLoc, elLoc, sigAz, sigEl, i, j)
+            norm=sum(w)
+            if norm==0:
+                norm=1
+                rSm[i,j]=np.nan #0 #min( r )
+            else:
+                w = w / norm
+                rSm[i,j] = sum(r * w)
+    print "seconds: ", time.time() - s
+
+    print "sph2cart ..."
+    s = time.time()
+    xyz = sph2cart(azLoc.flatten(), elLoc.flatten(), rSm.flatten(), verbose=False)
+    print "seconds: ", time.time() - s
+
+    # return (azLoc, elLoc, rSm)
+    # if cartesian:
+    #     print "sph2cart ..."
+    #     s = time.time()
+    #     xyz = sph2cart(azLoc.flatten(), elLoc.flatten(), rSm.flatten(), verbose=False)
+    #     print "seconds: ", time.time() - s
+    # else:
+    #     xyz = (azLoc, elLoc, rSm)
+
+    return xyz
 
 def selfWindow(x, y, z, N):
 
@@ -741,5 +1027,8 @@ def main():
 if __name__=='__main__':
     # selfWindowTest()
     # testDigitizeWindow()
-    demoDigitize()
+    # demoDigitize()
     # createSamplePTXFile()    
+    # testSmoothDigitalWins()
+    # testSmoothDigitalWins()
+    testSmoothXYZvsGPUs()
