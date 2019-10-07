@@ -3,6 +3,7 @@ import os
 import sys
 import logging
 import logging.config
+import numpy as np
 from datetime import datetime
 
 import runTLSLogging
@@ -14,7 +15,11 @@ logging.config.dictConfig(runTLSLogging.config)
 logger = logging.getLogger(__name__)
 
 
-def runScans(a):
+def runScans(a, path=None):
+
+    if path is None:
+        path = "/home/scratch/pmargani/LASSI/scannerData"
+
     inScan = False
     prevTimes = None
     #for i in range(2):
@@ -42,6 +47,8 @@ def runScans(a):
                     logger.debug("Got all our keys: %s" % keys)
 
 
+                    logger.debug(a.get_results()['HEADER'])
+
                     # make sure we aren't getting stale data
                     results = a.get_results()
                     times = results['TIME_ARRAY']
@@ -54,10 +61,16 @@ def runScans(a):
                     time.sleep(3)
                     now = datetime.now()
                     ts = now.strftime("%Y-%m-%d_%H:%M:%S")
+
+                    # save off the time values
+                    # path = "/home/scratch/pmargani/LASSI/scannerData"
+                    fn = "%s_%s_times.csv" % (scanNum, ts)
+                    fpath = os.path.join(path, fn)
+                    np.savetxt(fpath, times, delimiter=",")
+
                     # TBF: why are we getting scan nums incremented by 2?
                     # fn = "%s_%s.ptx" % (scanNum, ts)
                     fn = "%s_%s.ptx" % (scanNum, ts)
-                    path = "/home/scratch/pmargani/LASSI/scannerData"
                     fpath = os.path.join(path, fn)
                     logger.debug("Saving to file: %s" % fpath)
                     
@@ -114,6 +127,8 @@ def runOneScan(a, path=None):
         keys = a.get_results().keys()
     print "We have all our keys now: ", keys
 
+    logger.debug(a.get_results()['HEADER'])
+
     gotKeysSecs = time.time() - s
     s = time.time()
 
@@ -121,7 +136,21 @@ def runOneScan(a, path=None):
     if path is None:
         path = "/home/sandboxes/pmargani/LASSI/data"
 
-    ptxfn = "test-%d.ptx" % scanNum
+    results = a.get_results()
+    times = results['TIME_ARRAY']
+
+    # time.sleep(3)
+    now = datetime.now()
+    ts = now.strftime("%Y-%m-%d_%H:%M:%S")
+
+    fn = "%s_%s_times.csv" % (scanNum, ts)
+    fpath = os.path.join(path, fn)
+    logger.debug( "saving times to file %s" % fpath)
+    np.savetxt(fpath, times, delimiter=",")
+
+    ptxfn = "%s_%s.ptx" % (scanNum, ts)
+
+    # ptxfn = "test-%d.ptx" % scanNum
     filenamePtx = os.path.join(path, ptxfn)    
     # filename = "/home/sandboxes/pmargani/LASSI/data/17sep2019/test-%d.ptx" % scanNum
     logger.debug( "exporting to file %s" % filenamePtx)
@@ -130,7 +159,8 @@ def runOneScan(a, path=None):
     exportPtxSecs = time.time() - s
     s = time.time()
 
-    csvfn = "test-%d.csv" % scanNum
+    #csvfn = "test-%d.csv" % scanNum
+    csvfn = "%s_%s.csv" % (scanNum, ts)
     filenameCsv = os.path.join(path, csvfn)    
     logger.debug( "exporting to file %s" % filenameCsv)
     a.export_csv_results(filenameCsv)    
@@ -169,7 +199,40 @@ def testScanRange(a, proj, cntr_az, cntr_el, az_fov, el_fov, path=None):
 def thisCB(key, data):
     logger.debug("thisCB: %s" % key)
 
-def main():
+def configureScanner(a, proj, res, sensitivity, scan_mode, cntr_az, cntr_el, az_fov, el_fov):
+    "Wraps configure_scanner so that parameters are logged"
+
+    # validate some inputs
+    resValues = ["500mm@100m", 
+                 "250mm@100m",
+                 "125mm@100m", 
+                 "63mm@100m",
+                 "31mm@100m",
+                 "16mm@100m",
+                 "8mm@100m"]
+    assert res in resValues             
+
+    sensValues = ['Normal', 'High']
+    assert sensitivity in sensValues
+
+    modeValues = ["Speed", "Range", "Medium Range", "Long Range"]
+    assert scan_mode in modeValues
+
+    logger.debug("Configuring Scanner:")
+    logger.debug("Project: %s", proj)
+    logger.debug("Resolution: %s", res)
+    logger.debug("Sensitivity: %s", sensitivity)
+    logger.debug("Scan Mode: %s", scan_mode)
+
+    logger.debug("cntr_az: %f", cntr_az)    
+    logger.debug("cntr_el: %f", cntr_el)    
+    logger.debug("az_fov: %f", az_fov)    
+    logger.debug("el_fov: %f", el_fov)    
+
+    a.configure_scanner(proj, res, sensitivity, scan_mode, cntr_az, cntr_el, az_fov, el_fov)
+
+def runThisScan():
+
 
     a=TLSaccess("lassi.ad.nrao.edu")
 
@@ -189,7 +252,8 @@ def main():
     # reconfigure? why not
     #proj = "11jun2019_24hrTests"
     #proj = "14aug2019_test"
-    proj = "17sep2019_test"
+    # proj = "17sep2019_test"
+    proj = "test"
     res = "63mm@100m"
     #res = "31mm@100m"
     sensitivity = "Normal"
@@ -202,8 +266,8 @@ def main():
     # scans > 15
     cntr_az = 270
     cntr_el = 45
-    az_fov = 360
-    el_fov = 90
+    az_fov = 45
+    el_fov = 45
 
     # make this a short scan
     #az_fov = 30
@@ -213,7 +277,8 @@ def main():
     #logger.debug("Configuring to: delme, 31mm@100m, Normal, Speed, 352, 0, 180, 180")
     #a.configure_scanner("delme", "31mm@100m", "Normal", "Speed", 352, 45, 180, 90)
     #a.configure_scanner("delme", "63mm@100m", "Normal", "Speed", 352, 45, 180, 90)
-    a.configure_scanner(proj, res, sensitivity, scan_mode, cntr_az, cntr_el, az_fov, el_fov)
+    # a.configure_scanner(proj, res, sensitivity, scan_mode, cntr_az, cntr_el, az_fov, el_fov)
+    configureScanner(a, proj, res, sensitivity, scan_mode, cntr_az, cntr_el, az_fov, el_fov)
 
     #logger.debug("Configuring Scanner ...")
     #a.configure_scanner("delme", "31mm@100m", "Normal", "Speed", 352, 0, 5, 5)
@@ -228,5 +293,8 @@ def main():
     a.cntrl_exit()
     sys.exit(1)
 
+def main():
+    runThisScan()
+    
 if __name__=='__main__':
     main()
