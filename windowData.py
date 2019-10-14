@@ -159,6 +159,108 @@ def demoDigitize():
         print "xBin[i]: ", i, xBins[i], xBins[i+1]
         print "mean: ", np.mean(v)
 
+def digitizeSphericalData(N=None):
+    "bins our data using numpy.digitize"
+
+    if N is None:
+        N = 30
+
+    fn = "/home/sandboxes/jbrandt/Telescope27Mar2019/Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv.sph.csv"
+
+    # reallY: r, az, el
+    z, x, y = getDishXYZ(fn)
+    
+    print "len data: ", len(x), len(y), len(z)
+
+    assert len(x) == len(y)
+    assert len(y) == len(z)
+
+    # x = x[:100]
+    # y = y[:100]
+
+    # figure out how to group our data
+    xMin = np.min(x)
+    xMax = np.max(x)
+    yMin = np.min(y)
+    yMax = np.max(y)
+
+    # what's the size of each cell?
+    # first, split our space up.  We use N+1 because
+    # we want N bins, and N+1 gives us the last fence post,
+    # that is, the end point of the last bin.
+    xBins = np.linspace(xMin, xMax, N)
+    yBins = np.linspace(yMin, yMax, N)
+
+    # however, we use this same 
+    xDelta = xBins[1] - xBins[0]
+    yDelta = yBins[1] - yBins[0]
+
+    print "org xBins", xBins
+    print "xDelta", xDelta
+
+    xBins = xBins - (xDelta/2.)
+    yBins = yBins - (yDelta/2.)
+
+    xBins = np.append(xBins, xBins[-1] + xDelta)
+    yBins = np.append(yBins, yBins[-1] + yDelta)
+    #print "bins:"
+    #print xBins
+    #print yBins
+
+    
+    xd = np.digitize(x, xBins)
+    yd = np.digitize(y, yBins)
+
+    print "digitized"
+
+    xt = yt = 0
+    bins = {}
+
+    ind = np.array(range(len(xd)))
+
+    lbins = np.zeros((N, N))
+    # lbins = np.zeros((N-1, N-1))
+    total = 0
+    # for xi in range(1, N+1):
+    for xi in range(N):
+        print xi
+        # for yi in range(1, N+1):
+        for yi in range(N):
+            #print xi, yi
+            # import ipdb; ipdb.set_trace()
+            #xij = [x[i] for i in range(len(x)) if xd[i] == xi and yd[i] == yi]
+            # yij = [y[i] for i in yd if i == yi]
+            #yij = [y[i] for i in range(len(y)) if xd[i] == xi and yd[i] == yi]
+            #bins[(xi, yi)] = (xij, yij)
+            #assert len(xij) == len(yij)
+            #lbins[xi-1][yi-1] = len(xij)
+            xx = xd == xi + 1
+            yy = yd == yi + 1
+            thisBin = np.logical_and(xx, yy)
+            # t = len(xd[np.logical_and(xx, yy)])
+            # xThisBin = x[thisBin]
+
+            # assert np.all(np.logical_and(xThisBin >= xBins[xi], xThisBin < xBins[xi+1]))
+            # lenXx2 = xThisBin[np.logical_and(xThisBin >= xBins[xi], xThisBin < xBins[xi+1])]
+
+            # print "passed assertion in x for ", xi, xBins[xi], xBins[xi+1]
+            # print "mean in this bin: ", np.mean(xThisBin)
+            # if len(xThisBin) > 0:
+            #     print "mean in this bin: ", np.min(xThisBin), np.max(xThisBin),np.mean(xThisBin)
+
+            # yThisBin = y[thisBin]
+            # zThisBin = z[thisBin]
+            # bins[(xi, yi)] = (xThisBin, yThisBin, zThisBin)
+            bins[(xi, yi)] = ind[thisBin]
+            t = len(xd[thisBin])
+            lbins[xi][yi] = t
+            total += t
+            # error check
+            #xt += len(xij)
+            #yt += len(yij)
+
+    return xd, yd, bins, lbins
+
 # N=20, 6 secs
 # N=30, 14 secs
 # N=50, 43 secs
