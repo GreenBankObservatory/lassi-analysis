@@ -8,6 +8,9 @@ from astropy.io import fits
 
 LASSI_SCAN = "Running scan with scan number:"
 LASSI_EXPORT = "exporting to file"
+PTX_SIZE = "PTX Bytes"
+LASSI_SCAN_TIME = "Scan Mins"
+LASSI_EXPORT_TIME = "Total Export Mins"
 ACTSRF_SCAN = "Active Surface ref scan number:"
 LASSI_CONFIGURE = "Configuring Scanner:"
 ACTSRF_EL = "Active Surface Elevation:"
@@ -221,6 +224,12 @@ def parseLog(fpath, scans):
                     ptxScanNum = int(ptx.split('_')[0])
                     assert ptxScanNum == currentScan
                     scans[currentScan]['ptx'] = ptx
+        if PTX_SIZE in l:
+            scans[currentScan]['ptx (bytes)'] = int(getValue(l, PTX_SIZE))
+        if LASSI_SCAN_TIME in l:
+            scans[currentScan]['scan (mins)'] = float(getValue(l, LASSI_SCAN_TIME))
+        if LASSI_EXPORT_TIME in l:
+            scans[currentScan]['export (mins)'] = float(getValue(l, LASSI_EXPORT_TIME))
         if ACTSRF_SCAN in l:
             asScanNum = getActiveSurfaceScanNumber(l)
             # this appears before the LASSI scan number:
