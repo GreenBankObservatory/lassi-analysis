@@ -408,7 +408,7 @@ def processLeicaScan(fpath,
         # smoothedFiles, weights = smoothWithWeights(processedPath, xyz, N=N)
         smoothedFiles, weights = weightSmooth(processedPath, xyz)
     else:  
-        smoothedFiles = smooth(processedPath)
+        smoothedFiles = smooth(processedPath, N=N)
 
     #   fn = smoothedFiles[0]
     #   assert fn[-5:] == 'x.csv'
