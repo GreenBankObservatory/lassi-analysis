@@ -342,6 +342,7 @@ def processNewPTXData(lines,
                       simSignal=None,
                       iFilter=False,
                       nFilter=True,
+                      radius=None,
                       rFilter=True):
     "this is the processing we see works with 2019 data"
 
@@ -354,7 +355,8 @@ def processNewPTXData(lines,
         #yOffset = 60.0
         #yOffset = 55.0
 
-    radius = 45.5
+    if radius is None:
+        radius = 45.5
 
     print("ProcessNewPTXData with: ", xOffset, yOffset, rot, radius)
 
@@ -570,6 +572,7 @@ def getTimeStamps(fpath):
 
 def processNewPTX(fpath,
                   useTimestamps=False,
+                  convertToDatetimes=False,
                   rot=None,
                   xOffset=None,
                   yOffset=None,
@@ -577,6 +580,7 @@ def processNewPTX(fpath,
                   simSignal=None,
                   iFilter=False,
                   parabolaFit=None,
+                  radius=None,
                   rFilter=True):
 
     # is there associated time data?
@@ -597,6 +601,7 @@ def processNewPTX(fpath,
                             simSignal=simSignal,
                             parabolaFit=parabolaFit,
                             iFilter=iFilter,
+                            radius=radius,
                             rFilter=rFilter)
 
     # TBF: the old interface expects this 
@@ -615,7 +620,8 @@ def processNewPTX(fpath,
         print "writing out MJDs to:", outf
         np.savetxt(outf, dts, delimiter=",")
 
-    if dts is not None:
+    # converting to datetimes takes a LONG time.
+    if dts is not None and convertToDatetimes:
         print "Converting timestamps (MJDs) to datetime ..."
         mjd2utcArray = np.frompyfunc(mjd2utc, 1, 1)
         dts = mjd2utcArray(dts)
