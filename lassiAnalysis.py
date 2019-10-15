@@ -295,7 +295,7 @@ def processLeicaScan2(fpath,
     
     if False:
         print("Processing PTX file ...")
-        xyz = processNewPTX(fpath,
+        xyz, dts = processNewPTX(fpath,
                     rot=rot,
                     xOffset=xOffset,
                     yOffset=yOffset,
@@ -386,7 +386,7 @@ def processLeicaScan(fpath,
     #     xyz = np.loadtxt(processedPath, delimiter=',')
     # else:
     if True:
-        xyz = processNewPTX(fpath,
+        xyz, dts = processNewPTX(fpath,
                     rot=rot,
                     xOffset=xOffset,
                     yOffset=yOffset,
