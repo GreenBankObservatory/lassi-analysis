@@ -1,0 +1,17 @@
+#!/bin/bash
+
+gpuPath="$1"
+userArg="$2"
+hostArg="$3"
+
+echo "$gpuPath"
+echo "$userArg"
+echo "$hostArg"
+
+export LASSI_GPU_PATH="$gpuPath"
+
+# Now, retain all arguments except first
+shift; shift; shift
+
+# we need to be on a machine with a GPU
+ssh $userArg@$hostArg "${LASSI_GPU_PATH}/run_gpu_smooth_parts" "$@"
