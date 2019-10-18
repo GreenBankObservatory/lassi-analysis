@@ -1,5 +1,6 @@
 import csv
 import os
+import subprocess
 from copy import copy
 
 import numpy as np
@@ -1115,6 +1116,96 @@ def testSmoothXYZ():
     zz = np.zeros(xx.shape)
     xs, ys, zs = smoothXYZDask(xx, yy, zz, xx.shape[0], sigX=1, sigY=1)
     print(zs)
+
+def testSmoothGPUMulti(N=10):
+
+    if N is None:
+        N = 10
+
+    gpuPath1 = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpuMulti"
+    gpuPath2 = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpuMulti2"
+    gpuPaths = [gpuPath1, gpuPath2]
+
+    inFile1 = "/home/scratch/pmargani/LASSI/scannerData/Clean9.ptx.csv"
+    inFile2 = "/home/scratch/pmargani/LASSI/scannerData/Clean9.ptx.copy.csv"
+    inFiles = [inFile1, inFile2]
+
+    outFile = 'outFile'
+
+    smoothGPUMulti(gpuPaths, inFiles, outFile, N)
+
+    # did it work?
+    outfiles = []
+    xyzs = []
+    for i, gpuPath in enumerate(gpuPaths):
+        for dim in ['x', 'y', 'z']:
+            dimFile = "%s.%d.%s.csv" % (outFile, (i+1), dim)
+            dimPath = os.path.join(gpuPath, dimFile)
+            outfiles.append(dimPath)
+            print dimPath
+            assert os.path.isfile(dimPath)
+            print("GPUs created file: ", dimPath)
+        loadFile = os.path.join(gpuPath, "%s.%d" % (outFile, (i+1)))    
+        xyz = loadLeicaDataFromGpus(loadFile)
+        xyzs.append(xyz)
+    
+    x1, y1, z1 = xyzs[0]
+    x2, y2, z2 = xyzs[1]
+
+    x = np.concatenate((x1, x2))
+    y = np.concatenate((y1, y2))
+    z = np.concatenate((z1, z2))
+
+    scatter3dPlot(x, y, z, "testSmoothGPUMulti")
+
+def smoothGPUMulti(gpuPaths,
+                   inFiles,
+                   outFile,
+                   n):
+    "Smooth the data using multiple GPUs"
+    
+    gpuMultiScript = "runGpuParts"
+
+    # first just try it with two GPUs
+    user = os.getlogin()
+    host1 = settings.GPU_HOST
+    host2 = settings.GPU_HOST_2
+    hosts = [host1, host2]
+    parts = [1, 2]
+    
+    cmds = []
+    for i in range(len(parts)):
+        part = parts[i]
+        host = hosts[i]
+        gpuPath = gpuPaths[i]
+        inFile = inFiles[i]
+        cmd = [gpuMultiScript,
+               gpuPath,
+               user,
+               host,
+               inFile,
+               outFile,
+               "%s" % n,
+               "%d" % part,
+               "%d" % len(parts)
+        ]
+
+        print "cmd: ", cmd
+        cmds.append(cmd)
+
+    # make sure they get fired off
+    p1 = subprocess.Popen(cmds[0])  
+    print "called first command"  
+    p2 = subprocess.Popen(cmds[1])
+    print "called second command"
+
+    # THEN wait for them to finish
+    print "waiting for both to finish ..."
+    p1.wait()
+    p2.wait()
+
+    print "multiple GPU commands finished"
+
 
 def smoothGPUs(gpuPath,
                inFile,
