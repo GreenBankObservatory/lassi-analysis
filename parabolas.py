@@ -228,9 +228,9 @@ def fitLeicaScan(fn,
     yThetaFit = r.x[5]
     xrr, yrr, zrr = rotateData(x0, y0, z0, xThetaFit, yThetaFit)
     # also apply the translations
-    xrr -= c[1]
-    yrr -= c[2]
-    zrr -= c[3]
+    #xrr -= c[1]
+    #yrr -= c[2]
+    #zrr -= c[3]
     xrr.shape = yrr.shape = zrr.shape = (N, N)
     surface3dPlot(xrr, yrr, zrr, "Original Data (Rotated)")
 
@@ -289,11 +289,11 @@ def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfe
                       guess,
                       args=args,
                       bounds=bounds,
-                      max_nfev=100,
+                      max_nfev=max_nfev,
                       loss=loss,
                       f_scale=f_scale,
-                      ftol=1e-8,
-                      xtol=1e-8)
+                      ftol=ftol,
+                      xtol=xtol)
     return r
 
 def loadLeicaDataFromNumpy(fn):
