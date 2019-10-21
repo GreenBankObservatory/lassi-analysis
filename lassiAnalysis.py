@@ -16,6 +16,7 @@ import opticspy
 
 from astropy.stats import sigma_clip
 
+from zernikies import getZernikeCoeffs
 from processPTX import processPTX, processNewPTX, aggregateXYZ
 from main import smoothGPUs, smoothXYZGpu, splitXYZ
 from main import loadLeicaDataFromGpus
@@ -25,13 +26,71 @@ from zernikeIndexing import noll2asAnsi, printZs
 from simulateSignal import addCenterBump, zernikeFour
 from simulateSignal import zernikeFive, gaussian
 from plotting import sampleXYZData, scatter3dPlot
-from utils import sph2cart, cart2sph, log, difflog, midPoint
+from utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits
 from weightSmooth import weightSmooth
 import settings
 
 # where is the code we'll be running?
 # GPU_PATH = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
 GPU_PATH = settings.GPU_PATH
+
+def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.):
+    """
+    Takes two smoothed Leica scans and extracts Zernike coefficients from their difference, reference - signal.
+    :param refScanFile: File with the smoothed reference scan. <scan_name>.ptx.csv
+    :param sigScanFile: File with the smoothed signal scan. <scan_name>.ptx.csv
+    :param n: Number of elements per side in the smoothed data.
+    :param nZern: Number of Zernike polynomials to include in the fit. Must be less than 36.
+    :param pFitGuess: Initial guess for ther parabola fit.
+    :param rMaskRadius: Radius of the radial mask.
+    """
+
+    if rMaskRadius <= 0.:
+        radialMask = False
+    else:
+        radialMask = True
+        
+    print('Masking file: {}'.format(refScanFile))
+    ref_data = maskLeicaData(refScanFile, n=n, guess=pFitGuess, radialMask=radialMask, maskRadius=rMaskRadius)
+
+    # Extract the data we will use.
+    xrr, yrr, zrr = ref_data['rotated']
+    cr = ref_data['parabolaFitCoeffs']
+
+    print('Masking file: {}'.format(sigScanFile))
+    sig_data = maskLeicaData(sigScanFile, n=n, guess=pFitGuess, radialMask=radialMask, maskRadius=rMaskRadius)
+    
+    xs, ys, zs = sig_data['origMasked']
+     
+    # Rotate the signal scan.
+    xsr, ysr, zsr = rotateData(xs, ys, zs, cr[4], cr[5])
+    xsr.shape = ysr.shape = zsr.shape = (n,n)
+    zsr = np.ma.masked_where(zs.mask, zsr)
+
+    # The data has been rotated, but we haven't applied the shifts.
+    xrr = xrr - cr[1]
+    yrr = yrr - cr[2]
+    zrr = zrr - cr[3]
+    xsr = xsr - cr[1]
+    ysr = ysr - cr[2]
+    zsr = zsr - cr[3]
+
+    # Find the grid limits for the reference and signal scans.
+    xmin, xmax = gridLimits(xrr, xsr)
+    ymin, ymax = gridLimits(yrr, ysr)
+
+    xrrg, yrrg, zrrg = regridXYZMasked(xrr, yrr, zrr, n=n, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
+    xsrg, ysrg, zsrg = regridXYZMasked(xsr, ysr, zsr, n=n, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
+
+    # Surface deformation map: reference - signal
+    diff = zrrg - zsrg
+    diff = diff[::-1] # Flip the signal scan. Required to conform with the way we handle the data.
+                      # This should not be required if we handled the data consistently throughout.
+
+    # Find Zernike coefficients on the surface deformation map.
+    fitlist = getZernikeCoeffs(diff.filled(0), nZern, barChart=False, norm='active-surface')
+
+    return diff, fitlist
 
 def smooth(fpath, N=512, spherical=False):
 
