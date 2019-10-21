@@ -2,6 +2,13 @@
 import numpy as np
 from astropy.coordinates import cartesian_to_spherical
 from astropy.coordinates import spherical_to_cartesian
+from astropy.time import Time
+
+def mjd2utc(mjd):
+    "Converts MJD values to UTC datetime objects"
+    t = Time(mjd, format='mjd')
+    t.format = 'datetime'
+    return t.value
 
 def cart2sph(x, y, z, verbose=True):
     "Wrapper around astropy's cartesian_to_spherical"

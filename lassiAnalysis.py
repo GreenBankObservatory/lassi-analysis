@@ -364,17 +364,17 @@ def processLeicaScan2(fpath,
     
     if processPTX:
         print("Processing PTX file ...")
-        xyz = processNewPTX(fpath,
-                            rot=rot,
-                            xOffset=xOffset,
-                            yOffset=yOffset,
-                            radius=radius,
-                            rFilter=True,
-                            iFilter=False,
-                            parabolaFit=parabolaFit,
-                            simSignal=simSignal,
-                            sampleSize=sampleSize,
-                            filterClose=filterClose)
+        xyz, dts = processNewPTX(fpath,
+                    rot=rot,
+                    xOffset=xOffset,
+                    yOffset=yOffset,
+                    radius=radius,
+                    rFilter=True,
+                    iFilter=False,
+                    parabolaFit=parabolaFit,
+                    simSignal=simSignal,
+                    sampleSize=sampleSize,
+                    filterClose=filterClose) 
 
     e = time.time()
     print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
@@ -487,7 +487,7 @@ def processLeicaScan(fpath,
     #     xyz = np.loadtxt(processedPath, delimiter=',')
     # else:
     if True:
-        xyz = processNewPTX(fpath,
+        xyz, dts = processNewPTX(fpath,
                     rot=rot,
                     xOffset=xOffset,
                     yOffset=yOffset,

@@ -1,4 +1,5 @@
 import sys
+import os
 import random
 from copy import copy
 
@@ -12,7 +13,23 @@ from astropy import units as u
 from astropy.coordinates import CartesianRepresentation
 from astropy.coordinates.matrix_utilities import rotation_matrix
 
-from parabolas import scatter3dPlot, parabola
+from parabolas import parabola
+from plotting import scatter3dPlot
+from utils import mjd2utc
+
+def previewData(ptxFile, sample=None):
+
+    print "opening file", ptxFile
+    with open(ptxFile, 'r') as f:
+        ls = f.readlines()
+
+    print "reading data ..."
+    x, y, z, i = getRawXYZ(ls)
+    
+    print "plotting preview ..."
+    if sample is None:
+        sample = 1.0
+    scatter3dPlot(x, y, z, "preview", sample=sample)
 
 def rotateXYaboutZ(xyz, rotDegrees):
 
@@ -123,6 +140,8 @@ def processPTXdata(lines, rotationAboutZdegrees, searchRadius, quiet=True, sampl
     if preview:
         # a preview of what our processed data looks like
         sampleSize = 10000
+        if len(xyz) < sampleSize:
+            sampleSize = len(xyz)
         lsIdx = random.sample(range(len(xyz)), sampleSize)
         xyzr = xyz[lsIdx]
         xr, yr, zr = splitXYZ(xyzr)
@@ -197,7 +216,7 @@ def getRawXYZ(ls, sampleSize=None):
         # ls = f.readlines()
 
     # skip the header
-    ls = ls[11:]
+    ls = ls[10:]
 
     numLines = len(ls)
 
@@ -295,25 +314,7 @@ def testOffsets(lines, xOffset, yOffset, radius):
     plt.ylabel("y")
     plt.title("XY centered and below radus: %5.2f" % radius)
 
-# Commented out because this is slower than using a boolean mask
-#def radialFilter(x, y, z, xOffset, yOffset, radius):
-#    "returns only those points within the radius"
-#    xr = []
-#    yr = []
-#    zr = []
-#    for i in range(len(x)):
-#        r = np.sqrt((x[i]-xOffset)**2 + (y[i]-yOffset)**2)
-#        if r < radius:
-#            xr.append(x[i])
-#            yr.append(y[i])
-#            zr.append(z[i])
-#    xr = np.array(xr)        
-#    yr = np.array(yr)        
-#    zr = np.array(zr)        
-#    return xr, yr, zr
-# The nex method uses a boolean mask.
-
-def radialFilter(x, y, z, xOffset, yOffset, radius):
+def radialFilter(x, y, z, xOffset, yOffset, radius, dts=None):
     """
     Removes points outside a circle centered at (xOffset, yOffset).
 
@@ -321,13 +322,18 @@ def radialFilter(x, y, z, xOffset, yOffset, radius):
     
     mask = np.power(x - xOffset, 2.) + np.power(y - yOffset, 2.) < radius**2.
 
-    return x[mask], y[mask], z[mask]
+    if dts is None:
+        dts = np.array([])
+    else:
+        dts = dts[mask]
+
+    return x[mask], y[mask], z[mask], dts
 
 
 def processNewPTXData(lines,
+                      dts=None,
                       xOffset=None,
                       yOffset=None,
-                      radius=None,
                       plotTest=True,
                       rot=None,
                       sampleSize=None,
@@ -335,6 +341,7 @@ def processNewPTXData(lines,
                       simSignal=None,
                       iFilter=False,
                       nFilter=True,
+                      radius=None,
                       rFilter=True,
                       addOffset=False,
                       filterClose=True):
@@ -365,6 +372,8 @@ def processNewPTXData(lines,
     # lets first just remove all the zero data
     mask = i != 0.0
     i = i[mask]
+    if dts is not None:
+        dts = dts[mask]
 
     numFilteredOut = len(x) - len(i)
     percent = (float(numFilteredOut) / float(len(x))) * 100.
@@ -382,6 +391,8 @@ def processNewPTXData(lines,
         x, y, z, mask = neighborFilter(x, y, z, 0.122)
         i = i[mask]
         print("Now we have %d lines of data" % len(x))
+        if dts is not None:
+            dts = dts[mask]
 
     # we only want the data that has a decent intesity
     meanI = np.mean(i)
@@ -409,6 +420,9 @@ def processNewPTXData(lines,
         y = y[mask]
         z = z[mask]
 
+        if dts is not None:
+            dts = dts[mask]
+
         print("Now we have %d lines of data" % len(x))
 
     assert len(x) == len(y)
@@ -418,7 +432,7 @@ def processNewPTXData(lines,
     # we only want the inner 90% or so of the dish
     if rFilter:
         orgNum = len(x)
-        x, y, z =  radialFilter(x, y, z, xOffset, yOffset, radius)
+        x, y, z, dts =  radialFilter(x, y, z, xOffset, yOffset, radius, dts=dts)
         newNum = len(x)
         print("radial limit filtered out %d points outside radius %5.2f" % ((orgNum - newNum), radius))
         print("Now we have %d lines of data" % len(x))
@@ -432,13 +446,15 @@ def processNewPTXData(lines,
     # dish, but with some things the radial filter didn't
     # get rid of above or below the dish
     zLimit = -80
-    mask = z > -80
+    mask = np.logical_and(z > -80, z < -10)
     orgNum = len(z)
     x = x[mask]
     y = y[mask]
     z = z[mask]
+    if dts is not None:
+        dts = dts[mask]
     newNum = len(z)
-    print("z - limit filtered out %d points below %5.2f" % ((orgNum - newNum), zLimit))
+    print("z - limit filtered out %d points below %5.2f and above -10" % ((orgNum - newNum), zLimit))
 
     if simSignal is not None:
         # just now we add a bump
@@ -496,6 +512,8 @@ def processNewPTXData(lines,
         x = x[parMask]
         y = y[parMask]
         z = z[parMask]
+        if dts is not None:
+            dts = dts[parMask]
         xyz = aggregateXYZ(x, y, z)
         res = res[parMask]
         numFiltered = orgLenX - len(x)
@@ -525,7 +543,9 @@ def processNewPTXData(lines,
         plt.ylabel("y")
         plt.title("X Y orientation of data")
 
-    return xyz
+
+
+    return xyz, dts
 
 def aggregateXYZ(x, y, z):
     xyz = []
@@ -546,23 +566,58 @@ def splitXYZ(xyz):
     y = np.array(y)    
     return x, y, z
 
+def getTimeStamps(fpath):
+    "Read in file of form *_times.csv and return MJDs"
+
+    # assuming file of form <path>/<name>.ptx, then our timestamp
+    # data should be <path>/<name>_times.csv
+
+    if fpath[-4:] != ".ptx":
+        return None
+
+    dtPath = fpath[:-4] + "_times.csv"
+
+    if not os.path.isfile(dtPath):
+        return None
+
+    print "loading timestamps from: ", dtPath
+    mjds = np.loadtxt(dtPath)
+
+    # don't do this here because some of this data
+    # will later get filtered out most likely
+    # print "converting MJDs to datetimes ..."
+    # convert to datetimes; do it efficiently though
+    # mjd2utcArray = np.frompyfunc(mjd2utc, 1, 1)
+
+    # return mjd2utcArray(mjds)
+    return mjds
+
 def processNewPTX(fpath,
+                  useTimestamps=False,
+                  convertToDatetimes=False,
                   rot=None,
                   xOffset=None,
                   yOffset=None,
-                  radius=None,
                   sampleSize=None,
                   simSignal=None,
                   iFilter=False,
                   parabolaFit=None,
+                  radius=None,
                   rFilter=True,
                   addOffset=False,
                   filterClose=True):
 
+    # is there associated time data?
+    if useTimestamps:
+        dts = getTimeStamps(fpath)
+    else:
+        dts = None    
+
     with open(fpath, 'r') as f:
         ls = f.readlines()
     
-    xyz = processNewPTXData(ls,
+    xyz, dts = processNewPTXData(ls,
+                            dts=dts,
                             rot=rot,
                             xOffset=xOffset,
                             yOffset=yOffset,
@@ -586,7 +641,18 @@ def processNewPTX(fpath,
     outf = fpath + ".csv"
     np.savetxt(outf, xyz, delimiter=",")
 
-    return xyz
+    if dts is not None:
+        outf = fpath + "_times.processed.csv"
+        print "writing out MJDs to:", outf
+        np.savetxt(outf, dts, delimiter=",")
+
+    # converting to datetimes takes a LONG time.
+    if dts is not None and convertToDatetimes:
+        print "Converting timestamps (MJDs) to datetime ..."
+        mjd2utcArray = np.frompyfunc(mjd2utc, 1, 1)
+        dts = mjd2utcArray(dts)
+
+    return xyz, dts
 
 def addCenterBump(x, y, z, rScale=10., zScale=0.05):
 
