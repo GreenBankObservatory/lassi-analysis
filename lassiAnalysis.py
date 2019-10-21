@@ -25,7 +25,7 @@ from zernikeIndexing import noll2asAnsi, printZs
 from simulateSignal import addCenterBump, zernikeFour
 from simulateSignal import zernikeFive, gaussian
 from plotting import sampleXYZData, scatter3dPlot
-from utils import sph2cart, cart2sph, log, difflog
+from utils import sph2cart, cart2sph, log, difflog, midPoint
 from weightSmooth import weightSmooth
 import settings
 
@@ -261,10 +261,20 @@ def processLeicaScan2(fpath,
                      rot=None,
                      xOffset=None,
                      yOffset=None,
+                     radius=None,
+                     filterClose=True,
                      sampleSize=None,
                      parabolaFit=None,
                      useFittingWeights=False,
-                     simSignal=None):
+                     simSignal=None,
+                     processPTX=True,
+                     smoothPTX=True,
+                     radialMask=True,
+                     maskRetro=True,
+                     maskGuess=[60., 0., 0., -50., 0., 0.],
+                     regrid=True,
+                     save=True,
+                     returnData=True):
     """
     High level function for processing leica data:
        * processes PTX file
@@ -291,58 +301,89 @@ def processLeicaScan2(fpath,
     if rot is None:
         rot = 0.
     
-    processedPath = "{}/{}.csv".format(GPU_PATH, fileBasename)
+    processedPath = fpath + ".csv"
     
-    if False:
+    if processPTX:
         print("Processing PTX file ...")
         xyz, dts = processNewPTX(fpath,
                     rot=rot,
                     xOffset=xOffset,
                     yOffset=yOffset,
+                    radius=radius,
                     rFilter=True,
                     iFilter=False,
                     parabolaFit=parabolaFit,
                     simSignal=simSignal,
-                    sampleSize=sampleSize) #xOffset=xOffset, yOffset=yOffset)
+                    sampleSize=sampleSize,
+                    filterClose=filterClose) 
 
     e = time.time()
     print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
 
-    print("Masking data and fitting parabola.")
+    # Reduces our data via GPUs.
     s = time.time()
-
-    maskedData = maskLeicaData(processedPath, n=N)
-
-    diff = maskedData['fitResidual']
-    xRot, yRot, zRot = maskedData['rotated']
-
-    e = time.time()
-    print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
-
-    print("Regriding data to a uniformly sampled grid.")
-    s = time.time()
-
-    xReg,yReg,diffReg = regridXYZ(xRot, 
-                                  yRot, 
-                                  diff.filled(np.nan), 
-                                  n=N, verbose=False)
     
-    _,_,retroMask = regridXYZ(xRot, 
-                              yRot, 
-                              np.ma.masked_where(diff.mask, diff.mask.astype(float)).filled(np.nan), 
-                              n=N, verbose=False)
-
-    diffRegMasked = np.ma.masked_where(retroMask, diffReg)
+    if smoothPTX:
+        print("Smoothing data ...")
+        smoothedFiles = smooth(processedPath)
 
     e = time.time()
     print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
 
-    # Write the final results to disk.
-    finalFile = "%s.processedMasked" % fileBasename
-    print("Saving {} to disk".format(finalFile))
-    np.savez(finalFile, xs=xReg, ys=yReg, diffs=diffRegMasked)
+    # Masks retroreflectors and fits a parabola to the data.
+    s = time.time()
 
-    return xReg, yReg, diffRegMasked
+    if maskRetro:
+        print("Masking data and fitting parabola.")
+        smoothedDataPath = "{}/{}.csv".format(GPU_PATH, fileBasename)
+        maskedData = maskLeicaData(smoothedDataPath, n=N, radialMask=radialMask, guess=maskGuess)
+
+        diff = maskedData['fitResidual']
+        xRot, yRot, zRot = maskedData['rotated']
+    else:
+        xRot = xyz[:,0]
+        yRot = xyz[:,1]
+        zRot = xyz[:,2]
+
+    e = time.time()
+    print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
+
+    s = time.time()
+
+    if regrid:
+        print("Regriding data to a uniformly sampled grid.")
+        # Mask with points outside the primary.
+        outMask = np.ma.masked_invalid(xRot).mask
+    
+        xReg,yReg,diffReg = regridXYZ(xRot[~outMask], 
+                                      yRot[~outMask], 
+                                      diff[~outMask], 
+                                      n=N, verbose=False)
+        
+        _,_,retroMask = regridXYZ(xRot[~outMask], 
+                                  yRot[~outMask], 
+                                  diff.mask.astype(float)[~outMask], 
+                                  n=N, verbose=False)
+
+        diffRegMasked = np.ma.masked_where(retroMask, diffReg)
+    else:
+        xReg = xRot
+        yReg = yRot
+        diffRegMasked = zRot
+
+    e = time.time()
+    print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
+
+    if save:
+        # Write the final results to disk.
+        finalFile = "%s.processed" % fileBasename
+        print("Saving {} to disk".format(finalFile))
+        np.savez(finalFile, xs=xReg, ys=yReg, diffs=diffRegMasked, retroMask=retroMask)
+
+    if returnData:
+        return xReg, yReg, diffRegMasked
+    else:
+        return 0, 0, 0
 
 def processLeicaScan(fpath,
                      N=512,
@@ -352,7 +393,8 @@ def processLeicaScan(fpath,
                      sampleSize=None,
                      parabolaFit=None,
                      useFittingWeights=False,
-                     simSignal=None):
+                     simSignal=None,
+                     addOffset=False):
     """
     High level function for processing leica data:
        * processes PTX file
@@ -394,7 +436,8 @@ def processLeicaScan(fpath,
                     iFilter=False,
                     parabolaFit=parabolaFit,
                     simSignal=simSignal,
-                    sampleSize=sampleSize) #xOffset=xOffset, yOffset=yOffset)
+                    sampleSize=sampleSize,
+                    addOffset=addOffset)
 
     e = time.time()
     print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
@@ -464,14 +507,122 @@ def processLeicaScan(fpath,
 def loadProcessedData(filename):
     "Loads the results of processLeicaScan from file"
     d = np.load(filename)
-    return d["xs"], d["ys"], d["diffs"]
+    return d["xs"], d["ys"], d["diffs"], d["retroMask"]
 
-def maskLeicaData(filename, n=512, **kwargs):
+def maskXYZ(x, y, z, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radialMask=True, maskRadius=40., **kwargs):
+    """
+    """
+    
+    xf = x[~np.isnan(x)]
+    yf = y[~np.isnan(x)]
+    zf = z[~np.isnan(x)]
+
+    # Fit a parabola to the data.
+    fitresult = fitLeicaData(xf, yf, zf, guess, bounds=bounds, weights=None)
+
+    # Subtract the fitted parabola from the data.
+    # The difference should be flat.
+    c = fitresult.x
+    newX, newY, newZ = newParabola(x, y, z, c[0], c[1], c[2], c[3], c[4], c[5])
+    newX.shape = newY.shape = newZ.shape = (n, n)
+    xrr, yrr, zrr = rotateData(x, y, z, c[4], c[5])
+    xrr.shape = yrr.shape = zrr.shape = (n, n)
+    diff = zrr - newZ
+
+    if radialMask:
+        xc = midPoint(xrr)
+        yc = midPoint(yrr)
+        mask = (((xrr - xc)**2. + (yrr - yc)**2.) < maskRadius**2.)
+        mdiff = np.ma.masked_where(~mask, diff)
+    else:
+        mdiff = diff
+
+    # Mask any pixels which deviate from the noise.
+    # This should mask out retroreflectors, misaligned panels and sub-scans where the TLS moved due to wind.
+    mcdiff = sigma_clip(mdiff)
+
+    # Apply the mask to the original data and repeat once more.
+    # In the end also fit a parabola to each row in the data, and mask outliers.
+    # This allows to find more subtle features in the data.
+    xf = np.ma.masked_where(mcdiff.mask, x)
+    yf = np.ma.masked_where(mcdiff.mask, y)
+    zf = np.ma.masked_where(mcdiff.mask, z)
+
+    masked_fitresult = fitLeicaData(xf.compressed(), yf.compressed(), zf.compressed(),
+                                       guess, bounds=bounds, weights=None)
+
+    c = masked_fitresult.x
+    newXm, newYm, newZm = newParabola(x, y, z, c[0], c[1], c[2], c[3], c[4], c[5])
+    newXm.shape = newYm.shape = newZm.shape = (n, n)
+    xrrm, yrrm, zrrm = rotateData(x, y, z, c[4], c[5])
+    xrrm.shape = yrrm.shape = zrrm.shape = (n, n)
+    masked_diff = zrrm - newZm
+
+    if radialMask:
+        xc = midPoint(xrrm)
+        yc = midPoint(yrrm)
+        mask = (((xrrm - xc)**2. + (yrrm - yc)**2.) < maskRadius**2.)
+        masked_diff = np.ma.masked_where(~mask, masked_diff)
+    else:
+        masked_diff = np.ma.masked_invalid(masked_diff)
+
+    mcdiff2 = masked_diff
+
+    # Final mask.
+    map_mask = np.zeros((n,n), dtype=bool)
+
+    xl = np.linspace(0,n,n)
+
+    # Loop over rows fitting a parabola and masking any pixels that deviate from noise.
+    for i in range(0,n):
+
+        yl = mcdiff2[i]
+
+        if len(xl[~yl.mask]) > 3:
+
+            poly_c = np.polyfit(xl[~yl.mask], yl[~yl.mask], 2)
+            poly_f = np.poly1d(poly_c)
+
+            res = np.ma.masked_invalid(yl - poly_f(xl))
+            res_sc = sigma_clip(res, **kwargs)
+
+            map_mask[i] = res_sc.mask
+
+        else:
+
+            map_mask[i] = True
+
+    # Prepare output.
+    origData = (x, y, z)
+
+    origMaskedData = (np.ma.masked_where(map_mask, x),
+                      np.ma.masked_where(map_mask, y),
+                      np.ma.masked_where(map_mask, z))
+
+    rotatedData = (xrrm,
+                   yrrm,
+                   np.ma.masked_where(map_mask, zrrm))
+
+    fitResidual = np.ma.masked_where(map_mask, zrrm - newZm)
+
+    parabolaFit = (newXm, newYm, newZm)
+
+    outData = {'origData': origData,
+               'origMasked': origMaskedData,
+               'rotated': rotatedData,
+               'fitResidual': fitResidual,
+               'parabolaFit': parabolaFit,
+               'parabolaFitCoeffs': c}
+
+    return outData
+
+def maskLeicaData(filename, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radialMask=True, maskRadius=40., **kwargs):
     """
     Given a GPU smoothed file, it will try and find bumps in the surface and mask them.
 
     :param filename: file with the GPU smoothed data.
     :param n: number of samples in the GPU smoothed data. Default n=512.
+    :param guess: Initial guess for the parabola fit. [focus, x0, y0, z0, thetaX, thetaY].
     :param kwargs: keyword arguments passed to astropy.stats.sigma_clip.
     """
 
@@ -481,17 +632,8 @@ def maskLeicaData(filename, n=512, **kwargs):
     yf = cleanData[1]
     zf = cleanData[2]
 
-    # Assemble initial guess.
-    f = 60.
-    v1x = 0.
-    v1y = 0.
-    v2 = 0.
-    xTheta = 0.
-    yTheta = 0.
-    guess = [f, v1x, v1y, v2, xTheta, yTheta]
-
     # Fit a parabola to the data.
-    fitresult = fitLeicaData(xf, yf, zf, guess, weights=None)
+    fitresult = fitLeicaData(xf, yf, zf, guess, bounds=bounds, weights=None)
     
     # Subtract the fitted parabola from the data.
     # The difference should be flat.
@@ -502,8 +644,14 @@ def maskLeicaData(filename, n=512, **kwargs):
     xrr.shape = yrr.shape = zrr.shape = (n, n)
     diff = zrr - newZ
     
-    mask = (((xrr - 2.)**2 + (yrr - 50.)**2) < 45**2)
-    mdiff = np.ma.masked_where(~mask, diff)
+    if radialMask:
+        xc = midPoint(xrr)
+        yc = midPoint(yrr)
+        mask = (((xrr - xc)**2 + (yrr - yc)**2) < maskRadius**2)
+        mdiff = np.ma.masked_where(~mask, diff)
+    else:
+        mdiff = diff
+
     # Mask any pixels which deviate from the noise.
     # This should mask out retroreflectors, misaligned panels and sub-scans where the TLS moved due to wind.
     mcdiff = sigma_clip(mdiff)
@@ -515,16 +663,8 @@ def maskLeicaData(filename, n=512, **kwargs):
     yf = np.ma.masked_where(mcdiff.mask, orgData[1])
     zf = np.ma.masked_where(mcdiff.mask, orgData[2])
 
-    f = 60.
-    v1x = 0.
-    v1y = 0.
-    v2 = 0.
-    xTheta = 0.
-    yTheta = 0.
-    guess = [f, v1x, v1y, v2, xTheta, yTheta]
-
     masked_fitresult = fitLeicaData(xf.compressed(), yf.compressed(), zf.compressed(),
-                                       guess, weights=None)
+                                       guess, bounds=bounds, weights=None)
     
     c = masked_fitresult.x
     newXm, newYm, newZm = newParabola(orgData[0], orgData[1], orgData[2], c[0], c[1], c[2], c[3], c[4], c[5])
@@ -532,8 +672,15 @@ def maskLeicaData(filename, n=512, **kwargs):
     xrrm, yrrm, zrrm = rotateData(orgData[0], orgData[1], orgData[2], c[4], c[5])
     xrrm.shape = yrrm.shape = zrrm.shape = (n, n)
     masked_diff = zrrm - newZm
-    mask = (((xrr - 2.)**2 + (yrr - 50.)**2) < 45**2)
-    masked_diff = np.ma.masked_where(~mask, masked_diff)
+
+    if radialMask:
+        xc = midPoint(xrrm)
+        yc = midPoint(yrrm)
+        mask = (((xrrm - xc)**2 + (yrrm - yc)**2) < maskRadius**2)
+        masked_diff = np.ma.masked_where(~mask, masked_diff)
+    else:
+        masked_diff = np.ma.masked_invalid(masked_diff)
+
     mcdiff2 = masked_diff
     
     # Final mask.
@@ -560,19 +707,25 @@ def maskLeicaData(filename, n=512, **kwargs):
 
             map_mask[i] = True
 
-    # Prepare output
+    # Prepare output.
+    origData = (orgData[0],
+                orgData[1],
+                orgData[2])
+
     origMaskedData = (np.ma.masked_where(map_mask, orgData[0]),
                       np.ma.masked_where(map_mask, orgData[1]),
                       np.ma.masked_where(map_mask, orgData[2]))
 
-    rotatedData = (xrrm, yrrm, zrrm)
+    rotatedData = (xrrm,
+                   yrrm,
+                   np.ma.masked_where(map_mask, zrrm))
 
-    #fitResidual = np.ma.masked_where(map_mask, orgData[2] - newZm)
     fitResidual = np.ma.masked_where(map_mask, zrrm - newZm)
 
     parabolaFit = (newXm, newYm, newZm) 
 
-    outData = {'origMasked': origMaskedData,
+    outData = {'origData': origData,
+               'origMasked': origMaskedData,
                'rotated': rotatedData,
                'fitResidual': fitResidual,
                'parabolaFit': parabolaFit,
@@ -594,22 +747,25 @@ def processLeicaScanPair(filename1,
         # here in the CWD
         fn1 = "%s.processed.npz" % os.path.basename(filename1)
         print("Loading processed data from file:", fn1)
-        xs1, ys1, diff1 = loadProcessedData(fn1)
+        xs1, ys1, diff1, mask1 = loadProcessedData(fn1)
+        diff1 = np.ma.masked_where(mask1, diff1)
         fn2 = "%s.processed.npz" % os.path.basename(filename2)
         print("Loading processed data from file:", fn2)
-        xs2, ys2, diff2 = loadProcessedData(fn2)
+        xs2, ys2, diff2, mask2 = loadProcessedData(fn2)
+        diff2 = np.ma.masked_where(mask1, diff2)
         imagePlot(np.log(np.abs(np.diff(diff1))), "first scan log")
         imagePlot(np.log(np.abs(np.diff(diff2))), "second scan log")
 
     else:
         # we need to process each scan
         # WARNING: each scan takes about 10 minutes    
-        xs1, ys1, diff1, weights1 = processLeicaScan(filename1, rot=rot, parabolaFit=parabolaFit)
-        xs2, ys2, diff2, weights2 = processLeicaScan(filename2, rot=rot, parabolaFit=parabolaFit)
+        xs1, ys1, diff1 = processLeicaScan2(filename1, rot=rot, parabolaFit=parabolaFit)
+        xs2, ys2, diff2 = processLeicaScan2(filename2, rot=rot, parabolaFit=parabolaFit)
 
     print("Finding difference between scans ...")
     N = 512
     diffData = diff1 - diff2
+    retroMask = diffData.mask
 
     if rFilter:
         # TBF: which x, y to use?
@@ -629,7 +785,7 @@ def processLeicaScanPair(filename1,
                                  rLimit,
                                  np.nan)
         diffData.shape= (N, N)
-        
+        diffData = np.ma.masked_where(retroMask, diffData)
 
     # find the difference of the difference!
     diffData.shape = (N, N)
@@ -651,7 +807,7 @@ def processLeicaScanPair(filename1,
     diffData[np.isnan(diffData)] = 0.
 
     # print scaling up data for z-fit by 1000.
-    diffDataM = diffData * 1000.
+    diffDataM = diffData.filled(0) * 1000.
 
     # find the first 12 Zernike terms
     numZsFit = 36
@@ -675,7 +831,7 @@ def processLeicaScanPair(filename1,
 
     return (xs1, ys1, xs2, ys2), diffData
 
-def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False, ymax=False):
+def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False, ymax=False, method='linear'):
     """
     Regrids the XYZ data to a regularly sampled grid.
 
@@ -712,9 +868,33 @@ def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False
     # Regrid the data.
     reg_z = griddata(np.array([x[~np.isnan(z)].flatten(),y[~np.isnan(z)].flatten()]).T, 
                      z[~np.isnan(z)].flatten(), 
-                     (grid_xy[0], grid_xy[1]), method='linear', fill_value=np.nan)
-    
+                     (grid_xy[0], grid_xy[1]), method=method, fill_value=np.nan)
+
+    # We need to flip the reggrided data in the abscisa axis 
+    # so that it has the same orientation as the input.
     return grid_xy[0], grid_xy[1], reg_z.T
+
+def regridXYZMasked(x, y, z, n=512, verbose=False, xmin=False, xmax=False, ymin=False, ymax=False):
+    """
+    """
+
+    outMask = np.ma.masked_invalid(x).mask
+
+    xReg,yReg,zReg = regridXYZ(x[~outMask],
+                               y[~outMask],
+                               z[~outMask],
+                               n=n, verbose=verbose,
+                               xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
+
+    _,_,retroMask = regridXYZ(x[~outMask],
+                              y[~outMask],
+                              z.mask.astype(float)[~outMask],
+                              n=n, verbose=verbose,
+                              xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
+
+    zRegMasked = np.ma.masked_where(retroMask, zReg)
+
+    return xReg, yReg, zRegMasked
 
 def simulateSignal(sigFn,
                    refFn,

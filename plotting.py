@@ -2,7 +2,40 @@ from copy import copy
 import random
 
 import matplotlib.pylab as plt
-from mpl_toolkits.mplot3d import axes3d, Axes3D
+from mpl_toolkits.mplot3d import Axes3D
+
+def barChartPlot(index, fitlist):
+    """
+    Plots a bar chart with Zernike coefficients.
+    This is used in zernikies.getZernikeCoeffs.
+
+    :param index: List with the index of the Zernike polynomials to show.
+    :param fitlist: List with the coefficients of the Zernike polynomials.
+    """
+
+    fig = plt.figure(figsize=(9, 6), dpi=80)
+    xticklist = []
+    width = 0.6
+    for i in index:
+        xticklist.append('Z'+str(i))
+    barfigure = plt.bar(index, fitlist, width, color='#2E9AFE', edgecolor='#2E9AFE')
+    plt.xticks(index+width//2, xticklist, rotation=90)
+    plt.xlabel('Zernike polynomials', fontsize=18)
+    plt.ylabel('Coefficient', fontsize=18)
+    plt.title('Fitted Zernike polynomial coefficients', fontsize=18)
+
+def zernikeResiduals2DPlot(xx, yy, zz):
+    """
+    Plots the residuals of a Zernike fit.
+    This is used in zernikies.getZernikeCoeffs.
+    """
+
+    fig = plt.figure(figsize=(9, 6), dpi=80)
+    ax = fig.gca()
+    im = plt.pcolormesh(xx, yy, zz, cmap=plt.get_cmap('RdYlGn'))
+    plt.colorbar()
+    plt.title('Remaining Aberration', fontsize=18)
+    ax.set_aspect('equal', 'datalim')
 
 def linePlot(y, title):
     fig = plt.figure()

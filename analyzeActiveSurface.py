@@ -79,16 +79,24 @@ def plotData(data,
         x = hoops
         y = ribs
 
+    # Use masked arrays.
+    x = np.ma.masked_invalid(x)
+    y = np.ma.masked_invalid(y)
+    z = np.ma.masked_invalid(z)
+
     if filterDisabled:
         enabled= data.field('ENABLED')
         print(enabled)
         mask = enabled == True
         print("mask: ", mask)
         orgLen = len(x)
-        x = x[mask]
-        y = y[mask]
-        z = z[mask]
-        print("Removing %d disabled actuators" % (orgLen - len(z)))
+        #x = x[mask]
+        #y = y[mask]
+        #z = z[mask]
+        x.mask = ~mask
+        y.mask = ~mask
+        z.mask = ~mask
+        print("Removing %d disabled actuators" % (orgLen - len(z.compressed())))
 
     # now that we have the data the way we want it,
     # plot it
@@ -103,7 +111,7 @@ def plotData(data,
         plt.ylim(ylim)
     if zlim is not None:
         ax.set_zlim(zlim)
-    ax.scatter(x, y, z)
+    ax.scatter(x.compressed(), y.compressed(), z.compressed())
     
     return x, y, z
 
@@ -230,6 +238,83 @@ def plotFile(fn, filterMin=False, filterDisabled=True):
     delData = plotData(data, scan, 'DELTA')
 
     return h, r, x, y, ind, indPhi, absd
+
+def extractSurface(filename, fieldName, dividePhi=True, xy=True, filterDisabled=False, verbose=False):
+    """
+    """
+
+    hdu = fits.open(filename)
+    hdr = hdu[0].header
+
+    scan = hdr['SCAN']
+    
+    if verbose:
+        print("Zeros enabled:", hdr['ZERO'])
+        print("FEM enabled:", hdr['FEM'])
+        print("Random enabled:", hdr['RANDOM'])
+        print("Zernikes enabled:", hdr['ZERNIKE'])
+        print("Thermal Zernikes enabled", hdr['THRMZERN'])
+
+    if len(hdu) < 2:
+        print("Active Surface FITS file only has Primary Header")
+        return
+
+    try:
+        data = hdu['SURFACE'].data
+    except KeyError:
+        print("Does not contain SURFACE extension")
+        return
+
+    hoops = data.field('HOOP')
+    ribs = data.field('RIB')
+    z = data.field(fieldName)
+
+    if dividePhi:
+        phis = []
+        fn = "/home/gbt/etc/config/AsZernike.conf"
+        asz = AsZernikeFile(fn)
+        asz.parse()
+        for i, h in enumerate(hoops):
+            r = ribs[i]
+            act = asz.actuators[(h,r)]
+            phis.append(act.phi)
+        phis = np.array(phis)
+        if verbose:
+            print("Dividing z axis by phis.")
+        z = z / phis
+
+    if xy:
+        fn = "/home/gbt/etc/config/AsZernike.conf"
+        asz = AsZernikeFile(fn)
+        asz.parse()
+        x = []
+        y = []
+        for i, h in enumerate(hoops):
+            r = ribs[i]
+            act = asz.actuators[(h,r)]
+            x.append(act.x)
+            y.append(act.y)
+        x = np.array(x)
+        y = np.array(y)
+    else:
+        x = hoops
+        y = ribs
+
+    # Use masked arrays.
+    x = np.ma.masked_invalid(x)
+    y = np.ma.masked_invalid(y)
+    z = np.ma.masked_invalid(z)
+
+    if filterDisabled:
+        enabled = data.field('ENABLED')
+        mask = (enabled == True)
+        x.mask = ~mask
+        y.mask = ~mask
+        z.mask = ~mask
+        if verbose:
+            print("Removing %d disabled actuators" % (len(z) - len(z.compressed())))
+   
+    return x, y, z 
 
 def surfacePlot(data, z, title):
     fig = plt.figure()
