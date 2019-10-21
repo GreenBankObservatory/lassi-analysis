@@ -35,14 +35,14 @@ zernikeNorm = { 1: 1.,
                26: 14.,
                27: 14.,
                28: 14.,
-               29: 4.,
-               30: 4.,
-               31: 4.,
-               32: 4.,
-               33: 4.,
-               34: 4.,
-               35: 4.,
-               36: 4.}
+               29: 16.,
+               30: 16.,
+               31: 16.,
+               32: 16.,
+               33: 16.,
+               34: 16.,
+               35: 16.,
+               36: 16.}
 
 
 def _single_term_cos(power, rho, theta):
@@ -93,17 +93,17 @@ def zernikePolar(coefficients, rho, theta):
     z2  = z[1+1]  * _single_term_cos(1., rho, theta) # 
     z3  = z[1+2]  * _single_term_sin(1., rho, theta)
     z4  = z[1+3]  * _single_term_cos(2., rho, theta)
-    z5  = z[1+4]  * (2.*rho**2. - 1.)
+    z5  = z[1+4]  * (2.*rho**2. - 1.) # Defocus
     z6  = z[1+5]  * _single_term_sin(2., rho, theta)
-    z7  = z[1+6]  * _single_term_cos(3., rho, theta)
+    z7  = z[1+6]  * _single_term_cos(3., rho, theta) # Oblique trefoil
     z8  = z[1+7]  * _multi_term_cos(-2., 3., 1., rho, theta)
     z9  = z[1+8]  * _multi_term_sin(-2., 3., 1., rho, theta)
     z10 = z[1+9]  * _single_term_sin(3., rho, theta)
     z11 = z[1+10] * _single_term_cos(4., rho, theta)
     z12 = z[1+11] * _multi_term_cos(-3., 4., 2., rho, theta)
-    z13 = z[1+12] * (1. - (6.*np.power(rho, 2.))  + (6.*np.power(rho, 4.)))
+    z13 = z[1+12] * (1. - (6.*np.power(rho, 2.))  + (6.*np.power(rho, 4.))) # Primary spherical
     z14 = z[1+13] * _multi_term_sin(-3., 4., 2., rho, theta)
-    z15 = z[1+14] * _single_term_sin(4., rho, theta)
+    z15 = z[1+14] * _single_term_sin(4., rho, theta) # Oblique quadrafoil
     z16 = z[1+15] * _single_term_cos(5., rho, theta)
     z17 = z[1+16] * _multi_term_cos(-4., 5., 3., rho, theta)
     z18 = z[1+17] * (3.*rho - 12.*np.power(rho, 3.) + 10.*np.power(rho, 5.)) * np.cos(theta)
@@ -133,7 +133,7 @@ def zernikePolar(coefficients, rho, theta):
 
     return z_tot
 
-def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=True):
+def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=False, norm='sqrt'):
     """
 
     Determines the coefficients of Zernike polynomials that best describe a surface.
@@ -154,9 +154,10 @@ def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=T
     coeffs.append(0)
 
     # Make the support to evaluate the Zernike polynomials.
-    l = len(surface)
-    x = np.linspace(-1., 1., l)
-    y = np.linspace(-1., 1., l)
+    ny = surface.shape[0]
+    nx = surface.shape[1]
+    x = np.linspace(-1., 1., nx)
+    y = np.linspace(-1., 1., ny)
     [xx,yy] = np.meshgrid(x, y)
     r = np.sqrt(xx**2. + yy**2.)
     u = np.arctan2(yy, xx)
@@ -167,7 +168,16 @@ def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=T
         zf = zernikePolar(c, r, u)
         mask = (r > 1)
         zf[mask] = 0
-        a = np.sum(surface*zf)*2.*2./l/l/np.pi*zernikeNorm[i]
+
+        # Define the normalization factor.
+        if norm == 'sqrt':
+            zn = np.sqrt(zernikeNorm[i])
+        elif norm == 'active-surface':
+            zn = zernikeNorm[i]
+        elif norm == 'one':
+            zn = 1.
+
+        a = np.sum(surface*zf)*2.*2./nx/ny/np.pi*zn
         coeffs.append(a)
 
     # Plot bar chart of Zernike coefficients.
