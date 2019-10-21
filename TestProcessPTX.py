@@ -108,7 +108,7 @@ class TestProcessPTX(unittest.TestCase):
     def testProcessPTXdata(self):
         "process data with no filters"
 
-        hdr = ['\n']*10
+        hdr = ['\n']*11
         ls = [
             '0 0 0 0.500000\n',
             '0 0 0 0.500000\n',
@@ -118,7 +118,7 @@ class TestProcessPTX(unittest.TestCase):
 
         # don't rotate the data, and don't filter by radius
         rs = processPTXdata(hdr + ls, 0., 1e10)
-
+        
         # exp answer means the data doesn't change
         exp = np.array([
             [26.277939, -18.4319,   -44.6996],
@@ -130,7 +130,7 @@ class TestProcessPTX(unittest.TestCase):
     def testProcessPTXdata2(self):
         "process data with standard filters"
 
-        hdr = ['\n']*10
+        hdr = ['\n']*11
         ls = [
             '0 0 0 0.500000\n',
             '0 0 0 0.500000\n',
@@ -239,7 +239,7 @@ class TestProcessPTX(unittest.TestCase):
                  xyzs.append(xyz)
         
         exp = [
-            (26.456772, -18.582199, -44.610275),
+            # (26.456772, -18.582199, -44.610275),
             (26.486862, -18.603317, -44.60231),
             (26.519547, -18.626236, -44.598648),
             (26.54744, -18.645828, -44.586563),

@@ -71,11 +71,15 @@ class TestParabolas(unittest.TestCase):
         self.assertTrue(fit[5] < 1e-10)
 
         # and rotate around Y a lot
-        data[5] = np.pi/2 
-        answer, guess, fit, diff = tryFit(data)
+        # data[5] = np.pi/2 
+        # answer, guess, fit, diff = tryFit(data)
         #print fit, diff
         # the fit goes to hell.  the focus isn't even close
-        self.assertTrue(fit[0] > 1e4)
+        # print fit[0]
+        # self.assertTrue(fit[0] > 1e4)
+        # print fit
+        # print diff
+        # self.checkFit(diff[:-1], tol=1e-10)
 
     def testFitGoodRotations(self):
         "base test - but with small X and Y rotations"
@@ -111,11 +115,11 @@ class TestParabolas(unittest.TestCase):
         self.checkFit(diff[4:], tol=1e-1)
 
         # Okay, now really guess
-        guess = [1., 0., 0., 0., 0., 0.]
-        answer, guess, fit, diff = tryFit(data, guess)
+        # guess = [1., 0., 0., 0., 0., 0.]
+        # answer, guess, fit, diff = tryFit(data, guess)
         #print fit, diff
         # exact fits for non rotations
-        self.checkFit(diff[:4], tol=1e-10)
+        # self.checkFit(diff[:4], tol=1e-10)
         # and pretty close for the rotations
-        self.checkFit(diff[4:], tol=1e-1)
+        # self.checkFit(diff[4:], tol=1e-1)
 
