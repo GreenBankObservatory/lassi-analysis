@@ -110,3 +110,26 @@ def midPoint(x):
     """
 
     return (np.nanmax(x) - np.nanmin(x))/2. + np.nanmin(x)
+
+def gridLimits(arr0, arr1):
+    """
+    Finds the minimum and maximum values present in two arrays.
+    """
+
+    vmin = np.max([np.nanmin(arr0), np.nanmin(arr1)])
+    vmax = np.min([np.nanmax(arr0), np.nanmax(arr1)])
+
+    return vmin, vmax
+
+def dishLimits(maskedDish):
+    """
+    Returns the indices of the dish that are not masked.
+
+    return: [xmin, xmax, ymin, ymax]
+    """
+
+    noz = np.ma.nonzero(maskedDish)
+    ynm = noz[0]
+    xnm = noz[1]
+
+    return [np.min(xnm), np.max(xnm), np.min(ynm), np.max(ynm)]
