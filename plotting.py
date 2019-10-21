@@ -4,7 +4,7 @@ import random
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-def barChartPlot(index, fitlist):
+def barChartPlot(index, fitlist, expected=[]):
     """
     Plots a bar chart with Zernike coefficients.
     This is used in zernikies.getZernikeCoeffs.
@@ -18,11 +18,21 @@ def barChartPlot(index, fitlist):
     width = 0.6
     for i in index:
         xticklist.append('Z'+str(i))
-    barfigure = plt.bar(index, fitlist, width, color='#2E9AFE', edgecolor='#2E9AFE')
+    barfigure = plt.bar(index, fitlist, width, color='#2E9AFE', edgecolor='#2E9AFE', label='Measured')
+    if len(expected) > 0:
+        plt.bar(index-width/3, expected, width, color='#882255', edgecolor='#882255', label='Input')
+
+    plt.legend(loc=0, fancybox=True)
+
     plt.xticks(index+width//2, xticklist, rotation=90)
     plt.xlabel('Zernike polynomials', fontsize=18)
     plt.ylabel('Coefficient', fontsize=18)
     plt.title('Fitted Zernike polynomial coefficients', fontsize=18)
+
+    plt.gca().minorticks_on()
+    plt.gca().tick_params('both', direction='in', top=True, right=True)
+    plt.gca().tick_params('y', which='minor', direction='in', left=True, right=True)
+    plt.gca().tick_params('x', which='minor', bottom=False)
 
 def zernikeResiduals2DPlot(xx, yy, zz):
     """
