@@ -2,7 +2,7 @@ from copy import copy
 import random
 
 import matplotlib.pylab as plt
-from mpl_toolkits.mplot3d import axes3d, Axes3D
+from mpl_toolkits.mplot3d import Axes3D
 
 def barChartPlot(index, fitlist):
     """
