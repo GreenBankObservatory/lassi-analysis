@@ -140,6 +140,8 @@ def processPTXdata(lines, rotationAboutZdegrees, searchRadius, quiet=True, sampl
     if preview:
         # a preview of what our processed data looks like
         sampleSize = 10000
+        if len(xyz) < sampleSize:
+            sampleSize = len(xyz)
         lsIdx = random.sample(range(len(xyz)), sampleSize)
         xyzr = xyz[lsIdx]
         xr, yr, zr = splitXYZ(xyzr)
