@@ -30,14 +30,15 @@ def rotateXYaboutZ(xyz, rotDegrees):
 
     # get it back into original form
     # TBF: must be a faster method!
-    xyzNew = []
-    x = new_xyz[0]
-    y = new_xyz[1]
-    z = new_xyz[2]
-    for i in range(len(x)):
-        xyzNew.append((x[i], y[i], z[i]))
-        
-    return np.array(xyzNew)    
+#    xyzNew = []
+#    x = new_xyz[0]
+#    y = new_xyz[1]
+#    z = new_xyz[2]
+#    for i in range(len(x)):
+#        xyzNew.append((x[i], y[i], z[i]))
+    xyzNew = np.c_[new_xyz[0], new_xyz[1], new_xyz[2]]
+
+    return xyzNew 
         
     
 def processPTX(fpath, rotationAboutZdegrees=None, searchRadius=None, rFilter=True):
@@ -294,25 +295,39 @@ def testOffsets(lines, xOffset, yOffset, radius):
     plt.ylabel("y")
     plt.title("XY centered and below radus: %5.2f" % radius)
 
+# Commented out because this is slower than using a boolean mask
+#def radialFilter(x, y, z, xOffset, yOffset, radius):
+#    "returns only those points within the radius"
+#    xr = []
+#    yr = []
+#    zr = []
+#    for i in range(len(x)):
+#        r = np.sqrt((x[i]-xOffset)**2 + (y[i]-yOffset)**2)
+#        if r < radius:
+#            xr.append(x[i])
+#            yr.append(y[i])
+#            zr.append(z[i])
+#    xr = np.array(xr)        
+#    yr = np.array(yr)        
+#    zr = np.array(zr)        
+#    return xr, yr, zr
+# The nex method uses a boolean mask.
+
 def radialFilter(x, y, z, xOffset, yOffset, radius):
-    "returns only those points within the radius"
-    xr = []
-    yr = []
-    zr = []
-    for i in range(len(x)):
-        r = np.sqrt((x[i]-xOffset)**2 + (y[i]-yOffset)**2)
-        if r < radius:
-            xr.append(x[i])
-            yr.append(y[i])
-            zr.append(z[i])
-    xr = np.array(xr)        
-    yr = np.array(yr)        
-    zr = np.array(zr)        
-    return xr, yr, zr
+    """
+    Removes points outside a circle centered at (xOffset, yOffset).
+
+    """
+    
+    mask = np.power(x - xOffset, 2.) + np.power(y - yOffset, 2.) < radius**2.
+
+    return x[mask], y[mask], z[mask]
+
 
 def processNewPTXData(lines,
                       xOffset=None,
                       yOffset=None,
+                      radius=None,
                       plotTest=True,
                       rot=None,
                       sampleSize=None,
@@ -320,7 +335,9 @@ def processNewPTXData(lines,
                       simSignal=None,
                       iFilter=False,
                       nFilter=True,
-                      rFilter=True):
+                      rFilter=True,
+                      addOffset=False,
+                      filterClose=True):
     "this is the processing we see works with 2019 data"
 
     if rot is None:
@@ -329,10 +346,8 @@ def processNewPTXData(lines,
         xOffset = -8.0
     if yOffset is None:    
         yOffset = 50.0
-        #yOffset = 60.0
-        #yOffset = 55.0
-
-    radius = 45.5
+    if radius is None:
+        radius = 45.5
 
     print("ProcessNewPTXData with: ", xOffset, yOffset, rot, radius)
 
@@ -430,12 +445,13 @@ def processNewPTXData(lines,
         print("Adding Center Bump")
         z = addCenterBump(x, y, z)
 
-    # x, y, z -> [(x, y, z)]
-    # for rotation phase
-    xyz = []
-    for i in range(len(x)):
-        xyz.append((x[i], y[i], z[i]))
-    xyz = np.array(xyz)
+#    # x, y, z -> [(x, y, z)]
+#    # for rotation phase
+#    xyz = []
+#    for i in range(len(x)):
+#        xyz.append((x[i], y[i], z[i]))
+#    xyz = np.array(xyz)
+    xyz = np.c_[x, y, z]
 
     if rot is not None or rot != 0.0:
         print("Rotating about Z by %5.2f degrees" % rot)
@@ -443,6 +459,29 @@ def processNewPTXData(lines,
         xyz = rotateXYaboutZ(xyz, rotationAboutZdegrees)
     
     print("Now we have %d lines of data" % len(xyz))
+
+    if filterClose:
+        # Removes points that are closer than 10 m from the scanner.
+        tooClose = 10.
+        orgNum = xyz.shape[0]
+        r = np.sqrt(np.power(xyz[:,0], 2.) + np.power(xyz[:,1], 2.) + np.power(xyz[:,2], 2.))
+        mask = r > tooClose
+        xyz = xyz[mask]
+        newNum = xyz.shape[0]
+        print("Removed {0:.0f} points closer than {1:.2f} m from the scanner.".format((orgNum - newNum), tooClose))
+
+    if addOffset:
+        xmin = np.nanmin(xyz[:,0])
+        xmax = np.nanmax(xyz[:,0])
+        ymin = np.nanmin(xyz[:,1])
+        ymax = np.nanmax(xyz[:,1])
+
+        #if xmin <= 0 and xmax >= 0:
+        #    print("Translating x axis.")
+        #    xyz[:,0] -= xmin + 1.
+        if ymin <= 0:
+            print("Translating y axis.")
+            xyz[:,1] -= ymin - 10.
 
     if parabolaFit is not None:
         pTol = 0.4
@@ -511,11 +550,14 @@ def processNewPTX(fpath,
                   rot=None,
                   xOffset=None,
                   yOffset=None,
+                  radius=None,
                   sampleSize=None,
                   simSignal=None,
                   iFilter=False,
                   parabolaFit=None,
-                  rFilter=True):
+                  rFilter=True,
+                  addOffset=False,
+                  filterClose=True):
 
     with open(fpath, 'r') as f:
         ls = f.readlines()
@@ -524,11 +566,14 @@ def processNewPTX(fpath,
                             rot=rot,
                             xOffset=xOffset,
                             yOffset=yOffset,
+                            radius=radius,
                             sampleSize=sampleSize,
                             simSignal=simSignal,
                             parabolaFit=parabolaFit,
                             iFilter=iFilter,
-                            rFilter=rFilter)
+                            rFilter=rFilter,
+                            addOffset=addOffset,
+                            filterClose=filterClose)
 
     # TBF: the old interface expects this 
     # in a different format
@@ -613,8 +658,6 @@ def neighborFilter(x, y, z, tol):
 
     # return the mask as well so we can filter out other things as well
     return xnew, y[mask], z[mask], mask
-        
-
 
 if __name__ == "__main__":
     import os
