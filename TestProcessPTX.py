@@ -11,6 +11,9 @@ matplotlib.use('agg')
 #from parabolas import *
 from processPTX import * 
 
+from lassiTestSettings import DATA_27MARCH2019, SCAN9, SETTINGS_27MARCH2019
+
+
 class TestProcessPTX(unittest.TestCase):
 
     def setUp(self):
@@ -295,3 +298,43 @@ class TestProcessPTX(unittest.TestCase):
 
         self.almostEqualMatrix(actual, exp)
 
+    def testProcessNewPTXDataScan9(self):
+
+        fpath = os.path.join(DATA_27MARCH2019, SCAN9)
+
+        with open(fpath, 'r') as f:
+            ls = f.readlines()
+
+        # original number of data points (plus header)
+        self.assertEqual(len(ls), 12546348)
+
+        xOffset = SETTINGS_27MARCH2019['xOffset']
+        yOffset = SETTINGS_27MARCH2019['yOffset']
+        rot = SETTINGS_27MARCH2019['rot']
+
+        # remove as little data as possible
+        xyz, _ = processNewPTXData(ls,
+                                   xOffset=xOffset,
+                                   yOffset=yOffset,
+                                   rot=rot,
+                                   plotTest=False,
+                                   nFilter=False,
+                                   iFilter=False,
+                                   rFilter=False,
+                                   filterClose=False)
+
+        # check 
+        self.assertEqual(len(xyz), 10032308)
+
+        # OK, do it again, but with the sensible filters on
+        xyz, _ = processNewPTXData(ls,
+                                   xOffset=xOffset,
+                                   yOffset=yOffset,
+                                   rot=rot,
+                                   plotTest=False,
+                                   nFilter=True,
+                                   iFilter=True,
+                                   rFilter=True,
+                                   filterClose=False)        
+
+        self.assertEqual(len(ls), 6928318)
