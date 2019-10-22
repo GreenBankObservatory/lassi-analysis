@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 
 from main import smoothGPUs, smoothGPUMulti, smooth, getWeight
-from main import importCsv
+from main import importCsv, loadLeicaDataFromGpus
 # from lassiTestSettings import DATA_27MARCH2019, SCAN9, SETTINGS_27MARCH2019
 import settings
 
@@ -126,3 +126,15 @@ class TestMain(unittest.TestCase):
         self.assertEqual(x[0], -1.253032129408059880e+01)
         self.assertEqual(y[0], 2.211914288349020552e+01)
         self.assertEqual(z[0], -4.575297499999999928e+01)
+
+    def testLoadLeicaDataFromGpus(self):
+
+        fn = "test"
+        x, y, z = loadLeicaDataFromGpus(fn)
+        
+        self.assertEqual(len(x), 100)
+        self.assertEqual(len(y), 100)
+        self.assertEqual(len(z), 100)
+
+        # spot check
+        self.assertAlmostEqual(x[3], 1.48345411, 7)
