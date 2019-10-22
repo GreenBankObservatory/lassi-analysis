@@ -137,7 +137,7 @@ def zernikeTen(x, y, xOffset, yOffset, amplitude=1.0):
     print("mean: %f, min: %f, max: %f" % (np.mean(z), np.nanmin(z), np.nanmax(z)))
     return z
 
-def zernikePoly(x, y, xOffset, yOffset, coefficients, verbose=False):
+def zernikePoly(x, y, xOffset, yOffset, coefficients, xMax=-1e22, yMax=-1e22, verbose=False):
     """
 
     Wrapper around opticspy.interferometer_zenike.__zernikepolar__
@@ -146,8 +146,13 @@ def zernikePoly(x, y, xOffset, yOffset, coefficients, verbose=False):
     if len(coefficients) > zernikies.nMax + 1:
         raise ValueError('coefficients must have less than {} items.'.format(zernikies.nMax+1))
 
-    xcn = (x - xOffset)/np.nanmax(x - xOffset)
-    ycn = (y - yOffset)/np.nanmax(y - yOffset)
+    if xMax == -1e22:
+        xMax = np.nanmax(x - xOffset)
+    if yMax == -1e22:
+        yMax = np.nanmax(y - yOffset)
+
+    xcn = (x - xOffset)/xMax
+    ycn = (y - yOffset)/yMax
 
     rcn = np.sqrt(xcn**2. + ycn**2.)
     ucn = np.arctan2(xcn, ycn)

@@ -38,11 +38,11 @@ def process(fn, n, outputName, noise=False):
     print("importing CSV data ...")
     x, y, z = importCsv(fn)
 
-    print(x.shape, y.shape, z.shape)
+    print((x.shape, y.shape, z.shape))
 
-    print(x[0], y[0], z[0])
-    print(type(x[0]))
-    print(type(x))
+    print((x[0], y[0], z[0]))
+    print((type(x[0])))
+    print((type(x)))
 
     print("Converting to spherical coords ...")
     r, az, el = cart2sph(x, y, z)
@@ -56,8 +56,8 @@ def process(fn, n, outputName, noise=False):
     print("smoothing data ...")
     azLoc, elLoc, rSmooth = smooth(az, el, r, n)
 
-    print("azLoc", azLoc)
-    print("elLoc", elLoc)
+    print(("azLoc", azLoc))
+    print(("elLoc", elLoc))
     if noise:
         print("adding noise to radial values ...")
         rSmooth = rSmooth + 1*np.random.randn(n,n)
@@ -151,7 +151,7 @@ def smoothWithWeights(fpath, N=None, useWeights=True):
     # work with a sample of the data
     down = 0.1
     seed = 1971
-    print("Downsampling data by %f" % down)
+    print(("Downsampling data by %f" % down))
     x, y, z = sampleXYZData(x, y, z, down, seed=seed)
 
     scatter3dPlot(x, y, z, "downsampled by %f" % down)
@@ -167,24 +167,24 @@ def smoothWithWeights(fpath, N=None, useWeights=True):
 
     nrsmooth2 = rSmooth2[np.logical_not(np.isnan(rSmooth2))]
 
-    print("num pos rsmooth2", len(nrsmooth2[nrsmooth2 > 0.]))
-    print("num neg rsmooth2", len(nrsmooth2[nrsmooth2 < 0.]))   
+    print(("num pos rsmooth2", len(nrsmooth2[nrsmooth2 > 0.])))
+    print(("num neg rsmooth2", len(nrsmooth2[nrsmooth2 < 0.])))   
 
 
     # TEacher says we can cheet
     sigmat = rSmooth2 - (rSmooth**2)
     mask = sigmat < 0.
-    print(sigmat[mask], rSmooth2[mask], rSmooth[mask]**2)
+    print((sigmat[mask], rSmooth2[mask], rSmooth[mask]**2))
 
     sigma2 = np.abs(rSmooth2 - (rSmooth**2))
 
 
-    print("Size of sigma2 vs. num zeros", sigma2.shape, len(sigma2[sigma2 == 0.0]))
+    print(("Size of sigma2 vs. num zeros", sigma2.shape, len(sigma2[sigma2 == 0.0])))
 
     nsigma2 = sigma2[np.logical_not(np.isnan(sigma2))]
 
-    print("num pos sigma2", len(nsigma2[nsigma2 > 0.]))
-    print("num neg sigma2", len(nsigma2[nsigma2 < 0.]))
+    print(("num pos sigma2", len(nsigma2[nsigma2 > 0.])))
+    print(("num neg sigma2", len(nsigma2[nsigma2 < 0.])))
 
     surface3dPlot(azLoc, elLoc, sigma2, "sigma squared")
 
@@ -219,7 +219,7 @@ def smoothWithWeights(fpath, N=None, useWeights=True):
     #ws = (1/sigma2) / np.sum(1/sigma2[np.logical_not(np.isnan(sigma2))])
     ws = (Ws_Not_Norm) / np.sum(Ws_Not_Norm[np.logical_not(np.isnan(sigma2))])
  
-    print("weights", ws, np.isnan(ws).all())
+    print(("weights", ws, np.isnan(ws).all()))
 
     if useWeights:
         xs, ys, diffs = fitLeicaScan(None, xyz=(xs, ys, zs), weights=ws)
@@ -287,7 +287,7 @@ def interpXYZ(x, y, z, n, xrange=None, yrange=None, checkLevels=False, center=Fa
     cond = [not b for b in np.isnan(z2f)]
     z3 = np.extract(cond, z2f)
 
-    print("Removed %d NaNs from %d data points" % (len(x2f) - len(x3), len(x2f)))
+    print(("Removed %d NaNs from %d data points" % (len(x2f) - len(x3), len(x2f))))
 
     assert len(x3) == len(y3)
     assert len(y3) == len(z3)
@@ -343,7 +343,7 @@ def zernikeFit(z):
                                           12,
                                           remain2D=1,
                                           barchart=1)
-    print("fitlist: ", fitlist)
+    print(("fitlist: ", fitlist))
     C1.listcoefficient()
     C1.zernikemap()
     # this works but takes forever!
@@ -387,7 +387,7 @@ def smoothXYZNew(x, y, z, n, sigX=None, sigY=None):
     zSm = np.ndarray(shape=(n,n))
     print("starting smoothing")
     for j in range(n):
-        print("J:", j)
+        print(("J:", j))
         for k in range(n):
             w=2*np.pi*np.exp( (- (x - xLoc[j,k])**2 /( 2.*sigX**2 )-(y-yLoc[j,k])**2 /(2.*sigY**2 )))
             norm=sum(w)
@@ -591,7 +591,7 @@ def smoothXYZ(x, y, z, n, sigX=None, sigY=None):
 
     print("Starting smoothing")
     for j in range(n):
-        print("J:", j)
+        print(("J:", j))
         for k in range(n):
             # rSms.append(rrr)
             w=2*np.pi*np.exp((-(x-xLoc[j,k])**2 /( 2.*sigX**2 )-(y-yLoc[j,k])**2 /(2.*sigY**2 )))
@@ -606,9 +606,9 @@ def smoothXYZ(x, y, z, n, sigX=None, sigY=None):
                 v = sum(z * w)
                 zSm[j,k] = v
 
-    print("xLoc", xLoc)
-    print("yLoc", yLoc)
-    print("zSm", zSm)
+    print(("xLoc", xLoc))
+    print(("yLoc", yLoc))
+    print(("zSm", zSm))
     return (xLoc, yLoc, zSm)
 
 def loadLeicaDataFromGpus(fn):
@@ -761,19 +761,19 @@ def cart2sph(x, y, z):
     lats = np.array([l.value for l in lats])
     lngs = np.array([l.value for l in lngs])
 
-    print("min/max lats (radians)", lats.min(), lats.max())
-    print("lngs range (radians)", -np.pi/2, np.pi/2)
-    print("min/max lngs (radians)", lngs.min(), lngs.max())
-    print("lats range (radians)", 0, 2*np.pi)
+    print(("min/max lats (radians)", lats.min(), lats.max()))
+    print(("lngs range (radians)", -np.pi/2, np.pi/2))
+    print(("min/max lngs (radians)", lngs.min(), lngs.max()))
+    print(("lats range (radians)", 0, 2*np.pi))
 
     return rs, lats, lngs
 
 def sph2cart(az, el, r):
 
-    print("min/max az (radians)", az.min(), az.max())
-    print("el range (radians)", -np.pi/2, np.pi/2)
-    print("min/max el (radians)", el.min(), el.max())
-    print("az range (radians)", 0, 2*np.pi)
+    print(("min/max az (radians)", az.min(), az.max()))
+    print(("el range (radians)", -np.pi/2, np.pi/2))
+    print(("min/max el (radians)", el.min(), el.max()))
+    print(("az range (radians)", 0, 2*np.pi))
 
 
     xs, ys, zs = spherical_to_cartesian(r, az, el)
@@ -857,11 +857,11 @@ def identityTest(x, y, z):
 
     r, lat, lng = cartesian_to_spherical(x, y, z)
 
-    print(r, lat, lng)
+    print((r, lat, lng))
 
     xs, ys, zs = spherical_to_cartesian(r, lat, lng)
 
-    print(xs, ys, zs)
+    print((xs, ys, zs))
 
 def multi(i, j):
     return i*j
@@ -994,7 +994,7 @@ def addCenterBump(x, y, z, rScale=10, zScale=0.25):
         if xi > xStart and xi < xEnd and yi > yStart and yi < yEnd:
             cnt +=1 
             z[i] = zi + (zScale*zi)
-    print("Added bump to %d pnts" % cnt)
+    print(("Added bump to %d pnts" % cnt))
 
     return z
 
@@ -1037,7 +1037,7 @@ def smoothSpherical(fn, n, sigAz=None, sigEl=None, addBump=False):
             if xi > xStart and xi < xEnd and yi > yStart and yi < yEnd:
                 cnt +=1 
                 z[i] = zi + (0.25*zi)
-        print("Added bump to %d pnts" % cnt)
+        print(("Added bump to %d pnts" % cnt))
 
     print("Converting to spherical coords ...")
     r, az, el = cart2sph(x, y, z)
@@ -1142,9 +1142,9 @@ def trySmoothGPUMulti(N=10):
             dimFile = "%s.%d.%s.csv" % (outFile, (i+1), dim)
             dimPath = os.path.join(gpuPath, dimFile)
             outfiles.append(dimPath)
-            print dimPath
+            print(dimPath)
             assert os.path.isfile(dimPath)
-            print("GPUs created file: ", dimPath)
+            print(("GPUs created file: ", dimPath))
         loadFile = os.path.join(gpuPath, "%s.%d" % (outFile, (i+1)))    
         xyz = loadLeicaDataFromGpus(loadFile)
         xyzs.append(xyz)
@@ -1191,7 +1191,7 @@ def smoothGPUMulti(gpuPaths,
                "%d" % len(parts)
         ]
 
-        print "cmd: ", cmd
+        print("cmd: ", cmd)
         cmds.append(cmd)
 
     if not test:
@@ -1206,7 +1206,7 @@ def smoothGPUMulti(gpuPaths,
         p1.wait()
         p2.wait()
 
-    print "multiple GPU commands finished"
+    print("multiple GPU commands finished")
 
     return cmds
 

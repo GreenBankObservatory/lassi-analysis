@@ -123,7 +123,7 @@ def gridLimits(arr0, arr1):
     Finds the minimum and maximum values present in two arrays.
     """
 
-    vmin = np.max([np.nanmin(arr0), np.nanmin(arr1)])
+    vmin = np.min([np.nanmin(arr0), np.nanmin(arr1)])
     vmax = np.min([np.nanmax(arr0), np.nanmax(arr1)])
 
     return vmin, vmax
