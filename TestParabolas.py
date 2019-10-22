@@ -123,3 +123,47 @@ class TestParabolas(unittest.TestCase):
         # and pretty close for the rotations
         # self.checkFit(diff[4:], tol=1e-1)
 
+    def testFitLeicaData(self):
+
+        # create a parabola
+        focus = 1.
+        v1x = 1.
+        v1y = 1.
+        v2 = 2.
+        x = np.linspace(0, 10, 10)
+        y = np.linspace(0, 10, 10)
+        xm, ym = np.meshgrid(x, y)
+
+        z = parabola(xm, ym, focus, v1x, v1y, v2)
+
+        # make our guess right on
+        guess = [focus, v1x, v1y, v2, 0., 0.]
+        r = fitLeicaData(xm, ym, z, guess)
+        
+        # and the fit should have no work to do
+        self.assertEqual(list(r.x), guess)
+
+        # now make our guess a bit off
+        # guess = [focus/2., v1x/2., v1y/2., v2/2., 0., 0.]
+        guess = [focus, 0., 0., 0., 0., 0.]
+        r = fitLeicaData(xm, ym, z, guess)
+        
+        # how deterministic is this?
+        self.assertAlmostEquals(r.x[0], focus, 5)
+        self.assertTrue(abs(r.x[1] - v1x) < 1e-2)
+        self.assertTrue(abs(r.x[2] - v1y) < 1e-2)
+        self.assertAlmostEquals(r.x[3], v2, 5)
+        self.assertTrue(abs(r.x[4]) < 1e-5)
+        self.assertTrue(abs(r.x[5]) < 1e-5)
+
+    # TBF: this seems to hang!
+    # def testFitLeicaScan(self):
+
+    #     fn = "./data/27mar2019/Clean9.ptx.csv"
+
+    #     diff, x, y = fitLeicaScan(fn,
+    #                               numpy=False,
+    #                               N=512,
+    #                               plot=False)
+
+    #     print diff.shape
