@@ -337,4 +337,4 @@ class TestProcessPTX(unittest.TestCase):
                                    rFilter=True,
                                    filterClose=False)        
 
-        self.assertEqual(len(ls), 6928318)
+        self.assertEqual(len(xyz), 6928318)
