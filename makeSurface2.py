@@ -15,7 +15,7 @@ def makecircle(a, r, PR):
 			if __np__.sqrt(r[i]**2+r[j]**2) > PR:
 				a[i,j] = max
 
-def testsurface2():
+def makeSurface2():
 
 	lambda_1 = 632*(10**-9)
 	PR = 1

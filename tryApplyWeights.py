@@ -17,7 +17,7 @@ def difflog(x):
 def log10(x):
     return np.log10(np.abs(x))
 
-def testApplyWeights(smoothFile, weightFile):
+def tryApplyWeights(smoothFile, weightFile):
     print("testApplyWeights: ", smoothFile, weightFile)
 
     N = 512
@@ -165,7 +165,7 @@ def reprocessScanPair(fn1, weightsFn1, fn2, weightsFn2):
     return diff
 
 
-def testScanPair():
+def tryScanPair():
     fn9 = "Clean9.ptx.csv"
     fn9 = os.path.join(settings.GPU_PATH, fn9) 
     wfn9 = "weightsScan9.npy"
