@@ -4,8 +4,8 @@ import unittest
 
 import numpy as np
 
-import matplotlib
-matplotlib.use('agg')
+# import matplotlib
+# matplotlib.use('agg')
 
 from utils import sph2cart, cart2sph
 
