@@ -149,7 +149,8 @@ def fitLeicaScan(fn,
                  rFilter=False,
                  xyz=None,
                  inSpherical=False,
-                 weights=None):
+                 weights=None,
+                 plot=True):
 
     # TBF: ignore weights for now!
 
@@ -176,7 +177,8 @@ def fitLeicaScan(fn,
         z = z0[np.logical_not(np.isnan(z0))];
 
 
-    scatter3dPlot(x, y, z, "Sample of Leica Data", sample=10.0)
+    if plot:
+        scatter3dPlot(x, y, z, "Sample of Leica Data", sample=10.0)
 
     print("x range:", np.min(x), np.max(x))
     print("y range:", np.min(y), np.max(y))
@@ -191,7 +193,8 @@ def fitLeicaScan(fn,
         yOffset = 50.0
         radius = 47.
         x, y, z = radialFilter(x, y, z, xOffset, yOffset, radius)
-        scatter3dPlot(x, y, z, "Leica Data Radial Filtered")
+        if plot:
+            scatter3dPlot(x, y, z, "Leica Data Radial Filtered")
 
     # assemble initial guess
     f = 60.
@@ -221,7 +224,8 @@ def fitLeicaScan(fn,
     print("cleaned data fitted with coefficients: ", c)
     newX, newY, newZ = newParabola(x0, y0, z0, c[0], c[1], c[2], c[3], c[4], c[5])
     newX.shape = newY.shape = newZ.shape = (N, N)
-    surface3dPlot(newX, newY, newZ, "Fitted Data")
+    if plot:
+        surface3dPlot(newX, newY, newZ, "Fitted Data")
 
     # rotate original data using fitted coefficients
     xThetaFit = r.x[4]
@@ -232,12 +236,14 @@ def fitLeicaScan(fn,
     #yrr -= c[2]
     #zrr -= c[3]
     xrr.shape = yrr.shape = zrr.shape = (N, N)
-    surface3dPlot(xrr, yrr, zrr, "Original Data (Rotated)")
+    if plot:
+        surface3dPlot(xrr, yrr, zrr, "Original Data (Rotated)")
 
     # return difference between fitted data and rotated original data
     diff = zrr - newZ
     diff2 = np.log(np.abs(np.diff(diff)))
-    imagePlot(diff2, "Fit - Org (Rotated)")
+    if plot:
+        imagePlot(diff2, "Fit - Org (Rotated)")
 
     return diff, newX, newY
 
