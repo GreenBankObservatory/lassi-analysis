@@ -1161,7 +1161,8 @@ def testSmoothGPUMulti(N=10):
 def smoothGPUMulti(gpuPaths,
                    inFiles,
                    outFile,
-                   n):
+                   n,
+                   test=False):
     "Smooth the data using multiple GPUs"
     
     gpuMultiScript = "runGpuParts"
@@ -1193,24 +1194,27 @@ def smoothGPUMulti(gpuPaths,
         print "cmd: ", cmd
         cmds.append(cmd)
 
-    # make sure they get fired off
-    p1 = subprocess.Popen(cmds[0])  
-    print "called first command"  
-    p2 = subprocess.Popen(cmds[1])
-    print "called second command"
+    if not test:
+        # make sure they get fired off
+        p1 = subprocess.Popen(cmds[0])  
+        print "called first command"  
+        p2 = subprocess.Popen(cmds[1])
+        print "called second command"
 
-    # THEN wait for them to finish
-    print "waiting for both to finish ..."
-    p1.wait()
-    p2.wait()
+        # THEN wait for them to finish
+        print "waiting for both to finish ..."
+        p1.wait()
+        p2.wait()
 
     print "multiple GPU commands finished"
 
+    return cmds
 
 def smoothGPUs(gpuPath,
                inFile,
                outFile,
                n,
+               test=False,
                verbose=False,
                noCos=False,
                spherical=False,
@@ -1244,7 +1248,11 @@ def smoothGPUs(gpuPath,
         cmd += " --no-conv"
 
     print("system cmd: ", cmd)
-    os.system(cmd)
+
+    if not test:
+        os.system(cmd)
+
+    return cmd
 
 # def smoothProcessedFile(fpath, N=512, squared=False):
 #     "Smooths processed file contents via GPUs, optionally squaring"
