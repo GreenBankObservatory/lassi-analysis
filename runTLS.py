@@ -178,7 +178,7 @@ def runOneScan(a, path=None):
 
     return filenamePtx
 
-def testScanRange(a, proj, cntr_az, cntr_el, az_fov, el_fov, path=None):
+def runScanRange(a, proj, cntr_az, cntr_el, az_fov, el_fov, path=None):
 
     res = "63mm@100m"
     sensitivity = "Normal"

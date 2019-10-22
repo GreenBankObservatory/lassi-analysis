@@ -107,7 +107,7 @@ def noll2asAnsi(zs):
     "Converts from NOLL to Active Surface ANSI"
     return ansi2activeAnsi(noll2ansi(zs))
 
-def testAnsi2ActiveAnsi():
+def tryAnsi2ActiveAnsi():
     zs = range(0,36)
     zs2 = ansi2activeAnsi(zs)
     print("ansi: ")
@@ -116,7 +116,7 @@ def testAnsi2ActiveAnsi():
     printZs(zs2)
     assert zs2 == asAnsiZs 
 
-def testNoll2ansi():
+def tryNoll2ansi():
     #ansi = range(1, 37)
     #noll = ansi2noll(ansi)
     noll = range(1,37)

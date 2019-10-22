@@ -262,7 +262,7 @@ def getRawXYZ(ls, sampleSize=None):
 
     return xs, ys, zs, it
 
-def testOffsets(lines, xOffset, yOffset, radius):
+def tryOffsets(lines, xOffset, yOffset, radius):
     "creates plots to make sure we are centered"
 
     sampleSize = 10000
@@ -359,7 +359,7 @@ def processNewPTXData(lines,
     if plotTest:
         # make some plots that ensure how we are doing
         # our radial filtering
-        testOffsets(lines, xOffset, yOffset, radius)
+        tryOffsets(lines, xOffset, yOffset, radius)
 
     # get the actual float values from the file contents
     x, y, z, i = getRawXYZ(lines, sampleSize=sampleSize)

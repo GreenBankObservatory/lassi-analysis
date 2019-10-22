@@ -843,7 +843,7 @@ def processDiffSimple(fn1, fn2):
     print("Zernikie's for surface diffs:")
     fits, c = zernikeFit(zDiff)
 
-def testTransforms():
+def tryTransforms():
 
     x = y = z = [1.]
     identityTest(x, y, z)
@@ -872,7 +872,7 @@ def assign(k):
 def identity(k):
     return k
 
-def testDask():
+def tryDask():
 
     n = 3
     ks = np.ndarray((n, n))
@@ -908,7 +908,7 @@ def plotXYZ(x, y, z):
     ax.scatter(x, y, z)
     plt.show()
 
-def testInterp():
+def tryInterp():
 
     fn = "smoothXYZ10.npz"
     r = np.load(fn)
@@ -1108,7 +1108,7 @@ def findTheDamnBumps():
     x2, y2, z2 = smoothSpherical(fn1, n)    
 
 
-def testSmoothXYZ():
+def trySmoothXYZ():
 
     x = np.linspace(-20, 20)
     y = np.linspace(-20, 20)
@@ -1117,7 +1117,7 @@ def testSmoothXYZ():
     xs, ys, zs = smoothXYZDask(xx, yy, zz, xx.shape[0], sigX=1, sigY=1)
     print(zs)
 
-def testSmoothGPUMulti(N=10):
+def trySmoothGPUMulti(N=10):
 
     if N is None:
         N = 10
@@ -1305,7 +1305,7 @@ def smoothGPUs(gpuPath,
 #     # square it then smooth it (<z**2>)
 #     smoothSquaredProcessedFile(fpath)
 
-def testSmoothGPUs():
+def trySmoothGPUs():
 
     # gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
     gpuPath = GPU_PATH

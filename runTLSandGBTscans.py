@@ -35,7 +35,7 @@ def checkOnConditions(activeSurface):
     windMps = float(w['weather3']['weather3']['WINDVEL_1']['value'])
     logger.debug("Weather3 Wind Velocity (m/s): %f" % windMps)
 
-def testConfigurations():
+def runConfigurations():
 
     resValues = ["500mm@100m", 
                  "250mm@100m",
@@ -65,7 +65,7 @@ def testConfigurations():
 
 
 
-def testOtherConfigurations():
+def runOtherConfigurations():
 
     # do a dumb ass easy to see zernike
     zs = [(5, 5000.)]

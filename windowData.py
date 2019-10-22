@@ -387,7 +387,7 @@ def digitizeWindow(x, y, z, N):
 
     return xBins, yBins, bins, lbins
 
-def testDigitizeWindow():
+def tryDigitizeWindow():
     print "loading dish data ..."
     x, y, z = getDishXYZ()
     print "starting digitization ..."
@@ -450,7 +450,7 @@ def getWeightNoCos(az, el, azLoc, elLoc, sigAz, sigEl, j, k):
     return 2*np.pi*np.exp(azTerm - elTerm)
 
 
-def testSmoothDigitalWins():
+def trySmoothDigitalWins():
 
     # x, y, z = getDishXYZ(fpath = "Scan-9-sample.ptx.csv")
     # N = 10
@@ -470,7 +470,7 @@ def testSmoothDigitalWins():
 
     smoothDigitalWinsXYZ(xm.flatten(), ym.flatten(), z.flatten(), N)
 
-def testSmoothXYZvsGPUs(N=None):
+def trySmoothXYZvsGPUs(N=None):
 
     if N is None:
        N = 10
@@ -511,7 +511,7 @@ def testSmoothXYZvsGPUs(N=None):
 
     return (xg, yg, zg), (xst, yst, zst)
 
-def testSmoothBinVsGPUs(N=None):
+def trySmoothBinVsGPUs(N=None):
 
     if N is None:
        N = 10

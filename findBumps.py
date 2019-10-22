@@ -101,7 +101,7 @@ def rotateData(xdata, ydata, zdata, rotX, rotY):
     zr = PrimeZ(pry, L)
     return xr, yr, zr
 
-def testRot():
+def tryRot():
 
     pry = [np.pi/4, -np.pi/2., np.pi/2.]
 
@@ -169,7 +169,7 @@ def fitScanOrg(fn):
     fittedData = None
     return xx, yy, zz, xyPrime, lsq, fittedData
 
-def test1():
+def try1():
 
     x = range(10)
     L = np.transpose(np.array([x, x, x]))
@@ -195,7 +195,7 @@ def test1():
     print("PrimeX:")
     print(PrimeX(b[:3], xyPrime))
 
-def test2():
+def try2():
 
     print("test2")
     #x = np.array(range(100)) * .5
