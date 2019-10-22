@@ -322,9 +322,7 @@ def radialFilter(x, y, z, xOffset, yOffset, radius, dts=None):
     
     mask = np.power(x - xOffset, 2.) + np.power(y - yOffset, 2.) < radius**2.
 
-    if dts is None:
-        dts = np.array([])
-    else:
+    if dts is not None:
         dts = dts[mask]
 
     return x[mask], y[mask], z[mask], dts
