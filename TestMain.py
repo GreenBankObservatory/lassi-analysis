@@ -128,7 +128,7 @@ class TestMain(unittest.TestCase):
 
     def testLoadLeicaDataFromGpus(self):
 
-        fn = "test"
+        fn = "data/test"
         x, y, z = loadLeicaDataFromGpus(fn)
         
         self.assertEqual(len(x), 100)
