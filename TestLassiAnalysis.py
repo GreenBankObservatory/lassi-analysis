@@ -92,8 +92,6 @@ class TestLassiAnalysis(unittest.TestCase):
         parabolaFit = d['parabolaFit']
         fitCoeffs = d['parabolaFitCoeffs']
 
-        print fitCoeffs
-
         expCoeffs = [
             6.00000000e+01,
             2.45124145e+00,

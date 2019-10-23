@@ -26,7 +26,6 @@ class TestMain(unittest.TestCase):
 
         user = os.getlogin()
         host = settings.GPU_HOST
-        print cmd    
         exp = "runGpuSmooth gpuPath %s %s inFile outFile 512 0.00100" % (user, host)
 
         self.assertEqual(exp, cmd)
