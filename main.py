@@ -1197,12 +1197,12 @@ def smoothGPUMulti(gpuPaths,
     if not test:
         # make sure they get fired off
         p1 = subprocess.Popen(cmds[0])  
-        print "called first command"  
+        print("called first command")
         p2 = subprocess.Popen(cmds[1])
-        print "called second command"
+        print("called second command")
 
         # THEN wait for them to finish
-        print "waiting for both to finish ..."
+        print("waiting for both to finish ...")
         p1.wait()
         p2.wait()
 
