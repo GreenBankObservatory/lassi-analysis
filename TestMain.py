@@ -114,8 +114,11 @@ class TestMain(unittest.TestCase):
     def testImportCSV(self):
         "Make sure we can import xyz data from CSV file"
 
-        fn = "data/Test1_STA14_Bump1_High-02_METERS.ptx.csv"
-        x, y, z = importCsv(fn)
+        fn = "Test1_STA14_Bump1_High-02_METERS.ptx.csv"
+        path = "/home/scratch/pmargani/LASSI/unitTestData"
+        fpath = os.path.join(path, fn)
+
+        x, y, z = importCsv(fpath)
 
         ln = 5915898
         self.assertEqual(len(x), ln)
