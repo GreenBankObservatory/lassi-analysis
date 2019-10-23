@@ -6,6 +6,7 @@ import numpy as np
 from plotting import scatter3dPlot
 
 from lassiAnalysis import regridXYZ, regridXYZMasked, maskLeicaData
+from lassiAnalysis import extractZernikesLeicaScanPair
 
 class TestLassiAnalysis(unittest.TestCase):
     "Test methods in lassiAnalysis that don't call gpu smoothing"
@@ -103,7 +104,50 @@ class TestLassiAnalysis(unittest.TestCase):
         for exp, act in zip(expCoeffs, fitCoeffs):
             self.assertAlmostEquals(exp, act, 3)
 
-        # TBF: finish checking stuff
-        # print origData[0].mask
-        # print origMaskedData[0].mask
+        N = 512
+        orgX = origData[0]
+        self.assertEquals(orgX.shape, (N, N))
+
+        orgMX = origMaskedData[0]
+        self.assertEquals(orgMX.shape, (N, N))
+
+        mask = orgMX.mask
+        self.assertEquals(mask.shape, (N, N))
+
+        fm = mask[mask == False]
+        tm = mask[mask == True]
+        
+        self.assertEquals(fm.shape, (143049,))
+        self.assertEquals(tm.shape, (119095,))
+        self.assertEqual(fitResidual.shape, (N,N))
+
+        mask = fitResidual.mask
+        self.assertEquals(mask.shape, (N, N))
+
+        fm = mask[mask == False]
+        tm = mask[mask == True]
+        
+        self.assertEquals(fm.shape, (143049,))
+        self.assertEquals(tm.shape, (119095,))
+        
             
+    def testExtractZernikesLeicaScanPair(self):
+
+        fn1 = "Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
+        fn2 = "Scan-11_5100x5028_20190327_1155_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
+        path = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
+        fpath1 = os.path.join(path, fn1)
+        fpath2 = os.path.join(path, fn2)
+
+        N = 512
+        nZern = 36
+        diff, fitlist = extractZernikesLeicaScanPair(fpath1,
+                                                     fpath2,
+                                                     n=N,
+                                                     nZern=nZern)
+
+        # TBF: all the diffs data looks masked. how to check that?
+        
+        self.assertEquals(diff.shape, (N, N))
+        self.assertEquals(len(fitlist), nZern + 1)
+        self.assertEquals(fitlist, [0.0]*(nZern + 1))
