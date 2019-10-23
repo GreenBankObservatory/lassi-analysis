@@ -5,3 +5,5 @@ GPU_PATH="/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/"
 
 # Where will the gpu smoothing code be running?
 GPU_HOST="vegas-hpc10"
+GPU_HOST_2="devenv-hpc1"
+
