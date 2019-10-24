@@ -1,0 +1,174 @@
+
+xfreerdp -sec-nla  /bpp:16 /d:AD /v:lassi.ad.nrao.edu /u:pmargani
+
+
+2019-10-09 10:17:01,863 - runTLS.configureScanner - DEBUG - Configuring Scanner:
+2019-10-09 10:17:01,865 - runTLS.configureScanner - DEBUG - Project: 9oct2019
+2019-10-09 10:17:01,868 - runTLS.configureScanner - DEBUG - Resolution: 63mm@100m
+2019-10-09 10:17:01,869 - runTLS.configureScanner - DEBUG - Sensitivity: Normal
+2019-10-09 10:17:01,871 - runTLS.configureScanner - DEBUG - Scan Mode: Speed
+2019-10-09 10:17:01,873 - runTLS.configureScanner - DEBUG - cntr_az: 270.000000
+2019-10-09 10:17:01,875 - runTLS.configureScanner - DEBUG - cntr_el: 45.000000
+2019-10-09 10:17:01,876 - runTLS.configureScanner - DEBUG - az_fov: 180.000000
+2019-10-09 10:17:01,878 - runTLS.configureScanner - DEBUG - el_fov: 90.000000
+
+10:19 AM EST
+
+Scan #2
+
+path = ""/home/sandboxes/pmargani/LASSI/data/9oct2019"
+
+Joe's lassi_daq logs at: /users/jbrandt/tmp/<timestamp>TLScanner.log
+Mine are at: /home/scratch/pmargani/tmp/<timestamp>TLScanner.log
+
+Using these offsets seems to work for the processing:
+ xOffset = -50, yOffset=-7.5, rot=80.
+
+processing looks good!  Proceed!
+
+asked operators to turn on Act. Surface
+
+runTLS logs in: /home/scratch/pmargani/LASSI/runTLSlogs
+
+Testing ref / signal pair with lassi scans 3 & 4.  Z5 = 5000
+
+Winds near zero.
+
+By 2 PM, here's what active surface FITS look like:
+
+{'DATE-OBS': '2019-10-09T13:23:48', 'ZERNIKES': [], 'SCAN': 200}
+{'DATE-OBS': '2019-10-09T13:24:07', 'ZERNIKES': [], 'SCAN': 201}
+{'DATE-OBS': '2019-10-09T14:01:05', 'ZERNIKES': [], 'SCAN': 202}
+{'DATE-OBS': '2019-10-09T14:02:06', 'ZERNIKES': [], 'SCAN': 203}
+{'DATE-OBS': '2019-10-09T15:10:46', 'ZERNIKES': [], 'SCAN': 204}
+{'DATE-OBS': '2019-10-09T15:26:08', 'ZERNIKES': [], 'SCAN': 205}
+{'DATE-OBS': '2019-10-09T15:43:24', 'ZERNIKES': [], 'SCAN': 206}
+{'DATE-OBS': '2019-10-09T15:44:08', 'ZERNIKES': [], 'SCAN': 207}
+{'DATE-OBS': '2019-10-09T15:45:27', 'ZERNIKES': [], 'SCAN': 208}
+{'DATE-OBS': '2019-10-09T15:45:35', 'ZERNIKES': [('Z5', 5000.0)], 'SCAN': 209}
+{'DATE-OBS': '2019-10-09T15:49:59', 'ZERNIKES': [], 'SCAN': 210}
+{'DATE-OBS': '2019-10-09T15:54:37', 'ZERNIKES': [('Z5', 5000.0)], 'SCAN': 211}
+{'DATE-OBS': '2019-10-09T16:01:08', 'ZERNIKES': [], 'SCAN': 212}
+{'DATE-OBS': '2019-10-09T16:05:43', 'ZERNIKES': [('Z7', 1000.0)], 'SCAN': 213}
+{'DATE-OBS': '2019-10-09T16:10:29', 'ZERNIKES': [], 'SCAN': 214}
+{'DATE-OBS': '2019-10-09T16:15:12', 'ZERNIKES': [('Z7', 500.0)], 'SCAN': 215}
+{'DATE-OBS': '2019-10-09T16:19:52', 'ZERNIKES': [], 'SCAN': 216}
+{'DATE-OBS': '2019-10-09T16:24:29', 'ZERNIKES': [('Z7', 150.0)], 'SCAN': 217}
+{'DATE-OBS': '2019-10-09T16:29:21', 'ZERNIKES': [], 'SCAN': 218}
+{'DATE-OBS': '2019-10-09T16:33:57', 'ZERNIKES': [('Z13', 1000.0)], 'SCAN': 219}
+{'DATE-OBS': '2019-10-09T16:38:37', 'ZERNIKES': [], 'SCAN': 220}
+{'DATE-OBS': '2019-10-09T16:43:10', 'ZERNIKES': [('Z13', 500.0)], 'SCAN': 221}
+{'DATE-OBS': '2019-10-09T16:47:49', 'ZERNIKES': [], 'SCAN': 222}
+{'DATE-OBS': '2019-10-09T16:52:26', 'ZERNIKES': [('Z13', 150.0)], 'SCAN': 223}
+{'DATE-OBS': '2019-10-09T16:57:03', 'ZERNIKES': [], 'SCAN': 224}
+{'DATE-OBS': '2019-10-09T17:01:42', 'ZERNIKES': [('Z15', 1000.0)], 'SCAN': 225}
+{'DATE-OBS': '2019-10-09T17:06:37', 'ZERNIKES': [], 'SCAN': 226}
+{'DATE-OBS': '2019-10-09T17:11:28', 'ZERNIKES': [('Z15', 500.0)], 'SCAN': 227}
+{'DATE-OBS': '2019-10-09T17:16:20', 'ZERNIKES': [], 'SCAN': 228}
+{'DATE-OBS': '2019-10-09T17:21:12', 'ZERNIKES': [('Z15', 150.0)], 'SCAN': 229}
+{'DATE-OBS': '2019-10-09T17:26:17', 'ZERNIKES': [], 'SCAN': 230}
+
+But it looks like we hung in exporting the data, so we restarted things.
+
+2:30 - rerunning, but with testConfigurations()
+
+3:12 - shit, I realized I was going to keep repeating the same resolution, so scan 24, 25 good, but scan 26 redundant.
+started new log file.
+
+4:30 testOtherconfigurations done, back to runTLSandGBTscnas
+
+6:07 - oops. it stopped, good thing I checked on it.
+
+Oct 10,
+Sometime after 7 AM, AS Mgr rebooted.  don't know why but default settings are different.
+
+from opslogs:
+Computer Software failure on Active Surface Manager. Restored on: 10/10/2019 08:25.
+NLT: NTL - Active Surface Manager lost connection to Active surface servo host. Restored by (262503): Restarted Active Surface Manager on host gbtdcr via Taskmaster. Fault cleared and all seems normal. -BM 
+
+I just wish they had told me.
+
+12 PM - stopped and reran so we could test Joe's removal of the filters in lassi_daq.
+
+12:42: resetup Active surface: write data, FEM on.
+
+~1:00 re ran the same zernikes again, but had repeat=False,
+so stopped at 2 PM.  Restarted at 2:50.
+
+Then at 2:54 John called and said they'd swap the mount over to the flat, so letting 2 scans finish, then letting them do that.
+
+flat mount!
+
+At 3:52, running scan #343 - first check of flat mount, but looks like what we did on Sep. 17.
+
+At 4:23 noticed that Act. Surface scan nubmers got reset, so reset nextScanNumber to 476.
+
+At 4:33, scan #350 is runTwoFlatMntScans
+but I screwed up 351 and so never exported the data.
+352 should be the second half.
+
+4:58 resuming the usual scan sequence.
+ oops had ro restart, so 354 should be a ref scan too.
+
+9:57 noticed that it stopped exporting and last file was 30 mins ago.  Restarting.
+
+11 PM: got call that it wasn't running.  restarted, ran all night.
+
+Oct. 11:
+
+8 am ish: restarted because my remote shell wasn't working.
+
+9 AM - it stopped and I didn't noticed because the watchdog wasn't running.  Just as well, since Active Surface got messed with.
+
+11 AM: restarted w/ LASSI scan 501 and AS scan 616
+shit, 11:36, noticed it was hung in exporting again.  Looks like it may not have finished the first scan.
+
+
+
+List of python log files:
+teleSpy.2019-10-09_11:45:24.log
+teleSpy.2019-10-09_11:49:56.log: 3 - 4
+teleSpy.2019-10-09_12:01:05.log: 5 - 23
+teleSpy.2019-10-09_14:32:10.log: 24 - 26
+teleSpy.2019-10-09_15:12:11.log: 27 - 30 (testConfigurations)
+teleSpy.2019-10-09_15:26:56.log: 31 - 38 (testOtherConfigurations)
+teleSpy.2019-10-09_16:51:05.log: 39 - 56 
+teleSpy.2019-10-09_18:25:18.log: 57 - 318
+teleSpy.2019-10-10_12:03:23.log: scans 2 & 3 again. oops.
+teleSpy.2019-10-10_12:45:53.log: 321 - 338
+teleSpy.2019-10-10_14:50:06.log: 340 - 341
+teleSpy.2019-10-10_15:51:51.log: 343 - 344
+teleSpy.2019-10-10_16:05:51.log: 346 - 349 
+teleSpy.2019-10-10_16:32:26.log: 350 - 352
+teleSpy.2019-10-10_16:57:40.log: 353 
+teleSpy.2019-10-10_17:04:50.log: 354 - 392
+teleSpy.2019-10-10_21:16:50.log: 393 - 395
+teleSpy.2019-10-10_21:58:59.log: 397 - 399
+teleSpy.2019-10-10_22:47:28.log: 401 - 487
+teleSpy.2019-10-11_08:16:59.log: 490 - 497
+
+
+Scanner Configuration tests:
+
+
+scan  filename                    res          sen      mode   bytes        scan   export type 
+24    24_2019-10-09_14:40:59.ptx  31mm@100m    Normal   Speed  1485976572   3.84   8.94   REF  
+25    25_2019-10-09_14:54:44.ptx  31mm@100m    Normal   Speed  1485173183   3.83   8.85   SIGNAL
+27    27_2019-10-09_15:15:15.ptx  63mm@100m    Normal   Speed  369303375    1.53   2.39   REF  
+28    28_2019-10-09_15:19:31.ptx  63mm@100m    Normal   Speed  369330973    1.53   2.31   SIGNAL
+29    29_2019-10-09_15:22:38.ptx  125mm@100m   Normal   Speed  92418987     1.12   0.7    REF  
+30    30_2019-10-09_15:24:40.ptx  125mm@100m   Normal   Speed  92419706     1.12   0.7    SIGNAL
+31    31_2019-10-09_15:29:57.ptx  63mm@100m    Normal   Speed  369274190    1.55   2.3    REF  
+32    32_2019-10-09_15:34:12.ptx  63mm@100m    Normal   Speed  369346383    1.54   2.3    SIGNAL
+33    33_2019-10-09_15:39:10.ptx  63mm@100m    Normal   Range  405114011    2.14   2.43   REF  
+34    34_2019-10-09_15:44:19.ptx  63mm@100m    Normal   Range  405116764    2.12   2.62   SIGNAL
+35    35_2019-10-09_15:51:14.ptx  63mm@100m    High     Speed  371440180    3.79   2.46   REF  
+36    36_2019-10-09_15:57:45.ptx  63mm@100m    High     Speed  371158525    3.79   2.35   SIGNAL
+37    37_2019-10-09_16:07:55.ptx  63mm@100m    High     Range  426715725    7.15   2.67   REF 
+
+
+
+Flat mount 2 half, 180 degree scans, all got screwed up
+Except the first pair, scans 350 and 351.
+
+
