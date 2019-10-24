@@ -117,8 +117,14 @@ class TestLassiAnalysis(unittest.TestCase):
         fm = mask[mask == False]
         tm = mask[mask == True]
         
-        self.assertEquals(fm.shape, (143049,))
-        self.assertEquals(tm.shape, (119095,))
+        fmLen = 143061
+        tmLen = 119083
+
+        # sanity check our expected values
+        self.assertEquals(fmLen + tmLen, N*N)
+
+        self.assertEquals(fm.shape, (fmLen,))
+        self.assertEquals(tm.shape, (tmLen,))
         self.assertEqual(fitResidual.shape, (N,N))
 
         mask = fitResidual.mask
@@ -127,8 +133,8 @@ class TestLassiAnalysis(unittest.TestCase):
         fm = mask[mask == False]
         tm = mask[mask == True]
         
-        self.assertEquals(fm.shape, (143049,))
-        self.assertEquals(tm.shape, (119095,))
+        self.assertEquals(fm.shape, (fmLen,))
+        self.assertEquals(tm.shape, (tmLen,))
         
             
     def testExtractZernikesLeicaScanPair(self):
