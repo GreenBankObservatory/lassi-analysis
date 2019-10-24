@@ -1,13 +1,15 @@
 "Unit tests for Utils module"
 
 import unittest
+from datetime import datetime
 
 import numpy as np
 
 # import matplotlib
 # matplotlib.use('agg')
 
-from utils import sph2cart, cart2sph
+from utils import sph2cart, cart2sph, utc2mjd, mjd2utc
+from utils import midPoint, gridLimits
 
 class TestUtils(unittest.TestCase):
     "unit tests for Utils module"
@@ -33,3 +35,31 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(np.all(np.abs(x2-xs) < tol))
         self.assertTrue(np.all(np.abs(y2-ys) < tol))
         self.assertTrue(np.all(np.abs(z2-zs) < tol))
+
+    def testTimeIdentity(self):
+        "test datetime -> mjd -> original datetime"
+
+        dt = datetime(2000, 1, 1)
+
+        mjd = utc2mjd(dt)
+
+        dt2 = mjd2utc(mjd)
+
+        self.assertEqual(dt, dt2)
+
+    def testMidPoint(self):
+
+        x = np.array([1, 2, 3])
+        self.assertEqual(midPoint(x), 2)
+
+    def testGridLimits(self):
+
+        x = np.array([1, 2, 3])
+        y = np.array([2, 3, 4])
+
+        xmx = np.nanmax(x)
+        ymy = np.nanmax(y)
+
+        mn, mx = gridLimits(x, y)
+        self.assertEqual(mn, 1)
+        self.assertEqual(mx, 4)

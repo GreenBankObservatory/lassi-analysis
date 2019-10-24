@@ -10,6 +10,12 @@ def mjd2utc(mjd):
     t.format = 'datetime'
     return t.value
 
+def utc2mjd(dt):
+    "Converts MJD values to UTC datetime objects"
+    t = Time(dt, format='datetime')
+    t.format = 'mjd'
+    return t.value
+
 def cart2sph(x, y, z, verbose=True):
     "Wrapper around astropy's cartesian_to_spherical"
     rs, lats, lngs = cartesian_to_spherical(x, y, z)
@@ -124,7 +130,7 @@ def gridLimits(arr0, arr1):
     """
 
     vmin = np.min([np.nanmin(arr0), np.nanmin(arr1)])
-    vmax = np.min([np.nanmax(arr0), np.nanmax(arr1)])
+    vmax = np.max([np.nanmax(arr0), np.nanmax(arr1)])
 
     return vmin, vmax
 
