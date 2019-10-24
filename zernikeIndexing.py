@@ -108,7 +108,7 @@ def noll2asAnsi(zs):
     return ansi2activeAnsi(noll2ansi(zs))
 
 def tryAnsi2ActiveAnsi():
-    zs = range(0,36)
+    zs = list(range(0,36))
     zs2 = ansi2activeAnsi(zs)
     print("ansi: ")
     printZs(zs)
@@ -119,7 +119,7 @@ def tryAnsi2ActiveAnsi():
 def tryNoll2ansi():
     #ansi = range(1, 37)
     #noll = ansi2noll(ansi)
-    noll = range(1,37)
+    noll = list(range(1,37))
     ansi = noll2ansi(noll)
     print("ansi: ")
     printZs(ansi)
@@ -129,7 +129,7 @@ def tryNoll2ansi():
 
 def main():
     #testNoll2ansi()
-    testAnsi2ActiveAnsi()
+    tryAnsi2ActiveAnsi()
 
 if __name__=='__main__':
     main()
