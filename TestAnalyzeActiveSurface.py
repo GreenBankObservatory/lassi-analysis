@@ -14,7 +14,8 @@ class TestAnalyzeActiveSurface(unittest.TestCase):
         # call and nothing blows up - most of the functionality
         # is for making plots that we check by hand.
         scans = [2, 3]
-        path = "/users/pmargani/tmp/lassi-analysis/simdata/TINT_080219/"
-        d = analyzeActiveSurfaceScans(path, scans, details=True, test=True)        
+        # path = "/users/pmargani/tmp/lassi-analysis/simdata/TINT_080219/"
+        path = "data/TINT_080219/"
+        d = analyzeActiveSurfaceScans(path, scans, details=True, test=True)
 
         self.assertEqual(len(d), len(scans))
