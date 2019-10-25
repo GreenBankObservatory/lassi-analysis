@@ -335,6 +335,7 @@ class TestProcessPTX(unittest.TestCase):
                                    nFilter=True,
                                    iFilter=True,
                                    rFilter=True,
-                                   filterClose=False)        
+                                   filterClose=False,
+                                   ellipse=[xOffset, yOffset, 45.5, 45.5, 0.])        
 
         self.assertEqual(len(xyz), 6928318)

@@ -31,6 +31,18 @@ def previewData(ptxFile, sample=None):
         sample = 1.0
     scatter3dPlot(x, y, z, "preview", sample=sample)
 
+def previewEllipticalFilter(PTXFile, ellipse):
+    """
+    Loads the PTX data and shows it along with the data 
+    that would be filtered by the elliptical filter.
+    """
+
+    print("Opening PTX file", PTXFile)
+    with open(PTXFile, 'r') as f:
+        ls = f.readlines()
+
+    tryEllipticalOffsets(ls, ellipse)
+
 def rotateXYaboutZ(xyz, rotDegrees):
 
     # define it as cartesian
@@ -314,6 +326,40 @@ def tryOffsets(lines, xOffset, yOffset, radius):
     plt.ylabel("y")
     plt.title("XY centered and below radus: %5.2f" % radius)
 
+def tryEllipticalOffsets(lines, ellipse):
+    """
+    """
+
+    sampleSize = 10000
+    x, y, z, _ = getRawXYZ(lines, sampleSize=sampleSize)
+
+    # plot the random sample of xyz data
+    fig = plt.figure()
+    ax = Axes3D(fig)
+    ax.scatter(x, y, z)
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title("Random sample of %d points" % sampleSize)
+
+    # plot the raw data including where the origin is
+    f = plt.figure()
+    ax = f.gca()
+    ax.plot(x, y, 'bo', [0], [0], '*')
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title("X Y orientation of data")
+
+    xin, yin, zin, _ = ellipticalFilter(x, y, z, ellipse[0], ellipse[1], ellipse[2], ellipse[3], ellipse[4])
+
+    f = plt.figure()
+    ax = f.gca()
+    ax.plot(x, y, 'ro')
+    ax.plot(xin, yin, 'o')
+    ax.plot([0], [0], 'y*')
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title("XY inside ellipse")
+
 def radialFilter(x, y, z, xOffset, yOffset, radius, dts=None):
     """
     Removes points outside a circle centered at (xOffset, yOffset).
@@ -327,6 +373,29 @@ def radialFilter(x, y, z, xOffset, yOffset, radius, dts=None):
 
     return x[mask], y[mask], z[mask], dts
 
+def ellipticalFilter(x, y, z, xOffset, yOffset, bMaj, bMin, angle, dts=None):
+    """
+    Filter points that lie outside an ellipse with 
+    a semi-major axis of bMaj, semi-minor axis bMin and rotated by angle.
+    """
+
+    cos_angle = np.cos(np.radians(180. - angle))
+    sin_angle = np.sin(np.radians(180. - angle))
+
+    # Shift the points.
+    xc = x - xOffset
+    yc = y - yOffset
+
+    # Rotate the points.
+    xct = xc * cos_angle - yc * sin_angle
+    yct = xc * sin_angle + yc * cos_angle
+
+    mask = (xct**2./(bMaj)**2.) + (yct**2./(bMin)**2.) <= 1.
+
+    if dts is not None:
+        dts = dts[mask]
+
+    return x[mask], y[mask], z[mask], dts
 
 def processNewPTXData(lines,
                       dts=None,
@@ -342,7 +411,8 @@ def processNewPTXData(lines,
                       radius=None,
                       rFilter=True,
                       addOffset=False,
-                      filterClose=True):
+                      filterClose=True,
+                      ellipse=[-8., 50., 49., 49., 0.]):
     "this is the processing we see works with 2019 data"
 
     if rot is None:
@@ -354,18 +424,19 @@ def processNewPTXData(lines,
     if radius is None:
         radius = 45.5
 
-    print(("ProcessNewPTXData with: ", xOffset, yOffset, rot, radius))
+    print(("ProcessNewPTXData with: ", ellipse))
+    #print(("ProcessNewPTXData with: ", xOffset, yOffset, rot, radius))
 
     if plotTest:
         # make some plots that ensure how we are doing
         # our radial filtering
-        tryOffsets(lines, xOffset, yOffset, radius)
+        #tryOffsets(lines, xOffset, yOffset, radius)
+        tryEllipticalOffsets(lines, ellipse)
 
     # get the actual float values from the file contents
     x, y, z, i = getRawXYZ(lines, sampleSize=sampleSize)
 
     print(("Starting with %d lines of data" % len(x)))
-
 
     # lets first just remove all the zero data
     mask = i != 0.0
@@ -427,13 +498,17 @@ def processNewPTXData(lines,
     assert len(y) == len(z)
     assert len(z) == len(i)
 
-    # we only want the inner 90% or so of the dish
+    # We want as much as possible of the dish.
+    # Since the dish will be rotated, it will look like an ellipse to the TLS.
     if rFilter:
         orgNum = len(x)
-        x, y, z, dts =  radialFilter(x, y, z, xOffset, yOffset, radius, dts=dts)
+        print('Elliptical fitler parameters:')
+        print(ellipse)
+        x, y, z, dts = ellipticalFilter(x, y, z, ellipse[0], ellipse[1], ellipse[2], ellipse[3], ellipse[4], dts=dts)
         newNum = len(x)
-        print(("radial limit filtered out %d points outside radius %5.2f" % ((orgNum - newNum), radius)))
-        print(("Now we have %d lines of data" % len(x)))
+        print("Filter removed {0} points outside the ellipse".format(orgNum - newNum))
+        print("The ellipse has semi-major axis {0:.2f} m, semi-minor axis {1:.2f} m and angle {2:.2f} degrees".format(ellipse[2], ellipse[3], ellipse[4]))
+        print("Now we have %d lines of data" % len(x))
 
     # TBF: why must we do this?  No idea, but this,
     # along with a rotation of -90. gets our data to
@@ -452,27 +527,21 @@ def processNewPTXData(lines,
     if dts is not None:
         dts = dts[mask]
     newNum = len(z)
-    print(("z - limit filtered out %d points below %5.2f and above -10" % ((orgNum - newNum), zLimit)))
+    print("z - limit filtered out %d points below %5.2f and above -10" % ((orgNum - newNum), zLimit))
 
     if simSignal is not None:
         # just now we add a bump
         print("Adding Center Bump")
         z = addCenterBump(x, y, z)
 
-#    # x, y, z -> [(x, y, z)]
-#    # for rotation phase
-#    xyz = []
-#    for i in range(len(x)):
-#        xyz.append((x[i], y[i], z[i]))
-#    xyz = np.array(xyz)
     xyz = np.c_[x, y, z]
 
     if rot is not None or rot != 0.0:
-        print(("Rotating about Z by %5.2f degrees" % rot))
+        print("Rotating about Z by %5.2f degrees" % rot)
         rotationAboutZdegrees = rot
         xyz = rotateXYaboutZ(xyz, rotationAboutZdegrees)
     
-    print(("Now we have %d lines of data" % len(xyz)))
+    print("Now we have %d lines of data" % len(xyz))
 
     if filterClose:
         # Removes points that are closer than 10 m from the scanner.
@@ -482,21 +551,22 @@ def processNewPTXData(lines,
         mask = r > tooClose
         xyz = xyz[mask]
         newNum = xyz.shape[0]
-        print(("Removed {0:.0f} points closer than {1:.2f} m from the scanner.".format((orgNum - newNum), tooClose)))
+        print("Removed {0:.0f} points closer than {1:.2f} m from the scanner.".format((orgNum - newNum), tooClose))
 
+    # If we want all points to be positive.
+    # This avoids the harmless distortion of the guitar pick.
     if addOffset:
         xmin = np.nanmin(xyz[:,0])
         xmax = np.nanmax(xyz[:,0])
         ymin = np.nanmin(xyz[:,1])
         ymax = np.nanmax(xyz[:,1])
 
-        #if xmin <= 0 and xmax >= 0:
-        #    print("Translating x axis.")
-        #    xyz[:,0] -= xmin + 1.
         if ymin <= 0:
             print("Translating y axis.")
             xyz[:,1] -= ymin - 10.
 
+    # We should get rid of this.
+    # We do not use it ever.
     if parabolaFit is not None:
         pTol = 0.4
         print(("Using parabola fit to filter: ", parabolaFit))
@@ -540,8 +610,6 @@ def processNewPTXData(lines,
         plt.xlabel("x")
         plt.ylabel("y")
         plt.title("X Y orientation of data")
-
-
 
     return xyz, dts
 
@@ -603,7 +671,8 @@ def processNewPTX(fpath,
                   radius=None,
                   rFilter=True,
                   addOffset=False,
-                  filterClose=True):
+                  filterClose=True,
+                  ellipse=[-8., 50., 49., 49., 0.]):
 
     # is there associated time data?
     if useTimestamps:
@@ -626,7 +695,8 @@ def processNewPTX(fpath,
                             iFilter=iFilter,
                             rFilter=rFilter,
                             addOffset=addOffset,
-                            filterClose=filterClose)
+                            filterClose=filterClose,
+                            ellipse=ellipse)
 
     # TBF: the old interface expects this 
     # in a different format

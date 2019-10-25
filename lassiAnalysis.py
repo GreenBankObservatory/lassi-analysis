@@ -31,7 +31,6 @@ from weightSmooth import weightSmooth
 import settings
 
 # where is the code we'll be running?
-# GPU_PATH = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
 GPU_PATH = settings.GPU_PATH
 
 def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.):
@@ -333,7 +332,8 @@ def processLeicaScan2(fpath,
                      maskGuess=[60., 0., 0., -50., 0., 0.],
                      regrid=True,
                      save=True,
-                     returnData=True):
+                     returnData=True,
+                     ellipse=[-8., 50., 49., 49., 0.]):
     """
     High level function for processing leica data:
        * processes PTX file
@@ -342,6 +342,10 @@ def processLeicaScan2(fpath,
        * regrids final data
     Final processed scan is ready for difference between
     this and a ref or signal scan.   
+
+    :param ellipse: Parameters for the elliptical filter during object segmentation. 
+                    specify as a list: [center x, center y, semi-major axis, semi-minor axis, angle]
+                    with units: [meters, meters, meters, meters, degrees].
     """
 
     assert os.path.isfile(fpath)
@@ -374,7 +378,8 @@ def processLeicaScan2(fpath,
                     parabolaFit=parabolaFit,
                     simSignal=simSignal,
                     sampleSize=sampleSize,
-                    filterClose=filterClose) 
+                    filterClose=filterClose,
+                    ellipse=ellipse) 
 
     e = time.time()
     print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
