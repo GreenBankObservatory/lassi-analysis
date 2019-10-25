@@ -5,7 +5,7 @@ import numpy as np
 
 from main import smoothGPUs, smoothGPUMulti, smooth, getWeight
 from main import importCsv, loadLeicaDataFromGpus
-# from lassiTestSettings import DATA_27MARCH2019, SCAN9, SETTINGS_27MARCH2019
+import lassiTestSettings
 import settings
 
 class TestMain(unittest.TestCase):
@@ -115,8 +115,9 @@ class TestMain(unittest.TestCase):
         "Make sure we can import xyz data from CSV file"
 
         fn = "Test1_STA14_Bump1_High-02_METERS.ptx.csv"
-        path = "/home/scratch/pmargani/LASSI/unitTestData"
-        fpath = os.path.join(path, fn)
+        # path = "/home/scratch/pmargani/LASSI/unitTestData"
+        path = lassiTestSettings.DATA_UNIT_TESTS
+        fpath = os.path.join(path, '2016', fn)
 
         x, y, z = importCsv(fpath)
 
