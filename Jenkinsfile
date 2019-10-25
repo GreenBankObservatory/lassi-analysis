@@ -33,7 +33,8 @@ pipeline {
         junit '*.xml'
       }
     }
-
+  }
+  
   post {
     regression {
         script { env.CHANGED = true }
