@@ -44,6 +44,263 @@ zernikeNorm = { 1: 1.,
                35: 16.,
                36: 16.}
 
+def z0(rho, theta):
+    """
+    """
+    return np.zeros(rho.shape)
+
+def z1(rho, theta):
+    """
+    Piston.
+    """
+    return np.ones(rho.shape)
+
+def z2(rho, theta):
+    """
+
+    """
+    return _single_term_cos(1., rho, theta)
+
+def z3(rho, theta):
+    """
+
+    """
+    return _single_term_sin(1., rho, theta)
+
+def z4(rho, theta):
+    """
+    """
+    return _single_term_cos(2., rho, theta)
+
+def z5(rho, theta):
+    """
+    Defocus.
+    """
+    return (2.*rho**2. - 1.)
+
+def z6(rho, theta):
+    """
+
+    """
+    return _single_term_sin(2., rho, theta)
+
+def z7(rho, theta):
+    """
+    Oblique trefoil.
+    """
+    return _single_term_cos(3., rho, theta)
+
+def z8(rho, theta):
+    """
+
+    """
+    return _multi_term_cos(-2., 3., 1., rho, theta)
+
+def z9(rho, theta):
+    """
+
+    """
+    return _multi_term_sin(-2., 3., 1., rho, theta)
+
+def z10(rho, theta):
+    """
+
+    """
+    return _single_term_sin(3., rho, theta)
+
+def z11(rho, theta):
+    """
+
+    """
+    return _single_term_cos(4., rho, theta)
+
+def z12(rho, theta):
+    """
+
+    """
+    return _multi_term_cos(-3., 4., 2., rho, theta)
+
+def z13(rho, theta):
+    """
+    Primary spherical.
+    """
+    return (1. - (6.*np.power(rho, 2.))  + (6.*np.power(rho, 4.)))
+
+def z14(rho, theta):
+    """
+
+    """
+    return _multi_term_sin(-3., 4., 2., rho, theta)
+
+def z15(rho, theta):
+    """
+    Oblique quadrafoil.
+    """
+    return _single_term_sin(4., rho, theta)
+
+def z16(rho, theta):
+    """
+
+    """
+    return _single_term_cos(5., rho, theta)
+
+def z17(rho, theta):
+    """
+
+    """
+    return _multi_term_cos(-4., 5., 3., rho, theta)
+
+def z18(rho, theta):
+    """
+
+    """
+    return (3.*rho - 12.*np.power(rho, 3.) + 10.*np.power(rho, 5.)) * np.cos(theta)
+
+def z19(rho, theta):
+    """
+
+    """
+    return (3.*rho - 12.*np.power(rho, 3.) + 10.*np.power(rho, 5.)) * np.sin(theta)
+
+def z20(rho, theta):
+    """
+
+    """
+    return _multi_term_sin(-4., 5., 3., rho, theta)
+
+def z21(rho, theta):
+    """
+
+    """
+    return _single_term_sin(5., rho, theta)
+
+def z22(rho, theta):
+    """
+
+    """
+    return _single_term_cos(6., rho, theta)
+
+def z23(rho, theta):
+    """
+
+    """
+    return _multi_term_cos(-5., 6., 4., rho, theta)
+
+def z24(rho, theta):
+    """
+
+    """
+    return (((6.*np.power(rho, 2.)) - (20.*np.power(rho, 4.)) + (15.*np.power(rho, 6.))) * np.cos(2.*theta))
+
+def z25(rho, theta):
+    """
+
+    """
+    return (-1. + (12.*np.power(rho, 2.)) - (30.*np.power(rho, 4.)) + (20.*np.power(rho, 6.)))
+
+def z26(rho, theta):
+    """
+
+    """
+    return (((6.*np.power(rho, 2.)) - (20.*np.power(rho, 4.)) + (15.*np.power(rho, 6.))) * np.sin(2.*theta))
+
+def z27(rho, theta):
+    """
+
+    """
+    return _multi_term_sin(-5., 6., 4., rho, theta)
+
+def z28(rho, theta):
+    """
+
+    """
+    return _single_term_sin(6., rho, theta)
+
+def z29(rho, theta):
+    """
+
+    """
+    return _single_term_cos(7., rho, theta)
+
+def z30(rho, theta):
+    """
+
+    """
+    return _multi_term_cos(-6., 7., 5., rho, theta)
+
+def z31(rho, theta):
+    """
+
+    """
+    return (((10.*np.power(rho, 3.)) - (30.*np.power(rho, 5.)) + (21.*np.power(rho, 7.))) * np.cos(3.*theta))
+
+def z32(rho, theta):
+    """
+
+    """
+    return (((-4.*np.power(rho, 1.)) + (30.*np.power(rho, 3.)) - (60.*np.power(rho, 5.)) + (35.*np.power(rho, 7.)))*np.cos(theta))
+
+def z33(rho, theta):
+    """
+
+    """
+    return (((-4.*np.power(rho, 1.)) + (30.*np.power(rho, 3.)) - (60.*np.power(rho, 5.)) + (35.*np.power(rho, 7.)))*np.sin(theta))
+
+def z34(rho, theta):
+    """
+    
+    """
+    return (((10.*np.power(rho, 3.)) - (30.*np.power(rho, 5.)) + (21.*np.power(rho, 7.))) * np.sin(3.*theta))
+
+def z35(rho, theta):
+    """
+
+    """
+    return _multi_term_sin(-6., 7., 5., rho, theta)
+
+def z36(rho, theta):
+    """
+
+    """
+    return _single_term_sin(7., rho, theta)
+
+zernikes = [z0,
+            z1,
+            z2,
+            z3,
+            z4,
+            z5,
+            z6,
+            z7,
+            z8,
+            z9,
+            z10,
+            z11,
+            z12,
+            z13,
+            z14,
+            z15,
+            z16,
+            z17,
+            z18,
+            z19,
+            z20,
+            z21,
+            z22,
+            z23,
+            z24,
+            z25,
+            z26,
+            z27,
+            z28,
+            z29,
+            z30,
+            z31,
+            z32,
+            z33,
+            z34,
+            z35,
+            z36]
 
 def _single_term_cos(power, rho, theta):
     """
@@ -164,8 +421,8 @@ def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=F
 
     # Loop over Zernike polynomials and use their orthogonality to determine their coefficients.
     for i in range(1,order+1):
-        c = [0]*i + [1] + [0]*(37-i-1)
-        zf = zernikePolar(c, r, u)
+        func = zernikes[i]
+        zf = func(r, u)
         mask = (r > 1)
         zf[mask] = 0
 
@@ -177,11 +434,12 @@ def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=F
         elif norm == 'one':
             zn = 1.
 
+        # Get the coefficients like in a Fourier series.
         a = np.sum(surface*zf)*2.*2./nx/ny/np.pi*zn
         coeffs.append(a)
 
     # Plot bar chart of Zernike coefficients.
-    if barChart == True:
+    if barChart:
         fitlist = coeffs[1:order+1]
         index = np.arange(1,order+1)
         barChartPlot(index, fitlist)
