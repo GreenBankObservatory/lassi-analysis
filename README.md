@@ -14,7 +14,7 @@ data coming out of the Leica scanner we'll be using for the LASSI project.
    * source <username>_lassi_env/bin/activate
    * cp settings.py.default settings.py
    * edit settings.py
-   * ./runUnitTests
+   * nosetests
 
 ## Running the notebook
 
