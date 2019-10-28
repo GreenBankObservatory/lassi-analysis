@@ -30,7 +30,7 @@
 #
 ######################################################################
 
-from SecurityModule import *
+from .SecurityModule import *
 from select import select, error
 import threading
 import SOAPpy
@@ -256,7 +256,7 @@ class GrailClient:
                         td.server.handle_request()
                         self.__lock.release()
 
-                except error, e:
+                except error as e:
                     # If the error is an interrupted system call then
                     # keep on running.  If it is something else, then
                     # pass it on.  The interrupted system call error
@@ -264,7 +264,7 @@ class GrailClient:
                     if e[0] != 4:
                         raise
                     else:
-                        print "### GrailClient: intercepted interrupted system call exception:", e
+                        print("### GrailClient: intercepted interrupted system call exception:", e)
 
 
     def __init__(self, host = None, port = 18000, cb_host = None, cb_port = 18005,

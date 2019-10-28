@@ -24,7 +24,7 @@
 import os  
 import sys
 from SOAPpy    import Types 
-from getConfigValue  import getConfigValue
+from .getConfigValue  import getConfigValue
 # TBF this does not work!? from gbt.ygor  import getConfigValue
 
 class SecurityModule:

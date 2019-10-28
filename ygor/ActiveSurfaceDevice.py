@@ -28,7 +28,7 @@ from datetime import datetime
 import numpy as np
 from astropy.time import Time
 
-from YgorDevice import YgorDevice
+from .YgorDevice import YgorDevice
 
 zernike_type = "thermal_zernike"
 zernike_param = "%s_coeff" % zernike_type
