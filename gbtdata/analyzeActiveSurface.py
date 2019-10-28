@@ -9,8 +9,8 @@ except:
 
 import numpy as np
 
-from ProjectScanLog import ProjectScanLog
-from AsZernikeFile import AsZernikeFile
+from .ProjectScanLog import ProjectScanLog
+from .AsZernikeFile import AsZernikeFile
 
 def plotData(data,
              scanNumber,
