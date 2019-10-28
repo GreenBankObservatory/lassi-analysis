@@ -4,7 +4,7 @@ from copy import copy
 import numpy as np
 
 from plotting import scatter3dPlot, sampleXYZData, imagePlot
-from utils import cart2sph, sph2cart, splitXYZ, aggregateXYZ
+from utils.utils import cart2sph, sph2cart, splitXYZ, aggregateXYZ
 from main import loadLeicaDataFromGpus, smoothGPUs
 
 # where is the code we'll be running?

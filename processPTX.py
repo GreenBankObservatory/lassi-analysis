@@ -15,7 +15,7 @@ from astropy.coordinates.matrix_utilities import rotation_matrix
 
 from parabolas import parabola
 from plotting import scatter3dPlot
-from utils import mjd2utc
+from utils.utils import mjd2utc
 
 def previewData(ptxFile, sample=None):
 

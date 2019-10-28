@@ -26,7 +26,7 @@ from zernikeIndexing import noll2asAnsi, printZs
 from simulateSignal import addCenterBump, zernikeFour
 from simulateSignal import zernikeFive, gaussian
 from plotting import sampleXYZData, scatter3dPlot
-from utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits
+from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits
 from weightSmooth import weightSmooth
 import settings
 

@@ -8,8 +8,8 @@ import numpy as np
 # import matplotlib
 # matplotlib.use('agg')
 
-from utils import sph2cart, cart2sph, utc2mjd, mjd2utc
-from utils import midPoint, gridLimits
+from utils.utils import sph2cart, cart2sph, utc2mjd, mjd2utc
+from utils.utils import midPoint, gridLimits
 
 class TestUtils(unittest.TestCase):
     "unit tests for Utils module"
