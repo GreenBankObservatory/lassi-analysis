@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from main import smooth, getWeight, importCsv
+from misc.main import smooth, getWeight, importCsv
 import lassiTestSettings
 import settings
 
