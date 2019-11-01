@@ -18,8 +18,8 @@ from astropy.stats import sigma_clip
 
 from zernikies import getZernikeCoeffs
 from processPTX import processPTX, processNewPTX, aggregateXYZ
-from main import smoothGPUs, smoothXYZGpu, splitXYZ
-from main import loadLeicaDataFromGpus
+from main import splitXYZ
+from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus
 from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
                       newParabola, rotateData, parabola
 from zernikeIndexing import noll2asAnsi, printZs

@@ -5,7 +5,7 @@ import numpy as np
 
 from plotting import scatter3dPlot, sampleXYZData, imagePlot
 from utils.utils import cart2sph, sph2cart, splitXYZ, aggregateXYZ
-from main import loadLeicaDataFromGpus, smoothGPUs
+from gpus import loadLeicaDataFromGpus, smoothGPUs
 
 # where is the code we'll be running?
 GPU_PATH = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
