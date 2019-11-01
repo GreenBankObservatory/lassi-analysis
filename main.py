@@ -17,7 +17,7 @@ from dask.diagnostics import ProgressBar, Profiler, ResourceProfiler, CacheProfi
 from dask.diagnostics import visualize
 
 from plotting import *
-
+from utils.utils import importCsv as importCsvXYZ
 from parabolas import fitLeicaScan
 
 import settings
@@ -717,23 +717,8 @@ def sph2cart(az, el, r):
 def importCsv(filename):
     "Import x,y,z values from CSV file"
 
-
-    fieldnames = ['x', 'y', 'z']
-
-    xs = []
-    ys = []
-    zs = []
-
-    with open(filename, 'r') as f:
-        reader = csv.DictReader(f, fieldnames=fieldnames)
-
-        for row in reader:
-            xs.append(float(row['x']))
-            ys.append(float(row['y']))
-            zs.append(float(row['z']))
-
-
-    return np.array(xs), np.array(ys), np.array(zs)
+    return importCsvXYZ(filename)
+    
 
 def processDiffSimple(fn1, fn2):
     "Find diff between two evenly-spaced surfaces and fit"
