@@ -15,7 +15,7 @@ from astropy.coordinates.matrix_utilities import rotation_matrix
 
 from parabolas import parabola
 from plotting import scatter3dPlot
-from utils.utils import mjd2utc
+from utils.utils import mjd2utc, splitXYZ, aggregateXYZ
 
 def previewData(ptxFile, sample=None):
 
@@ -612,25 +612,6 @@ def processNewPTXData(lines,
         plt.title("X Y orientation of data")
 
     return xyz, dts
-
-def aggregateXYZ(x, y, z):
-    xyz = []
-    for i in range(len(x)):
-        xyz.append((x[i], y[i], z[i]))
-    return np.array(xyz)
-
-def splitXYZ(xyz):
-    x = []
-    y = []
-    z = []
-
-    for xi, yi, zi in xyz:
-        x.append(xi); y.append(yi); z.append(zi)
-        
-    x = np.array(x)
-    z = np.array(z) 
-    y = np.array(y)    
-    return x, y, z
 
 def getTimeStamps(fpath):
     "Read in file of form *_times.csv and return MJDs"

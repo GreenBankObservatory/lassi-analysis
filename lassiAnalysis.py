@@ -18,7 +18,6 @@ from astropy.stats import sigma_clip
 
 from zernikies import getZernikeCoeffs
 from processPTX import processPTX, processNewPTX, aggregateXYZ
-from main import splitXYZ
 from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus
 from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
                       newParabola, rotateData, parabola
@@ -26,7 +25,7 @@ from zernikeIndexing import noll2asAnsi, printZs
 from simulateSignal import addCenterBump, zernikeFour
 from simulateSignal import zernikeFive, gaussian
 from plotting import sampleXYZData, scatter3dPlot
-from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits
+from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits, splitXYZ
 from weightSmooth import weightSmooth
 import settings
 

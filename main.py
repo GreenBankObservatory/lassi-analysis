@@ -16,8 +16,6 @@ from dask import config
 from dask.diagnostics import ProgressBar, Profiler, ResourceProfiler, CacheProfiler
 from dask.diagnostics import visualize
 
-from processPTX import splitXYZ
-
 from plotting import *
 
 from parabolas import fitLeicaScan
