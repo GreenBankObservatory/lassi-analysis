@@ -6,4 +6,6 @@
 *.log
 *.bkp
 \#*\#
-
+settings.py
+*lassi_env
+.ipynb_checkpoints/
