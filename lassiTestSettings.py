@@ -7,4 +7,24 @@ SETTINGS_27MARCH2019 = {
     'yOffset': 50.0,
     'rot': -10.0,
     }
+SETTINGS_12JUNE2019 = {
+    'xOffset': -8.0,
+    'yOffset': 50.0,
+    'rot': -10.0,
+    }
+SETTINGS_17SEPTEMBER2019 = {
+    'xOffset': -45.0,
+    'yOffset': -5.0,
+    'rot': 80.0,
+    }
+SETTINGS_10OCTOBER2019 = {
+    'xOffset': -52.0,
+    'yOffset': -8.0,
+    'rot': 80.0,
+    }
+SETTINGS_11OCTOBER2019 = {
+    'xOffset': -44.0,
+    'yOffset': -6.5,
+    'rot': 80.0,
+    }
 DATA_UNIT_TESTS = "/home/scratch/pmargani/LASSI/unitTestData/"
