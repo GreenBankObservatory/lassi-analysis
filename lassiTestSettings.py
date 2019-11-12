@@ -21,10 +21,12 @@ SETTINGS_10OCTOBER2019 = {
     'xOffset': -52.0,
     'yOffset': -8.0,
     'rot': 80.0,
+    'radius': 49.0,
     }
 SETTINGS_11OCTOBER2019 = {
     'xOffset': -44.0,
     'yOffset': -6.5,
     'rot': 80.0,
+    'radius': 49.0,
     }
 DATA_UNIT_TESTS = "/home/scratch/pmargani/LASSI/unitTestData/"
