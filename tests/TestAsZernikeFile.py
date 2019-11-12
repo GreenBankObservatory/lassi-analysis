@@ -2,7 +2,7 @@
 
 import unittest
 
-from AsZernikeFile import AsZernikeFile
+from gbtdata.AsZernikeFile import AsZernikeFile
 
 class TestAsZernikeFile(unittest.TestCase):
     "Unit tests for code that parses AsZernike.conf file"

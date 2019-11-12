@@ -3,8 +3,7 @@ import unittest
 
 import numpy as np
 
-from main import smoothGPUs, smoothGPUMulti, smooth, getWeight
-from main import importCsv, loadLeicaDataFromGpus
+from misc.main import smooth, getWeight, importCsv
 import lassiTestSettings
 import settings
 
@@ -13,57 +12,7 @@ class TestMain(unittest.TestCase):
     def setUp(self):
         pass
 
-    def testSmoothGPUs(self):
-        "Make sure system command is configured correctly"
-    
-        gpuPath = 'gpuPath'
-        inFile = 'inFile'
-        outFile = 'outFile'
-        n = 512
-        test = True
 
-        cmd = smoothGPUs(gpuPath, inFile, outFile, n, test=test)
-
-        user = os.getlogin()
-        host = settings.GPU_HOST
-        exp = "runGpuSmooth gpuPath %s %s inFile outFile 512 0.00100" % (user, host)
-
-        self.assertEqual(exp, cmd)
-
-    def testSmoothGPUMulti(self):
-        "Make sure system commands are configured correctly"
-
-        gpuPath = 'gpuPath'
-        gpuPaths = [gpuPath]*2
-        inFile = 'inFile'
-        inFiles = [inFile]*2
-        outFile = 'outFile'
-        n = 512
-        test = True
-
-        cmds = smoothGPUMulti(gpuPaths, inFiles, outFile, n, test=test)
-
-        user = os.getlogin()
-        host = settings.GPU_HOST
-        host2 = settings.GPU_HOST_2
-        hosts = [host, host2]
-
-        exps = []
-        for i in range(2):
-            exp = [
-                'runGpuParts',
-                gpuPath,
-                user,
-                hosts[i],
-                inFile,
-                outFile,
-                str(n),
-                str(i+1),
-                '2'
-            ]
-            exps.append(exp)
-
-        self.assertEqual(exps, cmds)
 
     def testSmooth(self):
         "Test python (dask) implementation of smoothing algorithm"
@@ -130,14 +79,4 @@ class TestMain(unittest.TestCase):
         self.assertEqual(y[0], 2.211914288349020552e+01)
         self.assertEqual(z[0], -4.575297499999999928e+01)
 
-    def testLoadLeicaDataFromGpus(self):
 
-        fn = "data/test"
-        x, y, z = loadLeicaDataFromGpus(fn)
-        
-        self.assertEqual(len(x), 100)
-        self.assertEqual(len(y), 100)
-        self.assertEqual(len(z), 100)
-
-        # spot check
-        self.assertAlmostEqual(x[3], 1.48345411, 7)

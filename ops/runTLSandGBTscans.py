@@ -4,11 +4,11 @@ import os
 
 from astropy.io import fits
 
-from pyTLS import TLSaccess
-from runTLS import runOneScan, configureScanner
-from ActiveSurfaceDevice import ActiveSurface
-from GrailClient import GrailClient
-import runTLSLogging
+from .pyTLS import TLSaccess
+from .runTLS import runOneScan, configureScanner
+from ygor.ActiveSurfaceDevice import ActiveSurface
+from ygor.GrailClient import GrailClient
+from . import runTLSLogging
 
 # Initialize the logging configuration
 logging.config.dictConfig(runTLSLogging.config)
@@ -92,7 +92,7 @@ def runTLSandGBTscans(zernikes,
     lassiPath = "/home/sandboxes/pmargani/LASSI/data/9oct2019"
 
     a = TLSaccess("lassi.ad.nrao.edu")
-    print a.get_status()
+    print (a.get_status())
 
     if scan_number is not None:
         a.set_scan_number(scan_number)
@@ -170,7 +170,7 @@ def runTLSandGBTscans(zernikes,
                     keepGoing = False
 
         except KeyboardInterrupt:
-            print "User Break"
+            print ("User Break")
             a.cntrl_exit()
             keepGoing = False
         # finally:
@@ -222,14 +222,14 @@ def checkActiveSurfaceFITS(proj):
 
     # get fits files
     fs = os.listdir(fitsPath)
-    print fs
+    print (fs)
     fs = sorted([f for f in fs if f[-4:] == 'fits'])
-    print "fits files: ", fs
+    print ("fits files: ", fs)
 
     for f in fs:
         fpath = os.path.join(fitsPath, f)
         info = readActiveSurfaceFITS(fpath)
-        print info
+        print (info)
 
 
 def runTwoFlatMntScans(a=None,
@@ -242,7 +242,7 @@ def runTwoFlatMntScans(a=None,
 
     if a is None:
         a = TLSaccess("lassi.ad.nrao.edu")
-        print a.get_status()
+        print (a.get_status())
 
     if scan_number is not None:
         a.set_scan_number(scan_number)
@@ -302,7 +302,7 @@ def main():
     for zi in zis:
         for zamp in zamps:
             zs.append((zi, zamp)) 
-    print "running with zernikes: ",zs
+    print ("running with zernikes: ",zs)
     # zs = [(5, 5000)]        
     runTLSandGBTscans(zs, twoFlat=False, repeat=True, scan_number=517)
     #checkActiveSurfaceFITS("JUNK")

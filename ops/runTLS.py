@@ -6,9 +6,9 @@ import logging.config
 import numpy as np
 from datetime import datetime
 
-import runTLSLogging
+from . import runTLSLogging
 
-from pyTLS import TLSaccess
+from .pyTLS import TLSaccess
 
 # Initialize the logging configuration
 logging.config.dictConfig(runTLSLogging.config)
@@ -100,11 +100,11 @@ def runOneScan(a, path=None):
     while state != "Ready":
         status = a.get_status()
         state = status.state
-        print "State: ", state
-        print datetime.now()
+        print("State: ", state)
+        print (datetime.now())
         time.sleep(1)
 
-    print "Scan Done"
+    print ("Scan Done")
     scanSecs = time.time() - s
 
     # print "sleeping for 60 secs "
@@ -125,7 +125,7 @@ def runOneScan(a, path=None):
         print("not enough keys: ", keys)
         time.sleep(1)
         keys = a.get_results().keys()
-    print "We have all our keys now: ", keys
+    print ("We have all our keys now: ", keys)
 
     logger.debug(a.get_results()['HEADER'])
 

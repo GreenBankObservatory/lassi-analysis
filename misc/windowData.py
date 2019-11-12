@@ -13,7 +13,7 @@ from dask.diagnostics import visualize
 from plotting import imagePlot, scatterPlot, sampleXYZData, scatter3dPlot
 from processPTX import getRawXYZ
 from main import importCsv
-from utils import cart2sph, sph2cart, aggregateXYZ
+from utils.utils import cart2sph, sph2cart, aggregateXYZ
 from parabolas import loadLeicaDataFromGpus
 
 #config.set(scheduler='distributed')  # overwrite default with multiprocessing scheduler

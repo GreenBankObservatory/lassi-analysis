@@ -16,10 +16,8 @@ from dask import config
 from dask.diagnostics import ProgressBar, Profiler, ResourceProfiler, CacheProfiler
 from dask.diagnostics import visualize
 
-from processPTX import splitXYZ
-
 from plotting import *
-
+from utils.utils import importCsv as importCsvXYZ
 from parabolas import fitLeicaScan
 
 import settings
@@ -611,79 +609,9 @@ def smoothXYZ(x, y, z, n, sigX=None, sigY=None):
     print(("zSm", zSm))
     return (xLoc, yLoc, zSm)
 
-def loadLeicaDataFromGpus(fn):
-    "Crudely loads x, y, z csv files into numpy arrays"
-
-    xyzs = {}
-    dims = ['x', 'y', 'z']
-    for dim in dims:
-        data = []
-        fnn = "%s.%s.csv" % (fn, dim)
-        with open(fnn, 'r') as f:
-            ls = f.readlines()
-        for l in ls:
-            ll = l[:-1]
-            if ll == 'nan':
-                data.append(np.nan)
-            else:
-                data.append(float(ll))
-        xyzs[dim] = np.array(data)
-    return xyzs['x'], xyzs['y'], xyzs['z']
 
 # def smoothXYZGpu(x, y, z, n, sigX=None, sigY=None, filename=None):
-def smoothXYZGpu(x, y, z, n, sigXY=None, filename=None):
-    "use GPU code to do the simple XYZ smoothing"
 
-    if sigXY is None:
-        sigXY = 0.1
-
-
-    # first get data into file format expected by GPU code:
-    # x, y, z per line
-    x = x.flatten()
-    y = y.flatten()
-    z = z.flatten()
-
-    x = x[[not b for b in np.isnan(x)]]
-    y = y[[not b for b in np.isnan(y)]]
-    z = z[[not b for b in np.isnan(z)]]
-
-    assert len(x) == len(y)
-    assert len(y) == len(z)
-
-    # TBF: how to zip 3 together?
-    xyz = []
-    for i in range(len(x)):
-        xyz.append((x[i], y[i], z[i]))
-    xyz = np.array(xyz)
-
-    # where's our input data?
-    abspath = os.path.abspath(os.path.curdir)
-    if filename is None:
-        fn = "test"
-    else:
-        fn = filename
-            
-    inFile = os.path.join(abspath, "data", fn)
-
-    np.savetxt(inFile, xyz, delimiter=",") 
-
-    # call the GPU code
-    # where is the code we'll be running?
-    # gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
-    gpuPath = GPU_PATH
-    outFile = fn
-    smoothGPUs(gpuPath, inFile, outFile, n, noCos=True, sigAzEl=sigXY)
-
-    # make sure the output is where it should be
-    for dim in ['x', 'y', 'z']:
-        dimFile = "%s.%s.csv" % (outFile, dim)
-        dimPath = os.path.join(gpuPath, dimFile)
-        assert os.path.isfile(dimPath)
-
-    # extract the results from the resultant files
-    outPath = os.path.join(gpuPath, outFile)
-    return loadLeicaDataFromGpus(outPath)
 
     
 def smoothXYZDask(x, y, z, n, sigX=None, sigY=None):
@@ -789,23 +717,8 @@ def sph2cart(az, el, r):
 def importCsv(filename):
     "Import x,y,z values from CSV file"
 
-
-    fieldnames = ['x', 'y', 'z']
-
-    xs = []
-    ys = []
-    zs = []
-
-    with open(filename, 'r') as f:
-        reader = csv.DictReader(f, fieldnames=fieldnames)
-
-        for row in reader:
-            xs.append(float(row['x']))
-            ys.append(float(row['y']))
-            zs.append(float(row['z']))
-
-
-    return np.array(xs), np.array(ys), np.array(zs)
+    return importCsvXYZ(filename)
+    
 
 def processDiffSimple(fn1, fn2):
     "Find diff between two evenly-spaced surfaces and fit"
@@ -1107,7 +1020,6 @@ def findTheDamnBumps():
     x1, y1, z1 = smoothSpherical(fn1, n, sigAz=1.0, sigEl=1.0)    
     x2, y2, z2 = smoothSpherical(fn1, n)    
 
-
 def trySmoothXYZ():
 
     x = np.linspace(-20, 20)
@@ -1249,12 +1161,7 @@ def smoothGPUs(gpuPath,
     if spherical:
         cmd += " --no-conv"
 
-    print("system cmd: ", cmd)
 
-    if not test:
-        os.system(cmd)
-
-    return cmd
 
 # def smoothProcessedFile(fpath, N=512, squared=False):
 #     "Smooths processed file contents via GPUs, optionally squaring"
@@ -1307,21 +1214,7 @@ def smoothGPUs(gpuPath,
 #     # square it then smooth it (<z**2>)
 #     smoothSquaredProcessedFile(fpath)
 
-def trySmoothGPUs():
 
-    # gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
-    gpuPath = GPU_PATH
-    abspath = os.path.abspath(os.path.curdir)
-    inFile = "Test1_STA14_Bump1_High-02_METERS.ptx.csv"
-    fpath1 = os.path.join(abspath, "data", inFile)
-    n = 100
-    assert os.path.isfile(fpath1)
-    #outFile1 = os.path.basename(fpath1)
-    outFile1 = inFile
-    smoothGPUs(gpuPath, fpath1, outFile1, n)
-
-    xOutfile = os.path.join(gpuPath, inFile + ".x.csv")
-    assert os.path.isfile(xOutfile)
 
 def main():
     testSmoothGPUs()

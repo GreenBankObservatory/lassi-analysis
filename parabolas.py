@@ -10,7 +10,7 @@ from scipy.optimize import leastsq
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import axes3d, Axes3D
 
-from utils import sph2cart, cart2sph
+from utils.utils import sph2cart, cart2sph
 
 from rotate import *
 

@@ -22,8 +22,8 @@
 #
 # $Id
 
-from getConfigValue import getConfigValue
-from GrailClient    import GrailClient
+from .getConfigValue import getConfigValue
+from .GrailClient    import GrailClient
 
 class YgorConnection:
     """

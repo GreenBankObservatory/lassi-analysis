@@ -1,3 +1,4 @@
+import csv
 
 import numpy as np
 from astropy.coordinates import cartesian_to_spherical
@@ -146,3 +147,24 @@ def dishLimits(maskedDish):
     xnm = noz[1]
 
     return [np.min(xnm), np.max(xnm), np.min(ynm), np.max(ynm)]
+
+def importCsv(filename):
+    "Import x,y,z values from CSV file"
+
+
+    fieldnames = ['x', 'y', 'z']
+
+    xs = []
+    ys = []
+    zs = []
+
+    with open(filename, 'r') as f:
+        reader = csv.DictReader(f, fieldnames=fieldnames)
+
+        for row in reader:
+            xs.append(float(row['x']))
+            ys.append(float(row['y']))
+            zs.append(float(row['z']))
+
+
+    return np.array(xs), np.array(ys), np.array(zs)

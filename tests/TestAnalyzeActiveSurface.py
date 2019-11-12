@@ -2,7 +2,7 @@
 
 import unittest
 
-from analyzeActiveSurface import analyzeActiveSurfaceScans
+from gbtdata.analyzeActiveSurface import analyzeActiveSurfaceScans
 
 class TestAnalyzeActiveSurface(unittest.TestCase):
     "Unit tests for module that examines Active Surface FITS files"
