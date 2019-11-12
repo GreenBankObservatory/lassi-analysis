@@ -1,10 +1,12 @@
 import csv
 import os
 import subprocess
+import time
 from copy import copy
 
 import numpy as np
 
+from plotting import scatter3dPlot
 import settings
 
 GPU_PATH = settings.GPU_PATH
@@ -22,9 +24,13 @@ def trySmoothGPUMulti(N=10):
     inFile2 = "/home/scratch/pmargani/LASSI/scannerData/Clean9.ptx.copy.csv"
     inFiles = [inFile1, inFile2]
 
+    host1 = settings.GPU_HOST
+    host2 = settings.GPU_HOST_2
+    hosts = [host1, host2]
+
     outFile = 'outFile'
 
-    smoothGPUMulti(gpuPaths, inFiles, outFile, N)
+    smoothGPUMulti(gpuPaths, hosts, inFiles, outFile, N)
 
     # did it work?
     outfiles = []
@@ -50,22 +56,137 @@ def trySmoothGPUMulti(N=10):
 
     scatter3dPlot(x, y, z, "testSmoothGPUMulti")
 
+def smoothGPUParallel(inFile, N, test=False):
+    "Highest level for calling smoothing using multiple GPUs"
+
+    assert os.path.isfile(inFile)
+
+    # we need to specify the aboslute path of our inputs
+    abspath = os.path.abspath(inFile)
+
+    # our output will be same file name, but with appendages
+    outFile = os.path.basename(inFile)
+
+    gpuPaths = settings.GPU_MULTI_PATHS
+    gpuHosts = settings.GPU_MULTI_HOSTS
+
+
+    cmds = smoothGPUMultiFile(gpuPaths, gpuHosts, abspath, outFile, N, test=test)
+
+    # if this was a test, no files were created on disk for us to read
+    if test:
+        print ("Tested with commands", cmds)
+        return None
+
+    # now collect the multiple results into one
+    outfiles = []
+    # xyzs = []
+    # initialize what will become our final results
+    x = np.array([])
+    y = np.array([])
+    z = np.array([])
+
+    for i, gpuPath in enumerate(gpuPaths):
+        for dim in ['x', 'y', 'z']:
+            dimFile = "%s.%d.%s.csv" % (outFile, (i+1), dim)
+            dimPath = os.path.join(gpuPath, dimFile)
+            outfiles.append(dimPath)
+            print(dimPath)
+            assert os.path.isfile(dimPath)
+            print(("GPUs created file: ", dimPath))
+        loadFile = os.path.join(gpuPath, "%s.%d" % (outFile, (i+1)))    
+        xyz = loadLeicaDataFromGpus(loadFile)
+        # xyzs.append(xyz)
+        xn, yn, zn = xyz
+        x = np.concatenate((x, xn))
+        y = np.concatenate((y, yn))
+        z = np.concatenate((z, zn))
+
+    # x1, y1, z1 = xyzs[0]
+    # x2, y2, z2 = xyzs[1]
+
+    # x = np.concatenate((x1, x2))
+    # y = np.concatenate((y1, y2))
+    # z = np.concatenate((z1, z2))
+
+    return x, y, z
+
+def smoothGPUMultiFile(gpuPath, hosts, inFile, outFile, n, test=False):
+    "Prepare the input for processing by multiple GPUs"
+
+    # currently it seems that the GPU code can't concurrently read
+    # from the same file
+
+    # TBF: we might also want to only read in part of the data of
+    # each file
+
+    # for now, make copies of the input file for each gpu
+    numInFiles = len(gpuPath)
+
+    # build up the files.  Assume the in put file is a csv
+    inFiles = [inFile]
+    for i in range(2, numInFiles + 1):
+        inFiles.append(inFile + ('.%d.csv' % i))
+    print ("infiles: ", inFiles)
+
+    # now copy them; time it!
+    s = time.time()
+
+    # if not test:
+    ps = []
+    for f in inFiles[1:]:
+        if test:
+            # just do something
+            cmd = ["ls", inFile]
+        else:
+            # shell for copying file!    
+            cmd = ["cp", inFile, f]
+        print (cmd)
+        p = subprocess.Popen(cmd)
+        ps.append(p)
+    
+    # now wait for them all to finish
+    for p in ps:
+        p.wait()
+
+    # make sure they really got copied
+    if not test:
+        for f in inFiles:
+            assert os.path.isfile(f)
+
+    # how long did the copy take?
+    print("Copy files elapsed seconds: ", time.time() - s)
+
+    return smoothGPUMulti(gpuPath, hosts, inFiles, outFile, n, test=test)            
+
 def smoothGPUMulti(gpuPaths,
+                   hosts,
                    inFiles,
                    outFile,
                    n,
                    test=False):
     "Smooth the data using multiple GPUs"
     
+    # print (len(gpuPaths))
+    # print (len(hosts))
+    # print (len(inFiles))
+
+    # make sure inputs make sense
+    assert len(gpuPaths) == len(hosts)
+    assert len(hosts) == len(inFiles)
+
+    numParts = len(gpuPaths)
+
     gpuMultiScript = "runGpuParts"
 
     # first just try it with two GPUs
     user = os.getlogin()
-    host1 = settings.GPU_HOST
-    host2 = settings.GPU_HOST_2
-    hosts = [host1, host2]
-    parts = [1, 2]
-    
+    # host1 = settings.GPU_HOST
+    # host2 = settings.GPU_HOST_2
+    # hosts = [host1, host2]
+    # parts = [1, 2]
+    parts = range(1, numParts + 1)
+
     cmds = []
     for i in range(len(parts)):
         part = parts[i]
@@ -88,15 +209,16 @@ def smoothGPUMulti(gpuPaths,
 
     if not test:
         # make sure they get fired off
-        p1 = subprocess.Popen(cmds[0])  
-        print("called first command")
-        p2 = subprocess.Popen(cmds[1])
-        print("called second command")
+        ps = []
+        for cmd in cmds:
+            p = subprocess.Popen(cmd)  
+            print("called command: ", cmd)
+            ps.append(p)
 
         # THEN wait for them to finish
-        print("waiting for both to finish ...")
-        p1.wait()
-        p2.wait()
+        print("waiting for all commands to finish ...")
+        for p in ps:
+            p.wait()
 
     print("multiple GPU commands finished")
 
