@@ -8,7 +8,7 @@ def surfacePlot(x, y, z, vmin=-5e-3, vmax=5e-3):
     """
     """
 
-    extent = [np.nanmin(x), np.nanmax(x), np.nanmin(y), np.nanmax(y)]
+    extent = [plt.np.nanmin(x), plt.np.nanmax(x), plt.np.nanmin(y), plt.np.nanmax(y)]
 
     fig = plt.figure(figsize=(5, 5), dpi=150)
     ax = fig.add_subplot(111)
