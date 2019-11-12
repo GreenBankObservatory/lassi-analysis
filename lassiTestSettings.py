@@ -7,15 +7,23 @@ SETTINGS_27MARCH2019 = {
     'yOffset': 50.0,
     'rot': -10.0,
     }
+"""
+These are the settings used to extract the scans during development.
+This does not mean these are optimal parameters.
+For example, using a radius smaller than 49 results in a bias in the 
+recovered Zernike values during the October scans.
+"""
 SETTINGS_12JUNE2019 = {
     'xOffset': -8.0,
     'yOffset': 50.0,
     'rot': -10.0,
+    'radius': 47.0
     }
 SETTINGS_17SEPTEMBER2019 = {
     'xOffset': -45.0,
     'yOffset': -5.0,
     'rot': 80.0,
+    'radius': 45.5
     }
 SETTINGS_10OCTOBER2019 = {
     'xOffset': -52.0,
