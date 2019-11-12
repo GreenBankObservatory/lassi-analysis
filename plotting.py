@@ -4,6 +4,26 @@ import random
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+def surfacePlot(x, y, z, vmin=-5e-3, vmax=5e-3):
+    """
+    """
+
+    extent = [np.nanmin(x), np.nanmax(x), np.nanmin(y), np.nanmax(y)]
+
+    fig = plt.figure(figsize=(5, 5), dpi=150)
+    ax = fig.add_subplot(111)
+
+    im = ax.imshow(z, extent=extent, vmin=vmin, vmax=vmax)
+
+    cb = plt.colorbar(im)
+
+    ax.minorticks_on()
+    ax.tick_params('both', direction='in', top=True, right=True, bottom=True, left=True)
+
+    ax.set_xlabel('x axis (m)')
+    ax.set_ylabel('y axis (m)')
+    plt.title('Surface')
+
 def barChartPlot(index, fitlist, expected=[]):
     """
     Plots a bar chart with Zernike coefficients.
@@ -54,6 +74,9 @@ def linePlot(y, title):
     plt.title(title)
     
 def imagePlot(z, title):
+    """
+    """
+    
     fig = plt.figure()
     ax = fig.gca()
     #cax = ax.imshow(np.log(np.abs(np.diff(zrr - newZ))))
