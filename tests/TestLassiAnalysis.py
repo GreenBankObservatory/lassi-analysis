@@ -153,10 +153,10 @@ class TestLassiAnalysis(unittest.TestCase):
 
         N = 512
         nZern = 36
-        diff, fitlist = extractZernikesLeicaScanPair(fpath1,
-                                                     fpath2,
-                                                     n=N,
-                                                     nZern=nZern)
+        x, y, diff, fitlist = extractZernikesLeicaScanPair(fpath1,
+                                                           fpath2,
+                                                           n=N,
+                                                           nZern=nZern)
 
         # TBF: all the diffs data looks masked. how to check that?
         

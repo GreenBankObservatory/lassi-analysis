@@ -3,6 +3,7 @@ import unittest
 
 import numpy as np
 
+import gpus
 from gpus import smoothGPUs, smoothGPUMulti, smoothGPUMultiFile, loadLeicaDataFromGpus
 import lassiTestSettings
 import settings
@@ -22,7 +23,8 @@ class TestGpus(unittest.TestCase):
 
         user = os.getlogin()
         host = settings.GPU_HOST
-        exp = "runGpuSmooth gpuPath %s %s inFile outFile 512 0.00100" % (user, host)
+        path = os.path.dirname( os.path.abspath(gpus.__file__) )
+        exp = "%s/runGpuSmooth gpuPath %s %s inFile outFile 512 0.00100" % (path, user, host)
 
         self.assertEqual(exp, cmd)
 
