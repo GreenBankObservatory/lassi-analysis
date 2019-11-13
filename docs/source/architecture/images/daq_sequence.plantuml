@@ -1,0 +1,23 @@
+@startuml
+participant manager
+participant DAQ
+participant TLS
+participant PP
+participant "active surface"
+
+manager -> DAQ : connect/subscribe
+PP -> DAQ : connect/subscribe
+manager -> DAQ : send configuration
+manager -> DAQ : run scan
+DAQ -> TLS : power up and deploy
+TLS -> DAQ : ready
+DAQ -> TLS : TLS configure
+DAQ -> TLS : Start TLS scan
+DAQ --> manager : status updates
+TLS -> DAQ : scan complete
+DAQ -> PP : scanner data
+DAQ -> TLS : power down and stow
+DAQ -> PP : start + reference scan info
+PP -> manager : results
+manager -> "active surface" : update Z's (non-ref scan only)
+@enduml

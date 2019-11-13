@@ -1,0 +1,10 @@
+@startuml
+package "GBT M&C" {
+  package ScanCoordinator
+  package ActiveSurface
+  package RcvrArray75_115
+  package Grail
+  package "Other components..."
+  package LASSI #lightblue
+}
+@enduml

@@ -1,0 +1,5 @@
+@startuml
+[LASSI Post-Processing] as PP #lightblue
+[LASSI DAQ] <.right. PP : <<use>>
+PP <.right.> [manager] : <<use>>
+@enduml

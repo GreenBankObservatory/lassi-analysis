@@ -1,0 +1,18 @@
+@startuml
+[*] --> Ready 
+Ready --> TLS_measurement
+TLS_measurement : measure GBT primary
+TLS_measurement : surface
+TLS_measurement --> Stop_TLS : abort
+Stop_TLS : clean shutdown of
+Stop_TLS : hardware
+Stop_TLS --> Ready
+TLS_measurement --> Post_Processing : done, data
+Post_Processing --> Shutdown_Post_Processing : abort event
+Post_Processing --> Comparison : comparison measurements
+Comparison : compare AOCS with current data
+Post_Processing --> Ready : AOCS measurement
+Comparison --> Shutdown_Post_Processing : abort event
+Shutdown_Post_Processing : clean shutdown of PP module
+Shutdown_Post_Processing --> Ready
+@enduml

@@ -1,0 +1,26 @@
+@startuml
+turtle -> manager: begin
+manager -> DAQ: run measurement
+DAQ -> TLS: deploy
+DAQ -> TLS: power up
+TLS -> DAQ: ready
+DAQ -> TLS: configure
+DAQ -> TLS: start measurement
+TLS -> DAQ: measurement complete
+TLS -> DAQ : raw data
+DAQ -> TLS : power down
+DAQ -> manager : measurement complete
+
+DAQ -> PP: raw data
+manager -> PP: start PP command
+DAQ ---> manager: raw data
+
+manager ---> NAS : raw data (FITS file)
+
+manager -> turtle: complete (reference meas. only)
+PP -> NAS : processed data (FITS file)
+PP -> manager: PP done Zs (signal meas. only)
+PP -> NAS : Zernike data (FITS file)
+manager -> "active surface": update Zs (signal meas. only)
+manager -> turtle: complete
+@enduml

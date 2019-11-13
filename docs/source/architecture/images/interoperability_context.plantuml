@@ -1,0 +1,19 @@
+@startuml
+skinparam linetype polyline
+
+package "GBT M&C" {
+  package "Antenna manager" as Antenna
+  package turtle as "turtle server"
+  package "LASSI manager" as manager
+  package LASSI #lightblue {
+    node "LASSI DAQ"
+    node "LASSI PP"
+    node "TLS Scanner"
+  }
+
+  manager --> LASSI : <<use>>
+  turtle --> Antenna : <<use>>
+  turtle --> manager : <<use>>
+
+}
+@enduml

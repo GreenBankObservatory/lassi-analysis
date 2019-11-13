@@ -1,0 +1,28 @@
+@startuml
+node TLS_Scanner
+
+node Enclosure
+
+node Windows {
+ node LASSI_DAQ 
+}
+
+TLS_Scanner -- Windows : ethernet
+Enclosure--Windows : ethernet 
+
+node Linux {
+ node "post-processing"
+}
+
+node "GBT M&C" as MandC {
+ node LASSI_Manager
+}
+
+database gbfiler
+
+Windows -- MandC : intranet
+Linux -- MandC : intranet
+
+MandC -left- gbfiler
+Linux -down- gbfiler
+@enduml

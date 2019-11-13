@@ -1,0 +1,20 @@
+@startuml
+node "GBT M&C" {
+
+
+component LASSI {
+
+[DAQ] -up-> [manager]
+[Post-Processing] -up-> [manager]
+[TLS Scanner] -right-> [DAQ]
+[DAQ] -right-> [Post-Processing]
+[TLS Scanner] -up-> [manager]
+}
+
+component [Active Surface]
+component [Receivers]
+component [Instrumentation]
+component [Servos]
+component ["..."]
+}
+@enduml

@@ -1,0 +1,15 @@
+@startuml
+package "GBT M&C" {
+package LASSI #lightblue {
+  package Manager
+  package TLS_Scanner
+  package LASSI_DAQ
+  package LASSI_post_processing
+}
+package turtle_server
+package Active_Surface
+
+turtle_server --> LASSI : <<use>>
+LASSI --> Active_Surface : <<use>>
+}
+@enduml
