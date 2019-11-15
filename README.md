@@ -29,3 +29,16 @@ data coming out of the Leica scanner we'll be using for the LASSI project.
 This code base is the product of research, where adherence to software engineering best practices has not always been followed.  Therefore, there's not a lot of great documentation.  There is though, a high level road map in docs/processLeicaScan.odt.
 
 Also, a type of high-level integration test can be found in Scan9vs11-Z-UnitTest.ipynb.  Run this notebook and make sure the final results match the expected results.
+
+## Structure
+
+  |- data/         # Data products associated with lassi-analysis.
+  |- notebooks/    # Notebooks detailing different aspects of the telescope (e.g., active surface) and the development of the code (e.g. parabolas).
+  |- gbtdata/
+  |- PDFs/         # Documentation describing different experiments.
+  |- misc/    
+  |- ops/          # TLS control
+  |- scannerTests/ # Commands and settings (active surface and TLS) used during the development experiments.
+  |- tests/        # Unit tests for the code.
+  |- utils/        # Module with utilities used during the processing of the scans.
+  |- ygor/         
