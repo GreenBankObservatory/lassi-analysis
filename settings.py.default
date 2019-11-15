@@ -7,6 +7,10 @@ GPU_PATH="/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/"
 DEV1 = "devenv-hpc1"
 DEV2 = "devenv-hpc2"
 
+# used by unit tests
+GPU_HOST = DEV1
+GPU_HOST_2 = DEV2
+
 # Where will GPU smoothing be run in parallel mode?
 GPU_MULTI_HOSTS = [DEV1]
 
