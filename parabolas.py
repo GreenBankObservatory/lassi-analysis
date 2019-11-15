@@ -172,6 +172,7 @@ def fitLeicaScan(fn,
 
     else:
         x0, y0, z0 = xyz
+        print("passed in data of shape", x0.shape, y0.shape, z0.shape)
         x = x0[np.logical_not(np.isnan(x0))];
         y = y0[np.logical_not(np.isnan(y0))];
         z = z0[np.logical_not(np.isnan(z0))];

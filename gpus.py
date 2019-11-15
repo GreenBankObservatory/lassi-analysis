@@ -59,6 +59,7 @@ def trySmoothGPUMulti(N=10):
 def smoothGPUParallel(inFile, N, test=False):
     "Highest level for calling smoothing using multiple GPUs"
 
+    print ("smoothGPUParallel: ", N, inFile)
     assert os.path.isfile(inFile)
 
     # we need to specify the aboslute path of our inputs
@@ -70,6 +71,9 @@ def smoothGPUParallel(inFile, N, test=False):
     gpuPaths = settings.GPU_MULTI_PATHS
     gpuHosts = settings.GPU_MULTI_HOSTS
 
+    assert len(gpuPaths) == len(gpuHosts)
+
+    numGpus = len(gpuHosts)
 
     cmds = smoothGPUMultiFile(gpuPaths, gpuHosts, abspath, outFile, N, test=test)
 
@@ -88,13 +92,23 @@ def smoothGPUParallel(inFile, N, test=False):
 
     for i, gpuPath in enumerate(gpuPaths):
         for dim in ['x', 'y', 'z']:
-            dimFile = "%s.%d.%s.csv" % (outFile, (i+1), dim)
+            # there's a little confusion over how to handle
+            # this parallel stuff if we just specified one GPU
+            if numGpus == 1:
+                dimFile = "%s.%s.csv" % (outFile, dim)
+            else:    
+                dimFile = "%s.%d.%s.csv" % (outFile, (i+1), dim)
             dimPath = os.path.join(gpuPath, dimFile)
             outfiles.append(dimPath)
             print(dimPath)
             assert os.path.isfile(dimPath)
             print(("GPUs created file: ", dimPath))
-        loadFile = os.path.join(gpuPath, "%s.%d" % (outFile, (i+1)))    
+        # now load the data using the base name shared by all dimensions
+        if numGpus == 1:    
+            loadFile = os.path.join(gpuPath, outFile)    
+        else:    
+            loadFile = os.path.join(gpuPath, "%s.%d" % (outFile, (i+1)))    
+        print("Loading from basename: ", loadFile)
         xyz = loadLeicaDataFromGpus(loadFile)
         # xyzs.append(xyz)
         xn, yn, zn = xyz
@@ -228,6 +242,7 @@ def smoothGPUs(gpuPath,
                inFile,
                outFile,
                n,
+               host=None,
                test=False,
                verbose=False,
                noCos=False,
@@ -245,7 +260,8 @@ def smoothGPUs(gpuPath,
     
     # get ssh credentials and target
     user = os.getlogin()
-    host = settings.GPU_HOST
+    if host is None:
+        host = settings.GPU_HOST
 
     cmd = "runGpuSmooth %s %s %s %s %s %d %1.5f" % (gpuPath, user, host, inFile, outFile, n, sigAzEl)
     # cmd = "runGpuSmooth %s %s %s %d %1.5f" % (gpuPath, inFile, outFile, n, sigAzEl)
@@ -324,9 +340,12 @@ def smoothXYZGpu(x, y, z, n, sigXY=None, filename=None):
     # call the GPU code
     # where is the code we'll be running?
     # gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
-    gpuPath = GPU_PATH
+    # TBF: we have moved to multiple GPUS, but we shouldn't be
+    # doing this anymore with GPUs, so this is a temp. kluge
+    gpuPath = settings.GPU_MULTI_PATHS[0]
+    host = settings.GPU_MULTI_HOSTS[0]
     outFile = fn
-    smoothGPUs(gpuPath, inFile, outFile, n, noCos=True, sigAzEl=sigXY)
+    smoothGPUs(gpuPath, inFile, outFile, n, host=host, noCos=True, sigAzEl=sigXY)
 
     # make sure the output is where it should be
     for dim in ['x', 'y', 'z']:

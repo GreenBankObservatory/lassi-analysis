@@ -18,7 +18,7 @@ from astropy.stats import sigma_clip
 
 from zernikies import getZernikeCoeffs
 from processPTX import processPTX, processNewPTX, aggregateXYZ
-from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus
+from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus,  smoothGPUParallel
 from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
                       newParabola, rotateData, parabola
 from zernikeIndexing import noll2asAnsi, printZs
@@ -514,7 +514,9 @@ def processLeicaScan(fpath,
         # smoothedFiles, weights = smoothWithWeights(processedPath, xyz, N=N)
         smoothedFiles, weights = weightSmooth(processedPath, xyz)
     else:  
-        smoothedFiles = smooth(processedPath, N=N)
+        # smoothedFiles = smooth(processedPath, N=N)
+        x, y, z = smoothGPUParallel(processedPath, N)
+        print("Smoothed data to shape: ", x.shape, y.shape, z.shape)
 
     #   fn = smoothedFiles[0]
     #   assert fn[-5:] == 'x.csv'
@@ -529,18 +531,23 @@ def processLeicaScan(fpath,
     # and figures out the rest
     s = time.time()
     print("Fitting paraboloa ...")
-    fn = smoothedFiles[0]
-    assert fn[-5:] == 'x.csv'
-    fn = fn[:-6]
-    print("Fitting data found in files:", fn)
+    # fn = smoothedFiles[0]
+    # assert fn[-5:] == 'x.csv'
+    # fn = fn[:-6]
+    # print("Fitting data found in files:", fn)
     # print "NOT USING WEIGHTS!"
     wc = copy(weights)
     # weights = None
-    diff, x, y = fitLeicaScan(fn,
-                              numpy=False,
+    # diff, x, y = fitLeicaScan(fn,
+    #                           numpy=False,
+    #                           N=N,
+    #                           rFilter=False,
+    #                           # inSpherical=useFittingWeights,
+    #                           weights=weights)
+    diff, x, y = fitLeicaScan(None, 
+                              xyz=(x, y, z),
                               N=N,
                               rFilter=False,
-                              # inSpherical=useFittingWeights,
                               weights=weights)
 
     e = time.time()

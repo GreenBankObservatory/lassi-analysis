@@ -1,9 +1,16 @@
 # copy this to settings.py and edit for this sandbox
+import os
 
-# Where is the gpu smoothing code installed?
 GPU_PATH="/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/"
 
-# Where will the gpu smoothing code be running?
-GPU_HOST="vegas-hpc10"
-GPU_HOST_2="devenv-hpc1"
 
+DEV1 = "devenv-hpc1"
+DEV2 = "devenv-hpc2"
+
+# Where will GPU smoothing be run in parallel mode?
+GPU_MULTI_HOSTS = [DEV1]
+
+
+gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions"
+gpuVersions = [DEV1]
+GPU_MULTI_PATHS = [os.path.join(gpuPath, f) for f in gpuVersions]
