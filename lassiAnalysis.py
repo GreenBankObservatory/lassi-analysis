@@ -74,8 +74,12 @@ def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFit
     zsr = zsr - cr[3]
 
     # Find the grid limits for the reference and signal scans.
-    xmin, xmax = gridLimits(xrr, xsr)
-    ymin, ymax = gridLimits(yrr, ysr)
+    #xmin, xmax = gridLimits(xrr, xsr)
+    #ymin, ymax = gridLimits(yrr, ysr)
+    xmin = np.min([np.nanmin(xrr), np.nanmin(xsr)])
+    xmax = np.min([np.nanmax(xrr), np.nanmax(xsr)])
+    ymin = np.min([np.nanmin(yrr), np.nanmin(ysr)])
+    ymax = np.min([np.nanmax(yrr), np.nanmax(ysr)])
 
     xrrg, yrrg, zrrg = regridXYZMasked(xrr, yrr, zrr, n=n, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
     xsrg, ysrg, zsrg = regridXYZMasked(xsr, ysr, zsr, n=n, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
@@ -88,7 +92,7 @@ def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFit
     # Find Zernike coefficients on the surface deformation map.
     fitlist = getZernikeCoeffs(diff.filled(0), nZern, barChart=False, norm='active-surface')
 
-    return diff, fitlist
+    return xsrg, ysrg, diff, fitlist
 
 def smooth(fpath, N=512, spherical=False):
 

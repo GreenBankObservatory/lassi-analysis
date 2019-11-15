@@ -1,0 +1,20 @@
+@startuml
+user -> turtle : AutoLASSI()
+turtle -> manager : prepare
+turtle --> antenna : slew
+manager -> LASSI : power up and deploy TLS
+LASSI -> manager : ready
+manager -> turtle : ready
+antenna -> turtle : ready
+turtle -> manager : do LASSI measurement
+manager -> LASSI : do LASSI measurement
+LASSI -> manager : TLS done
+manager -> turtle : done
+manager -> LASSI : power down and retract TLS
+turtle --> antenna : slew
+LASSI -> LASSI : data reduction
+LASSI -> manager : Zernikes
+manager -> turtle : Zernikes
+turtle -> antenna : active surface corrections
+turtle -> user : done
+@enduml

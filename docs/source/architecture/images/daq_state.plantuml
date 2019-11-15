@@ -1,0 +1,38 @@
+@startuml
+Ready : The scanner is powered up and ready for a command
+Paused : The scan was running, but has been paused
+Calculating : Not sure. Computing a result?
+Imaging : Acquiring images (i.e. pictures, not ranges)
+CalibratingTiltSensor : I expect this means what it sounds like.
+CalibratingTiltSensor : As a note, the tilt sensor cannot be used
+CalibratingTiltSensor : in the inverted mounting position.
+Scanning : Scanner is acquiring range data
+PreparingScan : Scan command has been given, but scanner
+PreparingScan : is performing internal preparations to scan,
+PreparingScan : like positioning mount or spinning up the mirror.
+Initializing : TBD
+Running : TBD
+Failure : Scanner has failed to complete an operation
+
+[*] --> Ready
+Ready --> StartScan
+StartScan --> PreparingScan
+PreparingScan --> ScannerReady
+ScannerReady --> Scanning
+Scanning : Scanner is acquiring range data
+Scanning --> ScanComplete
+ScanComplete --> Ready
+
+Ready --> CalibratingTiltSensor
+CalibratingTiltSensor --> Ready
+
+StartScan --> Failure
+PreparingScan --> Failure
+ScannerReady --> Failure
+Scanning --> Failure
+
+StartScan --> Paused
+PreparingScan --> Paused
+ScannerReady --> Paused
+Scanning --> Paused
+@enduml

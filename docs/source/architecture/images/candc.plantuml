@@ -1,0 +1,31 @@
+@startuml
+skinparam linetype polyline
+
+package "turtle server" as turtle
+
+package "LASSI" {
+  [LASSI Manager] as manager
+  [LASSI DAQ] as DAQ
+  [scanner enclosure] as enclosure
+  [TLS scanner] as scanner
+  [LASSI Post-Processing] as PP
+
+  DAQ-->PP : scan data
+  DAQ-->scanner : commands
+  scanner-->DAQ : point cloud
+
+  DAQ-->enclosure : commands
+
+  DAQ-->PP : "scan data"
+
+  manager<-left->DAQ : C&C
+  DAQ-left->manager : "scan data"
+  manager<--->PP : C&C
+  PP-right->manager : Zernike
+}
+
+package "active surface" as AS
+
+turtle-->LASSI : "scan request"
+LASSI-->AS : commands
+@enduml

@@ -1,0 +1,6 @@
+@startuml
+[LASSI DAQ] #lightblue
+[LASSI DAQ] -up- [LASSI Manager] : <<use>>
+[TLS Scanner] -right- [LASSI DAQ] : <<use>>
+[LASSI DAQ] -right- [LASSI Post-Processing] : <<use>>
+@enduml

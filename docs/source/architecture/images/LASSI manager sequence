@@ -1,0 +1,20 @@
+@startuml
+turtle -> manager: begin
+manager -> DAQ: run measurement
+DAQ -> TLS: deploy
+TLS -> DAQ: ready
+DAQ -> TLS: configure
+DAQ -> TLS: start measurement
+TLS -> DAQ: measurement complete
+DAQ -> PP: data
+DAQ -> NAS : data (FITS file)
+DAQ -> manager: data
+manager -> NAS : data (FITS file)
+manager -> PP: AOCS data
+manager -> PP: start PP command
+manager -> turtle: complete (AOCS scan only)
+PP -> manager: PP done Zs
+PP -> NAS : data (FITS file)
+manager -> "active surface": update Zs (non-AOCS only)
+manager -> turtle: complete
+@enduml

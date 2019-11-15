@@ -1,0 +1,65 @@
+@startuml
+Title Timing of primary surface corrections for high-frequency observations
+caption Times based on average historical data (min)
+concise "Current\n" as C
+concise "LASSI reference\n" as L
+concise "LASSI signal\n" as L2
+
+scale 10 as 300 pixels
+
+@0
+C is "2D Slew" : (2.5)
+
+@+2.5
+C is AutoOOF : (14.5)
+
+@+14.5
+C is PeakFocus : (3.2)
+
+@+3.2
+C is "2D slew" : (2.5)
+
+@+2.5
+C is "Observing" : SCIENCE!
+
+@0
+L is "2D Slew" : (2.5)
+
+@+2.5
+L is AutoOOF : (14.5)
+
+@+14.5
+L is PeakFocus : (3.2)
+
+@+3.2
+L is TLS : (3.0)
+
+@+3
+L is "2D slew" : (2.5)
+
+@+2.5
+L is "Observing" : SCIENCE!
+L -> C
+
+@0
+L2 is "1D slew" : (1.77)
+
+@+1.77
+L2 is TLS : (3.0)
+
+@+3
+L2 is "LASSI process" : (~7.0)
+
+@+7
+L2 is "2D slew" : (2.5)
+
+@+2.5
+L2 is PeakFocus : (3.2)
+
+@+3.2
+L2 is "2D slew" : (2.5)
+
+@+2.5
+L2 is Observing : SCIENCE!
+L2 -> C
+@enduml

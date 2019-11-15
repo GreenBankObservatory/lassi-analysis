@@ -260,10 +260,14 @@ def smoothGPUs(gpuPath,
     
     # get ssh credentials and target
     user = os.getlogin()
+
     if host is None:
         host = settings.GPU_HOST
 
-    cmd = "runGpuSmooth %s %s %s %s %s %d %1.5f" % (gpuPath, user, host, inFile, outFile, n, sigAzEl)
+    scriptDir = os.path.dirname(os.path.realpath(__file__))
+    
+    cmd = "%s/runGpuSmooth %s %s %s %s %s %d %1.5f" % (scriptDir, gpuPath, user, host, inFile, outFile, n, sigAzEl)
+    
     # cmd = "runGpuSmooth %s %s %s %d %1.5f" % (gpuPath, inFile, outFile, n, sigAzEl)
     # if sigAz is not None:
     #     cmd += " --sigAz %1.5f " % sigAz
