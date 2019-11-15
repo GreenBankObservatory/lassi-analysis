@@ -310,12 +310,14 @@ class TestProcessPTX(unittest.TestCase):
 
         xOffset = SETTINGS_27MARCH2019['xOffset']
         yOffset = SETTINGS_27MARCH2019['yOffset']
+        radius = SETTINGS_27MARCH2019['radius']
         rot = SETTINGS_27MARCH2019['rot']
+
+        ellipse = [xOffset, yOffset, radius, radius, 0]
 
         # remove as little data as possible
         xyz, _ = processNewPTXData(ls,
-                                   xOffset=xOffset,
-                                   yOffset=yOffset,
+                                   ellipse=ellipse,
                                    rot=rot,
                                    plotTest=False,
                                    nFilter=False,
@@ -328,14 +330,12 @@ class TestProcessPTX(unittest.TestCase):
 
         # OK, do it again, but with the sensible filters on
         xyz, _ = processNewPTXData(ls,
-                                   xOffset=xOffset,
-                                   yOffset=yOffset,
+                                   ellipse=ellipse,
                                    rot=rot,
                                    plotTest=False,
                                    nFilter=True,
                                    iFilter=True,
                                    rFilter=True,
-                                   filterClose=False,
-                                   ellipse=[xOffset, yOffset, 45.5, 45.5, 0.])        
+                                   filterClose=False)        
 
         self.assertEqual(len(xyz), 6928318)

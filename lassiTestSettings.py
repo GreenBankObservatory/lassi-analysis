@@ -6,6 +6,7 @@ SETTINGS_27MARCH2019 = {
     'xOffset': -8.0,
     'yOffset': 50.0,
     'rot': -10.0,
+    'radius': 45.5,
     }
 """
 These are the settings used to extract the scans during development.
