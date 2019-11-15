@@ -47,7 +47,7 @@ def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFit
         radialMask = False
     else:
         radialMask = True
-        
+
     print('Masking file: {}'.format(refScanFile))
     ref_data = maskLeicaData(refScanFile, n=n, guess=pFitGuess, radialMask=radialMask, maskRadius=rMaskRadius)
 
@@ -457,6 +457,7 @@ def processLeicaScan(fpath,
                      rot=None,
                      xOffset=None,
                      yOffset=None,
+                     radius=None,
                      sampleSize=None,
                      parabolaFit=None,
                      useFittingWeights=False,
@@ -499,6 +500,7 @@ def processLeicaScan(fpath,
                     rot=rot,
                     xOffset=xOffset,
                     yOffset=yOffset,
+                    radius=radius,
                     rFilter=True,
                     iFilter=False,
                     parabolaFit=parabolaFit,
