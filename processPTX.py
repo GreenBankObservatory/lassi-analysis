@@ -1,6 +1,7 @@
 import sys
 import os
 import random
+import warnings
 from copy import copy
 
 # import matplotlib
@@ -399,8 +400,6 @@ def ellipticalFilter(x, y, z, xOffset, yOffset, bMaj, bMin, angle, dts=None):
 
 def processNewPTXData(lines,
                       dts=None,
-                      xOffset=None,
-                      yOffset=None,
                       plotTest=True,
                       rot=None,
                       sampleSize=None,
@@ -417,20 +416,15 @@ def processNewPTXData(lines,
 
     if rot is None:
         rot = -90.0
-    if xOffset is None:
-        xOffset = -8.0
-    if yOffset is None:    
-        yOffset = 50.0
-    if radius is None:
-        radius = 45.5
+    if ellipse is None:
+        warnings.warn("No ellipse given. Will use default values.")
+        ellipse=[-8., 50., 49., 49., 0.]
 
     print("ProcessNewPTXData with: ", ellipse)
-    #print(("ProcessNewPTXData with: ", xOffset, yOffset, rot, radius))
 
     if plotTest:
         # make some plots that ensure how we are doing
         # our radial filtering
-        #tryOffsets(lines, xOffset, yOffset, radius)
         tryEllipticalOffsets(lines, ellipse)
 
     # get the actual float values from the file contents
@@ -643,8 +637,6 @@ def processNewPTX(fpath,
                   useTimestamps=False,
                   convertToDatetimes=False,
                   rot=None,
-                  xOffset=None,
-                  yOffset=None,
                   sampleSize=None,
                   simSignal=None,
                   iFilter=False,
@@ -667,8 +659,6 @@ def processNewPTX(fpath,
     xyz, dts = processNewPTXData(ls,
                             dts=dts,
                             rot=rot,
-                            xOffset=xOffset,
-                            yOffset=yOffset,
                             radius=radius,
                             sampleSize=sampleSize,
                             simSignal=simSignal,

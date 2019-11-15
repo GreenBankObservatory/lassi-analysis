@@ -320,9 +320,6 @@ def OLDsmoothWithWeights(fpath, N=512):
 def processLeicaScan2(fpath,
                      N=512,
                      rot=None,
-                     xOffset=None,
-                     yOffset=None,
-                     radius=None,
                      filterClose=True,
                      sampleSize=None,
                      parabolaFit=None,
@@ -359,11 +356,6 @@ def processLeicaScan2(fpath,
     s = time.time()
 
     # removes headers, does basic rotations, etc.
-    if xOffset is None:
-        xOffset = -8.
-        #xOffset = -6.
-    if yOffset is None:
-        yOffset = 50.0
     if rot is None:
         rot = 0.
     
@@ -373,9 +365,6 @@ def processLeicaScan2(fpath,
         print("Processing PTX file ...")
         xyz, dts = processNewPTX(fpath,
                     rot=rot,
-                    xOffset=xOffset,
-                    yOffset=yOffset,
-                    radius=radius,
                     rFilter=True,
                     iFilter=False,
                     parabolaFit=parabolaFit,
