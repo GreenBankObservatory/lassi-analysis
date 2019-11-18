@@ -73,7 +73,6 @@ def smoothGPUParallel(inFile, N, test=False):
 
     assert len(gpuPaths) == len(gpuHosts)
 
-    numGpus = len(gpuHosts)
 
     cmds = smoothGPUMultiFile(gpuPaths, gpuHosts, abspath, outFile, N, test=test)
 
@@ -81,6 +80,12 @@ def smoothGPUParallel(inFile, N, test=False):
     if test:
         print ("Tested with commands", cmds)
         return None
+
+    return loadParallelGPUFiles(outFile, gpuPaths)
+
+def loadParallelGPUFiles(outFile, gpuPaths):
+
+    numGpus = len(gpuPaths)
 
     # now collect the multiple results into one
     outfiles = []
