@@ -444,9 +444,7 @@ def processLeicaScan2(fpath,
 def processLeicaScan(fpath,
                      N=512,
                      rot=None,
-                     xOffset=None,
-                     yOffset=None,
-                     radius=None,
+                     ellipse=[-8., 50., 49., 49., 0.],
                      sampleSize=None,
                      parabolaFit=None,
                      useFittingWeights=False,
@@ -471,11 +469,6 @@ def processLeicaScan(fpath,
 
     # removes headers, does basic rotations, etc.
     print("Processing PTX file ...")
-    if xOffset is None:
-        xOffset = -8.
-        #xOffset = -6.
-    if yOffset is None:    
-        yOffset = 50.0
     if rot is None:
         rot = 0.
     processedPath = fpath + ".csv"
@@ -486,16 +479,14 @@ def processLeicaScan(fpath,
     # else:
     if True:
         xyz, dts = processNewPTX(fpath,
-                    rot=rot,
-                    xOffset=xOffset,
-                    yOffset=yOffset,
-                    radius=radius,
-                    rFilter=True,
-                    iFilter=False,
-                    parabolaFit=parabolaFit,
-                    simSignal=simSignal,
-                    sampleSize=sampleSize,
-                    addOffset=addOffset)
+                                 rot=rot,
+                                 ellipse=ellipse,
+                                 rFilter=True,
+                                 iFilter=False,
+                                 parabolaFit=parabolaFit,
+                                 simSignal=simSignal,
+                                 sampleSize=sampleSize,
+                                 addOffset=addOffset)
 
     e = time.time()
     print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
