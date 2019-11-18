@@ -1,3 +1,4 @@
+import pickle
 
 DATA_27MARCH2019 = "/home/sandboxes/jbrandt/Telescope27Mar2019"
 SCAN9 = "Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx"
@@ -35,7 +36,6 @@ SETTINGS_10OCTOBER2019 = {
     'rot': 80.0,
     'radius': 49.0,
     'dataPath': '/home/sandboxes/pmargani/LASSI/data/9oct2019'
-
     }
 SETTINGS_11OCTOBER2019 = {
     'xOffset': -44.0,
@@ -46,3 +46,28 @@ SETTINGS_11OCTOBER2019 = {
     }
 
 DATA_UNIT_TESTS = "/home/scratch/pmargani/LASSI/unitTestData/"
+
+def getData(settings):
+
+    xOffset = settings['xOffset']
+    yOffset = settings['yOffset']
+    radius = settings['radius']
+    rot = settings['rot']
+
+    ellipse = [xOffset, yOffset, radius, radius, 0]
+
+    return ellipse, rot
+
+def get27mar2019data():
+    return getData(SETTINGS_27MARCH2019)
+
+def get10oct2019scans():
+    "Returns the dictionary that describes scans for these tests"
+
+    d= None
+
+    # this pickle file was made in Python 2, so be carefule with strings
+    with open('scannerTests/lassiScans9oct2019.pickle', 'rb') as f:
+        d = pickle.load(f, emcoding='latin1')
+
+    return d
