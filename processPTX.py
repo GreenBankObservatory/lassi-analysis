@@ -403,7 +403,6 @@ def processNewPTXData(lines,
                       plotTest=True,
                       rot=None,
                       sampleSize=None,
-                      parabolaFit=None,
                       simSignal=None,
                       iFilter=False,
                       nFilter=True,
@@ -547,7 +546,7 @@ def processNewPTXData(lines,
         newNum = xyz.shape[0]
         print("Removed {0:.0f} points closer than {1:.2f} m from the scanner.".format((orgNum - newNum), tooClose))
 
-    # If we want all points to be positive.
+    # If we want all points to have positive x and y coordinates.
     # This avoids the harmless distortion of the guitar pick.
     if addOffset:
         xmin = np.nanmin(xyz[:,0])
@@ -558,31 +557,6 @@ def processNewPTXData(lines,
         if ymin <= 0:
             print("Translating y axis.")
             xyz[:,1] -= ymin - 10.
-
-    # We should get rid of this.
-    # We do not use it ever.
-    if parabolaFit is not None:
-        pTol = 0.4
-        print("Using parabola fit to filter: ", parabolaFit)
-        x, y, z = splitXYZ(xyz)
-        orgLenX = len(x)
-        focus, v1x, v1y, v2 = parabolaFit
-        zPar = parabola(x, y, focus, v1x, v1y, v2)
-        res = z - zPar
-        scatter3dPlot(x, y, res, "sample of residuals from parabola fit", sample=0.1)
-        parMask = np.abs(res) < pTol 
-        x = x[parMask]
-        y = y[parMask]
-        z = z[parMask]
-        if dts is not None:
-            dts = dts[parMask]
-        xyz = aggregateXYZ(x, y, z)
-        res = res[parMask]
-        numFiltered = orgLenX - len(x)
-        print("After rejecting %d outliers (> %f), residuals look like:" % (numFiltered, pTol))
-        print("mean: %f, std: %f" % (np.mean(res), np.std(res)))
-        print("Now we have %d lines of data" % len(xyz))
-        scatter3dPlot(x, y, res, "residuals from parabola fit (no outliers)", sample=0.1)
 
     if plotTest:
         # we plotted stuff earlier, so let's get
@@ -638,9 +612,7 @@ def processNewPTX(fpath,
                   convertToDatetimes=False,
                   rot=None,
                   sampleSize=None,
-                  simSignal=None,
                   iFilter=False,
-                  parabolaFit=None,
                   radius=None,
                   rFilter=True,
                   addOffset=False,
@@ -668,13 +640,6 @@ def processNewPTX(fpath,
                             addOffset=addOffset,
                             filterClose=filterClose,
                             ellipse=ellipse)
-
-    # TBF: the old interface expects this 
-    # in a different format
-    # xyz = []
-    # for i in range(len(x)):
-    #     xyz.append((x[i], y[i], z[i]))
-    # xyz = np.array(xyz)
 
     # write to CSV file
     outf = fpath + ".csv"
