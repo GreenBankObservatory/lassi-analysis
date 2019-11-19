@@ -107,7 +107,7 @@ def loadParallelGPUFiles(outFile, gpuPaths):
             outfiles.append(dimPath)
             print(dimPath)
             assert os.path.isfile(dimPath)
-            print(("GPUs created file: ", dimPath))
+            print("GPUs created file: ", dimPath)
         # now load the data using the base name shared by all dimensions
         if numGpus == 1:    
             loadFile = os.path.join(gpuPath, outFile)    
@@ -196,7 +196,8 @@ def smoothGPUMulti(gpuPaths,
 
     numParts = len(gpuPaths)
 
-    gpuMultiScript = "runGpuParts"
+    scriptDir = os.path.dirname(os.path.realpath(__file__))
+    gpuMultiScript = "{0}/runGpuParts".format(scriptDir)
 
     # first just try it with two GPUs
     user = os.getlogin()
