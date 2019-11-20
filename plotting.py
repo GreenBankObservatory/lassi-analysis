@@ -18,7 +18,7 @@ def surfacePlot(x, y, z, vmin=-5e-3, vmax=5e-3):
     cb = plt.colorbar(im)
 
     ax.minorticks_on()
-    ax.tick_params('both', direction='in', top=True, right=True, bottom=True, left=True)
+    ax.tick_params('both', which='both', direction='in', top=True, right=True, bottom=True, left=True)
 
     ax.set_xlabel('x axis (m)')
     ax.set_ylabel('y axis (m)')
