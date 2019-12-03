@@ -9,6 +9,7 @@ import numpy as np
 import msgpack_numpy
 import inspect
 from datetime import datetime
+import sys
 
 CONTROL_PORT=':55560'
 DATAPUB_PORT=':55562'
@@ -23,6 +24,7 @@ RESOLUTIONTOTEXT = { 0: "500mm@100m", 1: "250mm@100m", 2:"125mm@100m", \
 SENSITIVITYTOTEXT = {0: "Normal", 1: "High" }
 SCANMODETOTEXT = {0: "Speed", 1: "Range", 2: "Medium Range", 3: "Long Range" }
 
+
 def mycb(a, b):
     if a in "OK_STATUS":
         print("\nScanner State=", b.state)
@@ -31,10 +33,10 @@ def mycb(a, b):
 
 class OKStatus:
     def __init__(self, g):
-        self.error_msg = g[0]
+        self.error_msg = g[0].decode()
         self.is_ok = g[1]
         self.scan_number = g[2]
-        self.state = g[3]
+        self.state = g[3].decode()
         self.state_id = g[4]
 
     def __str__(self):
@@ -65,7 +67,7 @@ class ScanHeaderInfo:
             self.scan_number = int(g[4])
             ns_since_1970 = int(g[5])
             self.scan_time = datetime.fromtimestamp(ns_since_1970/1.0E9) # DateTime from long
-            self.tls_project = g[6]
+            self.tls_project = g[6].decode()
             resolution = int(g[7])
             if resolution in RESOLUTIONTOTEXT.keys():
                 self.tls_resolution = RESOLUTIONTOTEXT[resolution]
@@ -78,6 +80,7 @@ class ScanHeaderInfo:
             sensitivity = int(g[10]) # convert to string
             if sensitivity in SENSITIVITYTOTEXT.keys():
                 self.tls_sensitivity = SENSITIVITYTOTEXT[sensitivity]
+            self.tls_tilt_compensator = int(g[11])
 
     def __str__(self):
         """
@@ -96,9 +99,10 @@ class ScanHeaderInfo:
         scan_mode = %s
         tls_serial_number = %d
         sensitivity = %s
+        tls_tilt_compensator = %d
         """ % (self.center_az, self.center_el, self.fov_az, self.fov_el, self.scan_number, \
                self.scan_time, self.tls_project, self.tls_resolution, self.tls_scan_mode, \
-               self.tls_serial_number, self.tls_sensitivity)
+               self.tls_serial_number, self.tls_sensitivity, self.tls_tilt_compensator)
         return s
 
 
@@ -209,7 +213,14 @@ class TLSaccess(object):
         print("""export_csv_results(filename)""")
         print(self.export_csv_results.__doc__)
 
-      
+        print("""list_projects()""")
+        print(self.list_projects.__doc__)
+
+        print("""list_scan_names(project_name)""")
+        print(self.list_scan_names.__doc__)
+
+        print("""export_scan_from_project(project, scan)""")
+        print(self.export_scan_from_project.__doc__)
 
     def parse_OKStatus(self, msg):
         if msg is None:
@@ -218,6 +229,13 @@ class TLSaccess(object):
         kk = msgpack.unpackb(msg[1])
         status = OKStatus(kk)
         return status
+
+    def parse_listScans(self, msg):
+        bin_scanlist = msgpack.unpackb(msg[1])
+        scanlist = []
+        for k in bin_scanlist:
+            scanlist.append(k.decode())
+        return scanlist
 
     def encode_MoveAz(self, azcmd):
         return msgpack.packb([azcmd], use_bin_type=True)
@@ -229,16 +247,22 @@ class TLSaccess(object):
         #Note: this order must match the ordering in lassi_daq
         return msgpack.packb([ctr_az, ctr_el, fov_az, fov_el, project, res, mode, sensitivity])
 
-    def simple_cmd(self, cmd):
-        self.csock.send_string(cmd)
+    def simple_cmd(self, cmd, args=None):
+        if args is None:
+            self.csock.send_string(cmd)
+        else:
+            self.csock.send_string(cmd, zmq.SNDMORE)
+            for i in range(0,  len(args)):
+                if i < len(args)-1:
+                    self.csock.send_string(args[i], zmq.SNDMORE)
+                else:
+                    self.csock.send_string(args[i])
+
         rtn = self.csock.recv_multipart()
         return self.parse_OKStatus(rtn)
 
-    def encode_string(self, string):
-        return msgpack.packb([string])
 
     # API methods below
-
     def configure_scanner(self, project, resolution, sensitivity, scan_mode, center_az, center_el, fov_az, fov_el):
         """
         Sends a configuration to the scanner. Fields are:
@@ -291,7 +315,7 @@ class TLSaccess(object):
 
         msg = self.encode_Config(project, _resolution, _sensitivity, _scan_mode, \
                                  center_az, center_el, fov_az, fov_el)
-        self.csock.send('Configure', zmq.SNDMORE)
+        self.csock.send_string('Configure', zmq.SNDMORE)
         self.csock.send(msg)
 
         rtn = self.csock.recv_multipart()
@@ -304,7 +328,7 @@ class TLSaccess(object):
         returns an OKStatus object
         """
         msg = self.encode_MoveAz(az)
-        self.csock.send('MoveAz', zmq.SNDMORE)
+        self.csock.send_string('MoveAz', zmq.SNDMORE)
         self.csock.send(msg)
 
         rtn = self.csock.recv_multipart()
@@ -318,7 +342,7 @@ class TLSaccess(object):
             print(a.get_status().scan_number) also works.
         """
         msg = self.encode_ScanNumber(scannum)
-        self.csock.send('SetScanNumber', zmq.SNDMORE)
+        self.csock.send_string('SetScanNumber', zmq.SNDMORE)
         self.csock.send(msg)
 
         rtn = self.csock.recv_multipart()
@@ -374,8 +398,41 @@ class TLSaccess(object):
         """
         # clear the buffer first!
         self.results.clear()
-        
         return self.simple_cmd("Export")
+
+    def export_scan_from_project(self, project, scan):
+        """
+        Sends the command to publish a specific scan from a specific project
+        :param project: string name of project
+        :param scan: string name of scan e.g 'Scan-21'
+        :return: returns an OKStatus object
+        """
+        self.results.clear()
+        return self.simple_cmd('ExportScanFromProject', [project, scan])
+
+    def list_scan_names(self, project_name):
+        """
+        Requests a list of the scans in project named project_name.
+        Use list_projects() to query the available projects.
+        :param project_name: string, name of project on scanner
+        :return: list of string scan names
+        """
+        self.csock.send_string('ListScansFromProject', zmq.SNDMORE)
+        self.csock.send_string(project_name)
+
+        rtn = self.csock.recv_multipart()
+        scans = self.parse_listScans(rtn)
+        return scans
+
+    def list_projects(self):
+        """
+        Query the scanner for a list of the stored project names on the TLS.
+        :return: list of string project names
+        """
+        self.csock.send_string('ListProjects')
+        rtn = self.csock.recv_multipart()
+        projects = self.parse_listScans(rtn)
+        return projects
 
     def save_result(self, frame_type, data):
         """
@@ -727,7 +784,7 @@ class TLSaccess(object):
 
                 # sytactic sugar
                 subsock = self.subsock
-                subsock.setsockopt(zmq.SUBSCRIBE, "HEADER")
+                subsock.setsockopt(zmq.SUBSCRIBE, "".encode())
 
                 while not self.end_thread:
                     event = poller.poll(200)
@@ -780,7 +837,7 @@ class TLSaccess(object):
 
                         if sock == subsock:
                             msg = subsock.recv_multipart()
-                            message_header = msg[0]
+                            message_header = msg[0].decode()
                             # print("KEY=", message_header)
                             if message_header in "OK_STATUS":
                                 status = self.tls_access.parse_OKStatus(msg)
@@ -799,8 +856,13 @@ class TLSaccess(object):
 
                                 self.tls_access.hdr_info = ScanHeaderInfo(msgpack.unpackb(msg[1]))
                                 self.tls_access.save_result(message_header, self.tls_access.hdr_info)
+                                if self.tls_access.hdr_info.tls_tilt_compensator != 0:
+                                    print("******** ERROR **********")
+                                    print("** Tilt Compensator is ON **")
+                                    print("This will cause bad data when used in inverted position - you have been warned")
+                                    print("*************************")
                                 for i in range(2, len(msg), 2):
-                                    key = msg[i]
+                                    key = msg[i].decode()
                                     if key in self.tls_access.array_names:
                                         numpy_array = msgpack.unpackb(msg[i+1], object_hook=msgpack_numpy.decode)
                                         self.tls_access.save_result(key, numpy_array)
@@ -823,9 +885,9 @@ class TLSaccess(object):
                 #print 'In subscriber thread, exception zmq.core.error.ZMQError:', e
                 print("pipe_url:", self.pipe_url)
                 print(" pub_url:", self.pub_url)
-            except BaseException as e:
-                print("Exception in subscriber thread ", e)
-                self.end_thread = True
+            # except BaseException as e:
+            #     print("Exception in subscriber thread ", e)
+            #     self.end_thread = True
 
             finally:
                 print("TLSaccess: Ending subscriber thread.")
