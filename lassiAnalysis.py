@@ -27,6 +27,7 @@ from simulateSignal import zernikeFive, gaussian
 from plotting import sampleXYZData, scatter3dPlot
 from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits, splitXYZ
 from weightSmooth import weightSmooth
+from SmoothedFITS import SmoothedFITS
 import settings
 
 # where is the code we'll be running?
@@ -80,8 +81,9 @@ def processLeicaDataStream(x,
     x, y, z = smoothGPUParallel(processedPath, N)
 
     # save this off for later use
-    # fitsio = SmoothedDataFITS(x, y, z, hdr, dataDir, project, filename)
-    # fitsio.write()
+    fitsio = SmoothedFITS()
+    fitsio.setData(x, y, z, N, hdr, dataDir, project, filename)
+    fitsio.write()
 
     # create a visual for validation purposes
 

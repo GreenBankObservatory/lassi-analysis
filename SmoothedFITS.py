@@ -9,7 +9,8 @@ class SmoothedFITS:
     This class is responsible for writting the product of the spherical
     smoothing to a simple FITS file
     """
-    def __init__(self,
+
+    def setData(self,
                  x,
                  y,
                  z,
@@ -75,7 +76,19 @@ class SmoothedFITS:
         # finally, write to disk
         hdul.writeto(self.getFilePath())
 
-def main():
+    def read(self, filepath):
+
+        hdus = fits.open(filepath)
+
+        self.hdr = hdus[0].header
+
+        data = hdus[1].data
+
+        self.x = data.field('x')
+        self.y = data.field('y')
+        self.z = data.field('z')
+
+def tryWrite():
     "simple test"
     N = 3
     x = np.zeros((N, N))
@@ -86,8 +99,18 @@ def main():
     proj = "TEST"
     filenameBase = "test"
 
-    f = SmoothedFITS(x, y, z, N, hdr, dataDir, proj, filenameBase)
+    f = SmoothedFITS()
+    f.setData(x, y, z, N, hdr, dataDir, proj, filenameBase)
     f.write()
 
+def tryRead():
+    fn = "/home/sandboxes/pmargani/LASSI/data/TEST/LASSI/test.smoothed.fits"
+    f = SmoothedFITS()
+    f.read(fn)
+    print (f.x.shape)
+    print (f.hdr)
+    print (f.hdr['N'])
+    
 if __name__ == '__main__':
-    main()
+    # main()
+    tryRead()
