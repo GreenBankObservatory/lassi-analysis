@@ -17,7 +17,7 @@ import opticspy
 from astropy.stats import sigma_clip
 
 from zernikies import getZernikeCoeffs
-from processPTX import processPTX, processNewPTX, aggregateXYZ
+from processPTX import processPTX, processNewPTX, processNewPTXData, aggregateXYZ
 from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus,  smoothGPUParallel
 from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
                       newParabola, rotateData, parabola
@@ -31,6 +31,61 @@ import settings
 
 # where is the code we'll be running?
 GPU_PATH = settings.GPU_PATH
+
+def processLeicaDataStream(x,
+                           y,
+                           z,
+                           i,
+                           dts,
+                           hdr,
+                           ellipse,
+                           rot,
+                           project,
+                           dataDir,
+                           filename):
+    """
+    x, y, z: data streamed from scanner
+    i: intensity values
+    dts: datetime values
+    hdr: header dictionary from scanner stream
+    ellipse: used for filtering data (dependent on scanner position)
+    dataDir: where data files get written to (eg, /home/gbtdata)
+    project: same sense as GBT project (eg, TGBT19A_500_01)
+    filename: basename of file products (eg, 2019_09_26_01:35:43)
+    """
+
+    # do basic processing first: remove bad data, etc.
+    # TBF: backwards compatible (bad) interface
+    lines = None
+    xyzi = (x, y, z, i)
+    xyz, dts = processNewPTXData(lines,
+                                 xyzi=xyzi,
+                                 rot=rot,
+                                 ellipse=ellipse,
+                                 rFilter=True,
+                                 iFilter=False)
+
+
+    # TBF: refactor the GPU interface to not use files.
+    # for now we need to create this file as input to GPUs
+    fpathBase = os.path.join(dataDir, project, filename)
+    processedPath = "%s.csv" % fpathBase
+    print ("writing filtered data to CSV file: ", processedPath)
+    np.savetxt(processedPath, xyz, delimiter=",")
+
+    # We can lower this for testing purposes
+    # N = 512
+    N = 100
+
+    x, y, z = smoothGPUParallel(processedPath, N)
+
+    # save this off for later use
+    # fitsio = SmoothedDataFITS(x, y, z, hdr, dataDir, project, filename)
+    # fitsio.write()
+
+    # create a visual for validation purposes
+
+    # and save it off for use in GFM later
 
 def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.):
     """
