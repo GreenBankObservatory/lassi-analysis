@@ -105,6 +105,22 @@ class ScanHeaderInfo:
                self.tls_serial_number, self.tls_sensitivity, self.tls_tilt_compensator)
         return s
 
+    def asdict(self):
+        d = {
+            "center_az" : self.center_az,
+            "center_el" : self.center_el,
+            "fov_az" : self.fov_az,
+            "fov_el" : self.fov_el,
+            "scan_number": self.scan_number,
+            "scan_time": self.scan_time,
+            "project": self.tls_project,
+            "resolution" : self.tls_resolution,
+            "scan_mode" : self.tls_scan_mode,
+            "tls_serial_number" : self.tls_serial_number,
+            "sensitivity" : self.tls_sensitivity,
+            "tls_tilt_compensator" : self.tls_tilt_compensator
+        }
+        return d
 
 class TLSaccess(object):
     def __init__(self, scanner_host):

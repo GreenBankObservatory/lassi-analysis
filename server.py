@@ -84,7 +84,7 @@ def processing(state, results):
     z = results['Z_ARRAY']
     i = results['I_ARRAY']
     dts = results['TIME_ARRAY']
-    hdr = results['HEADER']
+    hdr = results['HEADER'].asdict()
 
     # then being processing
     lines = None
@@ -140,7 +140,7 @@ def processing(state, results):
     # if this is a ref scan we are done
 
     # if it is a signal scan, we need to compute Zernike's
-    
+
 def process(state):
     print("starting process, with state: ", state.value)
  
