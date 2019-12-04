@@ -2,11 +2,16 @@
 import zmq
 import random
 import sys
+import os
 import time
 from multiprocessing import Process, Value
 
+import numpy  as np
+
+import lassiTestSettings as settings
 from ops.pyTLS import TLSaccess
-from processPTX import processNewPTXData
+from processPTX import getRawXYZ
+from lassiAnalysis import processLeicaDataStream
 
 # states
 READY = 0 #"READY"
@@ -79,15 +84,54 @@ def processing(state, results):
     z = results['Z_ARRAY']
     i = results['I_ARRAY']
     dts = results['TIME_ARRAY']
+    hdr = results['HEADER']
 
     # then being processing
-    lines=None
-    xyzi=(x, y, z, i)
+    lines = None
+    xyzi = (x, y, z, i)
 
-    xyz, dts = processNewPTXData(lines,
-                      xyzi=xyzi,
-                      dts=dts,
-                      plotTest=False)
+    # xyz, dts = processNewPTXData(lines,
+    #                   xyzi=xyzi,
+    #                   dts=dts,
+    #                   plotTest=False)
+
+    s = settings.SETTINGS_27MARCH2019
+
+    test = True
+    if test:
+        # read data from previous scans
+        path = s['dataPath']
+        fn = settings.SCAN9
+
+        fpath = os.path.join(path, fn)
+        with open(fpath, 'r') as f:
+            ls = f.readlines()
+
+        # finally, substitue the data!
+        x, y, z, i = getRawXYZ(ls)
+
+        # fake the datetimes
+        dts = np.zeros(len(x))
+    
+    # TBF: in production this might come from config file?        
+    ellipse, rot = settings.getData(s)
+
+    # TBF: we'll get these from the manager
+    proj = "TEST"
+    dataDir = "/home/sandboxes/pmargani/LASSI/data"
+    filename = "test"
+
+    processLeicaDataStream(x,
+                           y,
+                           z,
+                           i,
+                           dts,
+                           hdr,
+                           ellipse,
+                           rot,
+                           proj,
+                           dataDir,
+                           filename)
 
     # any more processing?
 
@@ -96,6 +140,7 @@ def processing(state, results):
     # if this is a ref scan we are done
 
     # if it is a signal scan, we need to compute Zernike's
+    
 def process(state):
     print("starting process, with state: ", state.value)
  
