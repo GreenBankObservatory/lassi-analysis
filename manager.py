@@ -5,7 +5,7 @@ import time
 
 from ops.pyTLS import TLSaccess
 
-def runScan():
+def runScan(config):
 
     a = TLSaccess("lassi.ad.nrao.edu")
 
@@ -17,7 +17,8 @@ def runScan():
         status = a.get_status()
 
     # configure
-    proj = "test"
+
+    proj = config["proj"] #"test"
     res = "63mm@100m"
     sensitivity = "Normal"
     scan_mode = "Speed"
@@ -51,26 +52,67 @@ def runScan():
     socket.send_string("get_state")
     msg = socket.recv()
     print ("process server state: ", msg)
+    time.sleep(1)
 
+    socket.send_string("set:proj=cat")
+    msg = socket.recv()
+    print ("server response: ", msg)
+    time.sleep(1)
+
+    # set the meta-data
+    for k, v in config.items():
+        cmd = "set:%s=%s" % (k, v)
+        print(cmd)
+        socket.send_string(cmd)
+        msg = socket.recv()
+        print ("server set response: ", msg)
+        time.sleep(1)
+
+    # start processing
     socket.send_string("process")
     msg = socket.recv()
+    msgStr = "".join( chr(x) for x in msg)
     print ("process server response: ", msg)
 
-    while True:
+    time.sleep(3)
+
+    sec = 0
+    while msgStr != "Ready":
+    # while True:
         try:
             # status = a.get_status()
             # print ("scanner state: ", status.state)
             # see what state the server is in
             socket.send_string("get_state")
             msg = socket.recv()
+            msgStr = "".join( chr(x) for x in msg)
             print ("process server state: ", msg)
             time.sleep(1)
+            sec += 1
+            print(sec)
         except KeyboardInterrupt:
             # a.cntrl_exit()
             break
 
+    print ("done processing Scan")
+
 def main():
-    runScan()
+    c = {
+        "proj": "TEST",
+        "scanNum": 1,
+        "refScan": "True",
+        "refScanNum": 0,
+        "filename": "1"
+    }
+    runScan(c)
+    u = {
+        "scanNum": 2,
+        "refScan": "False",
+        "refScanNum": 1,
+        "filename": "2"
+    }
+    c.update(u)
+    runScan(c)
 
 if __name__ == '__main__':
     main()

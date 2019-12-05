@@ -30,6 +30,12 @@ stateMap = {
 
 state = Value('i', READY)
 
+proj = None
+scanNum = None
+refScan = True
+refScanNum = None
+filename = None
+
 # connect to the scanner
 # a = TLSaccess("lassi.ad.nrao.edu")
 
@@ -71,7 +77,7 @@ def waitForData(state, a):
 
 
 
-def processing(state, results):
+def processing(state, results, proj, scanNum, refScan, refScanNum, filename):
     state.value = PROCESSING
     print(stateMap[PROCESSING])
 
@@ -85,6 +91,12 @@ def processing(state, results):
     i = results['I_ARRAY']
     dts = results['TIME_ARRAY']
     hdr = results['HEADER'].asdict()
+
+    # update the header with more metadata
+    hdr['mc_project'] = proj
+    hdr['mc_scan'] = scanNum
+    hdr['REF'] = refScan
+    hdr['REFSCAN'] = refScanNum
 
     # then being processing
     lines = None
@@ -117,9 +129,9 @@ def processing(state, results):
     ellipse, rot = settings.getData(s)
 
     # TBF: we'll get these from the manager
-    proj = "TEST"
+    # proj = "TEST"
     dataDir = "/home/sandboxes/pmargani/LASSI/data"
-    filename = "test"
+    # filename = "test"
 
     processLeicaDataStream(x,
                            y,
@@ -134,14 +146,18 @@ def processing(state, results):
                            filename)
 
     # any more processing?
+    if refScan:
+        # if this is a ref scan we are done
+        print("This is a ref scan, we are done")
+        return
 
-    # right processed results to FITS file?
 
-    # if this is a ref scan we are done
+    # if it is a signal scan, we
+    # need to compute Zernike's
+    # find the previous refscan:
+    print("look for file for scan", refScanNum)
 
-    # if it is a signal scan, we need to compute Zernike's
-
-def process(state):
+def process(state, proj, scanNum, refScan, refScanNum, filename):
     print("starting process, with state: ", state.value)
  
     a = TLSaccess("lassi.ad.nrao.edu")
@@ -150,7 +166,7 @@ def process(state):
     r = waitForData(state, a)
 
     a.cntrl_exit()
-    processing(state, r)
+    processing(state, r, proj, scanNum, refScan, refScanNum, filename)
 
     # done!
     state.value = READY
@@ -162,7 +178,7 @@ context = zmq.Context()
 socket = context.socket(zmq.PAIR)
 socket.bind("tcp://*:%s" % port)
 
-socket.send_string("Server ready for commands")
+# socket.send_string("Server ready for commands")
 p = None
 
 while True:
@@ -172,7 +188,8 @@ while True:
     if msg == b"process":
         if state.value == READY:
             print("processing!")
-            p = Process(target=process, args=(state, ))
+            p = Process(target=process, 
+                        args=(state, proj, scanNum, refScan, refScanNum, filename))
             p.start()
             #state.value = PROCESSING
             socket.send_string("Started Processing")
@@ -204,6 +221,18 @@ while True:
         else:
             key = ps[0]
             value = ps[1]
+            if key == 'proj':
+                proj = value
+            elif key == 'scanNum':
+                scanNum = int(value)
+            elif key == 'refScan':
+                refScan = value == 'True' 
+            elif key == 'refScanNum':
+                refScanNum = int(value)
+            elif key == 'filename':
+                filename = value
+            else:
+                print("unknonw key", key)                    
             socket.send_string("setting %s to %s" % (key, value))    
     else:
         socket.send_string("Dont' understand message")
