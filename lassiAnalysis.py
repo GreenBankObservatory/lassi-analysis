@@ -17,10 +17,12 @@ import opticspy
 from astropy.stats import sigma_clip
 
 from zernikies import getZernikeCoeffs
-from processPTX import processPTX, processNewPTX, processNewPTXData, aggregateXYZ
+from processPTX import processPTX, processNewPTX, processNewPTXData, aggregateXYZ, getRawXYZ
+
 from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus,  smoothGPUParallel
 from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
                       newParabola, rotateData, parabola
+
 from zernikeIndexing import noll2asAnsi, printZs
 from simulateSignal import addCenterBump, zernikeFour
 from simulateSignal import zernikeFive, gaussian
@@ -29,10 +31,73 @@ from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits, 
 from weightSmooth import weightSmooth
 from SmoothedFITS import SmoothedFITS
 import settings
+import lassiTestSettings as usettings
+from gpus import loadParallelGPUFiles
 
 # where is the code we'll be running?
 GPU_PATH = settings.GPU_PATH
 
+def tryFit():
+
+    N = 512
+    
+    # path = "/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1"
+    path = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
+    
+    # file = "Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
+    file = "452_2019-10-11_04:26:55.ptx.csv"
+    x, y, z = loadParallelGPUFiles(file, [path])
+
+    diff, x, y = fitLeicaScan(None, 
+                              xyz=(x, y, z),
+                              N=N,
+                              rFilter=False,
+                              weights=None)
+
+   
+    xr, yr, zr = regridXYZ(x, y, diff, N)
+    print("done")
+
+def tryProcessLeicaDataStream():
+
+    s = usettings.SETTINGS_27MARCH2019
+
+    test = True
+    if test:
+        # read data from previous scans
+        path = s['dataPath']
+        fn = usettings.SCAN9
+
+        fpath = os.path.join(path, fn)
+        with open(fpath, 'r') as f:
+            ls = f.readlines()
+
+        # finally, substitue the data!
+        x, y, z, i = getRawXYZ(ls)
+
+        # fake the datetimes
+        dts = np.zeros(len(x))
+    
+    # TBF: in production this might come from config file?        
+    ellipse, rot = usettings.getData(s)
+
+    # TBF: we'll get these from the manager
+    proj = "TEST"
+    dataDir = "/home/sandboxes/pmargani/LASSI/data"
+    filename = "test2"
+
+    hdr = {'test': 1}
+    processLeicaDataStream(x,
+                           y,
+                           z,
+                           i,
+                           dts,
+                           hdr,
+                           ellipse,
+                           rot,
+                           proj,
+                           dataDir,
+                           filename)        
 def processLeicaDataStream(x,
                            y,
                            z,
@@ -85,7 +150,20 @@ def processLeicaDataStream(x,
     fitsio.setData(x, y, z, N, hdr, dataDir, project, filename)
     fitsio.write()
 
+    return fitsio.getFilePath()
+
+    # TBF: we need to create a visual of the scan,
+    # but the fitting routine below for this
+    # only hangs now, even though unit tests pass
     # create a visual for validation purposes
+    # diff, x, y = fitLeicaScan(None, 
+    #                           xyz=(x, y, z),
+    #                           N=N,
+    #                           rFilter=False,
+    #                           weights=None)
+
+   
+    # xr, yr, zr = regridXYZ(x, y, diff, N)
 
     # and save it off for use in GFM later
 
@@ -1141,7 +1219,9 @@ def simulateSignal(sigFn,
 
 def main():
     fpath = "data/Baseline_STA10_HIGH_METERS.ptx"
-    processLeicaScan(fpath)
+    #processLeicaScan(fpath)
+    tryProcessLeicaDataStream()
+    #tryFit()
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,6 @@
 from copy import copy
 import random
+import os
 
 import numpy as np
 from scipy.optimize import least_squares
@@ -13,6 +14,8 @@ from mpl_toolkits.mplot3d import axes3d, Axes3D
 from utils.utils import sph2cart, cart2sph
 
 from rotate import *
+
+from SmoothedFITS import SmoothedFITS
 
 def parabola(xdata, ydata, focus, v1x, v1y, v2, heavy=False):
     if heavy:
@@ -218,7 +221,7 @@ def fitLeicaScan(fn,
 
     print("fitLeicaData xyz.shape: ", x.shape, y.shape, z.shape)
 
-    r = fitLeicaData(x, y, z, guess, weights=weights)
+    r = fitLeicaData(x, y, z, guess, weights=weights, verbose=True)
 
     # plot fitted data
     c = r.x
@@ -280,6 +283,8 @@ def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfe
 
     if method is None:
         if weights is None:
+            if verbose:
+                print ("Using method fitParabola")
             method = fitParabola
             args = (x .flatten(), y.flatten(), z.flatten())
         else:
@@ -317,8 +322,23 @@ def loadLeicaDataFromNumpy(fn):
     
     return (x, y, z), (xx, yy, zz)
 
+def loadSmoothedFits(fn):
+    f = SmoothedFITS()
+    f.read(fn)
+    return f.x, f.y, f.z
+
+    #return xyzs['x'], xyzs['y'], xyzs['z']
+
 def loadLeicaDataFromGpus(fn):
     "Crudely loads x, y, z csv files into numpy arrays"
+
+    # kluge:
+    # if this is a fits file, then 
+    # load from that
+    _, ext = os.path.splitext(fn)
+    if ext == ".fits":
+        print("processing fits file")
+        return loadSmoothedFits(fn)
 
     xyzs = {}
     dims = ['x', 'y', 'z']

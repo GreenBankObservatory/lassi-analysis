@@ -12,6 +12,9 @@ import lassiTestSettings as settings
 from ops.pyTLS import TLSaccess
 from processPTX import getRawXYZ
 from lassiAnalysis import processLeicaDataStream
+from lassiAnalysis import extractZernikesLeicaScanPair
+
+DATADIR = "/home/sandboxes/pmargani/LASSI/data"
 
 # states
 READY = 0 #"READY"
@@ -38,6 +41,26 @@ filename = None
 
 # connect to the scanner
 # a = TLSaccess("lassi.ad.nrao.edu")
+
+def getFITSFilePath(proj, filename):
+    return os.path.join(DATADIR, proj, "LASSI", filename + ".fits")
+
+def getRefScanFileName(scans, proj, refScanNum):
+
+    if proj not in scans:
+        print ("Proj not in scans: ", proj, scans.keys())
+        return None
+
+    if refScanNum not in scans[proj]:
+        print ("Scan not in proj: ", refScanNum, scans[proj].keys())
+        return None            
+
+    scan = scans[proj][refScanNum]
+    # assert scans[proj][scan]["refScan"]
+    # print(scans[proj][scan]["refScan"])
+    print(scan)
+
+    return scan['filepathSmoothed']
 
 def waitForScanEnd(state, a):
     print ("in WaitForScanEnd")
@@ -75,14 +98,24 @@ def waitForData(state, a):
     return a.get_results()
     # return None
 
-
-
-def processing(state, results, proj, scanNum, refScan, refScanNum, filename):
+def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, filename):
     state.value = PROCESSING
     print(stateMap[PROCESSING])
 
     # here we can finally process the data
     time.sleep(3)
+
+    test = True
+
+    if test:
+        results = {
+            'X_ARRAY': None,
+            'Y_ARRAY': None,
+            'Z_ARRAY': None,
+            'TIME_ARRAY': None,
+            'I_ARRAY': None,
+            'HEADER': {},
+        }
 
     # get x, y, z and intesity from results
     x = results['X_ARRAY']
@@ -90,7 +123,9 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, filename):
     z = results['Z_ARRAY']
     i = results['I_ARRAY']
     dts = results['TIME_ARRAY']
-    hdr = results['HEADER'].asdict()
+    hdrObj = results['HEADER']
+
+    hdr = hdrObj.asdict() if not test else {}
 
     # update the header with more metadata
     hdr['mc_project'] = proj
@@ -109,11 +144,13 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, filename):
 
     s = settings.SETTINGS_27MARCH2019
 
-    test = True
     if test:
         # read data from previous scans
         path = s['dataPath']
-        fn = settings.SCAN9
+
+        # determine which scan to read depending on
+        # whether this is a reference or signal scan
+        fn = settings.SCAN9 if refScan else settings.SCAN11
 
         fpath = os.path.join(path, fn)
         with open(fpath, 'r') as f:
@@ -130,10 +167,11 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, filename):
 
     # TBF: we'll get these from the manager
     # proj = "TEST"
-    dataDir = "/home/sandboxes/pmargani/LASSI/data"
+    # dataDir = "/home/sandboxes/pmargani/LASSI/data"
+    dataDir = DATADIR
     # filename = "test"
 
-    processLeicaDataStream(x,
+    fitsFile = processLeicaDataStream(x,
                            y,
                            z,
                            i,
@@ -155,18 +193,40 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, filename):
     # if it is a signal scan, we
     # need to compute Zernike's
     # find the previous refscan:
-    print("look for file for scan", refScanNum)
+    # print("look for file for scan", refScanNum)
+    sigScanFile = filename
+    N = 100
 
-def process(state, proj, scanNum, refScan, refScanNum, filename):
+    print("files: ", refScanFile, sigScanFile, fitsFile)
+
+    #testSig = '/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1/1.csv'
+    #testRef = '/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1/2.csv'
+    # extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.)
+    # extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=N, nZern=36)
+    xs, ys, zs, zernikes = extractZernikesLeicaScanPair(refScanFile,
+                                                        fitsFile,
+                                                        n=N,
+
+    # TBF: write results to final fits file                                                        nZern=36)
+
+def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
     print("starting process, with state: ", state.value)
- 
+
+    test = True
+    if test:
+        # skip all interactions with scanner
+        processing(state, {}, proj, scanNum, refScan, refScanNum, refScanFile, filename)
+        state.value = READY
+        print ("done, setting state: ", state.value)
+        return
+
     a = TLSaccess("lassi.ad.nrao.edu")
 
     waitForScanEnd(state, a)
     r = waitForData(state, a)
 
     a.cntrl_exit()
-    processing(state, r, proj, scanNum, refScan, refScanNum, filename)
+    processing(state, r, proj, scanNum, refScan, refScanNum, refScanFile, filename)
 
     # done!
     state.value = READY
@@ -181,15 +241,44 @@ socket.bind("tcp://*:%s" % port)
 # socket.send_string("Server ready for commands")
 p = None
 
+scans = {}
+
 while True:
     msg = socket.recv()
     print (msg)
     msgStr = "".join( chr(x) for x in msg)
     if msg == b"process":
         if state.value == READY:
+            # record the current state of all parameters so
+            # we know what scans are being processed
+            filepath = getFITSFilePath(proj, filename)
+            if proj not in scans:
+                scans[proj] = {}
+            scans[proj][scanNum] = {
+                "refScan": refScan,
+                "refScanNum": refScanNum,
+                "filename": filename,
+                "filepath": filepath,
+                "filepathSmoothed": filepath.replace(".fits", ".smoothed.fits")
+            }
+
+            print("scans list:", scans)
+            if not refScan:
+                # this is a signal scan, so get the filename of our 
+                # reference scan
+                refScanFile = getRefScanFileName(scans, proj, refScanNum)
+            else:
+                refScanFile = None
+                
             print("processing!")
             p = Process(target=process, 
-                        args=(state, proj, scanNum, refScan, refScanNum, filename))
+                        args=(state,
+                              proj, 
+                              scanNum, 
+                              refScan,
+                              refScanNum, 
+                              refScanFile, 
+                              filename))
             p.start()
             #state.value = PROCESSING
             socket.send_string("Started Processing")
