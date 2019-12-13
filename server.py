@@ -13,6 +13,7 @@ from ops.pyTLS import TLSaccess
 from processPTX import getRawXYZ
 from lassiAnalysis import processLeicaDataStream
 from lassiAnalysis import extractZernikesLeicaScanPair
+from ZernikeFITS import ZernikeFITS
 
 DATADIR = "/home/sandboxes/pmargani/LASSI/data"
 
@@ -206,8 +207,14 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     xs, ys, zs, zernikes = extractZernikesLeicaScanPair(refScanFile,
                                                         fitsFile,
                                                         n=N,
+                                                        nZern=36)
 
-    # TBF: write results to final fits file                                                        nZern=36)
+    # write results to final fits file                                                        nZern=36)
+    fitsio = ZernikeFITS()
+    fitsio.setData(xs, ys, zs, N, hdr, dataDir, proj, filename)
+    fitsio.setZernikes(zernikes)
+    print ("Writing Zernikes to: ", fitsio.getFilePath())
+    fitsio.write()
 
 def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
     print("starting process, with state: ", state.value)

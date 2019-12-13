@@ -10,6 +10,11 @@ class SmoothedFITS:
     smoothing to a simple FITS file
     """
 
+    def __init__(self):
+        
+        self.deviceName = 'LASSI'
+        self.ext = "smoothed.fits"
+
     def setData(self,
                  x,
                  y,
@@ -36,8 +41,7 @@ class SmoothedFITS:
         self.dataDir = dataDir
         self.proj = proj
         self.filenameBase = filenameBase
-        self.deviceName = 'LASSI'
-
+        
     def getPath(self):
         "Returns directory where FITS file is written to"
         return os.path.join(self.dataDir,
@@ -47,10 +51,19 @@ class SmoothedFITS:
 
     def getFilePath(self):
         "Returns full path of final FITS file"
-        fn = "%s.smoothed.fits" % self.filenameBase
+        fn = "%s.%s" % (self.filenameBase, self.ext)
         return os.path.join(self.getPath(), fn)
 
     def write(self):
+        hdus = self.getHdus()
+
+        hdul = fits.HDUList(hdus)
+ 
+        # finally, write to disk
+        hdul.writeto(self.getFilePath())
+
+
+    def getHdus(self):    
         "Use class attributes to write smoothed data to disk as FITS file"
         # First extension just has our header
         header = fits.Header()
@@ -71,10 +84,7 @@ class SmoothedFITS:
         colDefs = fits.ColDefs([xCol, yCol, zCol])
         bHdu = fits.BinTableHDU.from_columns(colDefs)
 
-        hdul = fits.HDUList([pHdu, bHdu])
-
-        # finally, write to disk
-        hdul.writeto(self.getFilePath())
+        return [pHdu, bHdu]
 
     def read(self, filepath):
 
@@ -113,4 +123,5 @@ def tryRead():
     
 if __name__ == '__main__':
     # main()
-    tryRead()
+    # tryRead()
+    tryWrite()
