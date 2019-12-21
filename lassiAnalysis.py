@@ -12,8 +12,6 @@ from scipy.interpolate import griddata
 # import matplotlib
 # matplotlib.use('agg')
 
-import opticspy
-
 from astropy.stats import sigma_clip
 
 from zernikies import getZernikeCoeffs
@@ -419,7 +417,7 @@ def maskLeicaData(filename, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None,
                'parabolaFitCoeffs': c}
 
     return outData 
-
+"""
 def processLeicaScanPair(filename1,
                          filename2,
                          processed=False,
@@ -517,6 +515,7 @@ def processLeicaScanPair(filename1,
     printZs(asAnsiZs)
 
     return (xs1, ys1, xs2, ys2), diffData
+"""
 
 def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False, ymax=False, method='linear'):
     """

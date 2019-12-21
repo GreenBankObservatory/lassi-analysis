@@ -8,26 +8,35 @@ from scipy.optimize import leastsq
 #import matplotlib
 #matplotlib.use('agg')
 import matplotlib.pylab as plt
-from mpl_toolkits.mplot3d import axes3d, Axes3D
+from mpl_toolkits.mplot3d import Axes3D
 
 from utils.utils import sph2cart, cart2sph
 
 from rotate import *
 
-def parabola(xdata, ydata, focus, v1x, v1y, v2, heavy=False):
+def parabola(xdata, ydata, focus, v1x=0, v1y=0, v2=0, heavy=False):
+    """
+    """
+
     if heavy:
         return parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2)
     else:
         return parabolaSimple(xdata, ydata, focus, v1x, v1y, v2)
 
+
 def parabolaSimple(xdata, ydata, focus, v1x, v1y, v2):
-    "simply the equation for a 2-D parabola"
+    """
+    Simply the equation for a 2-D parabola.
+    """
+
     focus = 60.
     return (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 + v2
+
 
 def parabolaSimple_(xdata, ydata, focus):
     "simply the equation for a 2-D parabola"
     return (1./(4.*focus))*(xdata)**2 + (1./(4.*focus))*(ydata)**2
+
 
 def parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2): #, hr=104.):
     "Reject everything outside the circle our data shows up in"
@@ -52,6 +61,7 @@ def parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2): #, hr=104.):
 def heavySide(x, y, v1x, v1y, xoffset, yoffset, radius):
     return ((x - v1x - xoffset)**2 + (y - v1y - yoffset)**2) > radius**2    
 
+
 def rotate(x, y, z, aroundXrads, aroundYrads):
     # first, around x
     # x = x
@@ -63,6 +73,7 @@ def rotate(x, y, z, aroundXrads, aroundYrads):
     # y = y;
     zRot = zRot*np.cos(aroundYrads) - x*np.sin(aroundYrads);
     return xRot, yRot, zRot
+
 
 def parabolaRot(xdata, ydata, focus, v1x, v1y, v2, rotX, rotY):
     zdata = parabola(xdata, ydata, focus, v1x, v1y, v2)
@@ -76,6 +87,7 @@ def parabolaRot(xdata, ydata, focus, v1x, v1y, v2, rotX, rotY):
     zr = PrimeZ(pry, L)
     return xr, yr, zr
 
+
 def rotateData(xdata, ydata, zdata, rotX, rotY):
     L = np.array([xdata.flatten(), ydata.flatten(), zdata.flatten()])
     pry = (rotX, rotY, 0.)
@@ -83,6 +95,7 @@ def rotateData(xdata, ydata, zdata, rotX, rotY):
     yr = PrimeY(pry, L)
     zr = PrimeZ(pry, L)
     return xr, yr, zr
+
 
 def fitParabolaNew(L, f, v1x, v1y, v2, xTheta, yTheta):
     coeffs = [f, v1x, v1y, v2, xTheta, yTheta]
@@ -94,8 +107,17 @@ def fitParabolaWithWeights(coeffs, x, y, z, weights):
     z = fitParabola(coeffs, x, y, z)
     return z*weights
 
+
 def fitParabola(coeffs, x, y, z):
-    
+    """
+    Computes the residuals between a paraboloid and a 3D vector.
+    coeffs[0] is the focus, 
+    coeffs[1] the offset in the x coordinate, 
+    coeffs[2] the offset in the y coordinate,
+    coeffs[3] the offset in the z coordinate,
+    coeffs[4] a rotation along the x axis,
+    coeffs[5] a rotation along the y axis.
+    """
     
     L = np.array([x.flatten(), y.flatten(), z.flatten()])
     pry = (coeffs[4], coeffs[5], 0.)
@@ -106,6 +128,7 @@ def fitParabola(coeffs, x, y, z):
     zdata = parabola(xr, yr, coeffs[0], coeffs[1], coeffs[2], coeffs[3])
 
     return zr - zdata
+
 
 def newParabola(xdata, ydata, zdata, focus, v1x, v1y, v2, rotX, rotY):
 
@@ -119,6 +142,7 @@ def newParabola(xdata, ydata, zdata, focus, v1x, v1y, v2, rotX, rotY):
 
     return xr, yr, new_zdata
 
+
 def fun(coeffs, xdata, ydata):
     focus = coeffs[0]
     v1x = coeffs[1]
@@ -126,8 +150,10 @@ def fun(coeffs, xdata, ydata):
     v2 = coeffs[3]
     return parabola(xdata, ydata, focus, v1x, v1y, v2)
 
+
 def errfun(coeffs, xdata, ydata, zdata):
     return fun(coeffs, xdata, ydata) - zdata
+
 
 def findTheBumps():
 
@@ -142,6 +168,7 @@ def findTheBumps():
     imagePlot(bumpDiff, "Bumps!")
 
     return bumps
+
 
 def fitLeicaScan(fn,
                  numpy=True,
@@ -248,6 +275,7 @@ def fitLeicaScan(fn,
 
     return diff, newX, newY
 
+
 def imagePlot(z, title):
     fig = plt.figure()
     ax = fig.gca()
@@ -255,6 +283,7 @@ def imagePlot(z, title):
     cax = ax.imshow(z)
     fig.colorbar(cax)
     plt.title(title)
+
 
 def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfev=10000, ftol=1e-12, xtol=1e-12, verbose=False):
 
@@ -269,7 +298,7 @@ def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfe
         b2 = [inf, inf,  inf,  inf,  pi2,  pi2]
         bounds = (b1, b2)
 
-    # robust fit: weights outliers outside of f_scale less
+    # Robust fit: weights outliers outside of f_scale less
     loss = "soft_l1"
     # 0.05 is a good educated guess from Andrew
     # f_scale = .05
@@ -280,17 +309,18 @@ def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfe
 
     if method is None:
         if weights is None:
+            print("Using parabola.fitParabola for fit.")
             method = fitParabola
-            args = (x .flatten(), y.flatten(), z.flatten())
+            args = (x.flatten(), y.flatten(), z.flatten())
         else:
             if verbose:
                 print("Using weights for fit!")
             method = fitParabolaWithWeights
-            args = (x .flatten(), y.flatten(), z.flatten(), weights.flatten())
+            args = (x.flatten(), y.flatten(), z.flatten(), weights.flatten())
     else:
         if verbose:
-            print("Using user supplied method.")
-        args = (x .flatten(), y.flatten(), z.flatten())
+            print("Using user supplied method for fit.")
+        args = (x.flatten(), y.flatten(), z.flatten())
 
     r = least_squares(method,
                       guess,
@@ -303,8 +333,13 @@ def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfe
                       xtol=xtol)
     return r
 
-def loadLeicaDataFromNumpy(fn):
 
+def loadLeicaDataFromNumpy(fn):
+    """
+    Loads Leica data stored by numpy's save at 
+    the end of lassiAnalysis.processLeicaData.
+    """
+    
     data = np.load(fn)
 
     x = data['x']
@@ -317,8 +352,11 @@ def loadLeicaDataFromNumpy(fn):
     
     return (x, y, z), (xx, yy, zz)
 
+
 def loadLeicaDataFromGpus(fn):
-    "Crudely loads x, y, z csv files into numpy arrays"
+    """
+    Crudely loads x, y, z csv files into numpy arrays
+    """
 
     xyzs = {}
     dims = ['x', 'y', 'z']
@@ -336,7 +374,11 @@ def loadLeicaDataFromGpus(fn):
         xyzs[dim] = np.array(data)
     return xyzs['x'], xyzs['y'], xyzs['z']
 
+
 def loadLeicaData(fn, n=None, numpy=True):
+    """
+    Loads data processed by lassiAnalysis.processLeicaScan.
+    """
 
     if numpy:
         orgData, flatData = loadLeicaDataFromNumpy(fn)
@@ -356,6 +398,7 @@ def loadLeicaData(fn, n=None, numpy=True):
 
     return (x, y, z), (xxn, yyn, zzn)
 
+
 def sampleXYZData(x, y, z, samplePercentage):
     "Return a random percentage of the data"
 
@@ -370,6 +413,7 @@ def sampleXYZData(x, y, z, samplePercentage):
 
     return copy(x[idx]), copy(y[idx]), copy(z[idx])
 
+
 def radialReplace(x, y, z, xOffset, yOffset, radius, replacement):
     "Replace z values outside of given radius with a new value"
 
@@ -383,6 +427,7 @@ def radialReplace(x, y, z, xOffset, yOffset, radius, replacement):
     print("radialReplace replaced %d points with %s" % (cnt, replacement))
     # only z gets changed
     return z
+
 
 def surface3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
     fig = plt.figure()
@@ -402,6 +447,7 @@ def surface3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
     if ylim is not None:
         plt.ylim(ylim)
 
+
 def scatter3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
 
     # plot all the data, or just some?
@@ -420,6 +466,7 @@ def scatter3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
         plt.xlim(xlim)
     if ylim is not None:
         plt.ylim(ylim)
+
 
 def fitNoRot():
 
@@ -441,6 +488,7 @@ def fitNoRot():
     r = least_squares(errfun, coeffs, args=(x2d.flatten(), y2d.flatten(), fakedata.flatten()))
     print(r)
 
+
 def fun2(coeffs, xdata, ydata):
     focus = coeffs[0]
     v1x = coeffs[1]
@@ -453,10 +501,12 @@ def fun2(coeffs, xdata, ydata):
     #xrot, yrot, z = parabolaRot(xdata, ydata, focus, v1x, v1y, v2, aroundX, aroundY)
     return z
 
+
 def errfun2(coeffs, xdata, ydata, zdata):
     # rotate zdatar using given coeffs
     zdatar = zdata
     return fun2(coeffs, xdata, ydata) - zdata
+
 
 def fun3(coeffs, xdata, ydata, zdata):
     focus = coeffs[0]
@@ -478,6 +528,7 @@ def fun3(coeffs, xdata, ydata, zdata):
     z4 = zr - z3
 
     return z4
+
 
 def fitRot():
 
@@ -551,7 +602,8 @@ def funFinal(coeffs, xdata, ydata):
     # optional Heavy Side
     hr = 30.
     return parabola(xdata, ydata, f, v1x, v1y, v2) 
-    
+
+
 def errfunFinal(coeffs, xdata, ydata, zdata):
     "Error function handles rotation properly"
     
@@ -559,13 +611,15 @@ def errfunFinal(coeffs, xdata, ydata, zdata):
     xr, yr, zr = rotateXY(xdata, ydata, zdata, coeffs[4], coeffs[5])
     z = funFinal(coeffs, xr, yr)
     return zr - z
-    
+
+
 def simData(xs2d, ys2d, f, v1x, v1y, v2, xRot, yRot):
     "Returns a rotated parabola based off inputs"
 
     zs2d = parabola(xs2d, ys2d, f, v1x, v1y, v2)
     xdata, ydata, zdata = rotateXY(xs2d, ys2d, zs2d, xRot, yRot)
     return xdata, ydata, zdata
+
 
 def lsqFit(xdata, ydata, zdata, coeffs):
     "least squares fit"
@@ -585,7 +639,6 @@ def lsqFit(xdata, ydata, zdata, coeffs):
                           ftol=1e-15,
                           xtol=1e-15)
     return r 
-
 
 
 def tryFit(answer, guess=None):
@@ -634,6 +687,7 @@ def tryFit(answer, guess=None):
     #                      xtol=1e-15)
     r = lsqFit(xdata, ydata, zdata, coeffs)
     return expAnswer, coeffs, r.x, np.abs(expAnswer - r.x)
+
 
 def tryFits():
     "A sequence of manual tests"
@@ -685,6 +739,7 @@ def tryFits():
     answer, guess, fit, diff = tryFit(data, guess)
     checkFit(answer, guess, fit, diff)
 
+
 def checkFit(answer, guess, fit, diff):
     tol = 1e-1
     for i, d in enumerate(diff):
@@ -695,6 +750,7 @@ def checkFit(answer, guess, fit, diff):
             return False
     print("fit passed with diff: ", answer, diff)
     return True
+
 
 def radialFilter(x, y, z, xOffset, yOffset, radius):
     "returns only those points within the radius"
@@ -712,13 +768,15 @@ def radialFilter(x, y, z, xOffset, yOffset, radius):
     zr = np.array(zr)        
     return xr, yr, zr
 
+
 def radialMask(x, y, z, xOffset, yOffset, radius):
     r = np.sqrt((x-xOffset)**2 + (y-yOffset)**2)
     x[r > radius] = np.nan
     y[r > radius] = np.nan
     z[r > radius] = np.nan
     return x, y, z
-    
+
+
 def main():
     #tryFits()
     fn = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/randomSampleScan10.csv"
@@ -726,6 +784,7 @@ def main():
     print(x, x[np.logical_not(np.isnan(x))])
     print(y)
     print(z)
+
 
 if __name__=='__main__':
     main()

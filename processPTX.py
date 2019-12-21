@@ -58,14 +58,6 @@ def rotateXYaboutZ(xyz, rotDegrees):
 
     new_xyz = new_rep.get_xyz().value
 
-    # get it back into original form
-    # TBF: must be a faster method!
-#    xyzNew = []
-#    x = new_xyz[0]
-#    y = new_xyz[1]
-#    z = new_xyz[2]
-#    for i in range(len(x)):
-#        xyzNew.append((x[i], y[i], z[i]))
     xyzNew = np.c_[new_xyz[0], new_xyz[1], new_xyz[2]]
 
     return xyzNew 
@@ -398,6 +390,36 @@ def ellipticalFilter(x, y, z, xOffset, yOffset, bMaj, bMin, angle, dts=None):
 
     return x[mask], y[mask], z[mask], dts
 
+def nearFilter(x, y, z, tol=10., dts=None):
+    """
+    Filter points that are closer than tol from the TLS.
+    """
+
+    r = np.sqrt(np.power(x, 2.) + np.power(y, 2.) + np.power(z, 2.))
+    mask = r > tol
+
+    if dts is not None:
+        dts = dts[mask]
+
+    return x[mask], y[mask], z[mask], dts
+
+def zLimitFilter(x, y, z, zLimit=-80, dts=None):
+    """
+    """
+    # z - filter: at this point we should have the
+    # dish, but with some things the radial filter didn't
+    # get rid of above or below the dish
+    mask = np.logical_and(z > zLimit, z < -10)
+    x = x[mask]
+    y = y[mask]
+    z = z[mask]
+
+    if dts is not None:
+        dts = dts[mask]
+
+    return x, y, z, dts
+
+
 def processNewPTXData(lines,
                       dts=None,
                       plotTest=True,
@@ -406,7 +428,6 @@ def processNewPTXData(lines,
                       simSignal=None,
                       iFilter=False,
                       nFilter=True,
-                      radius=None,
                       rFilter=True,
                       addOffset=False,
                       filterClose=True,
@@ -511,14 +532,15 @@ def processNewPTXData(lines,
     # z - filter: at this point we should have the
     # dish, but with some things the radial filter didn't
     # get rid of above or below the dish
-    zLimit = -80
-    mask = np.logical_and(z > -80, z < -10)
+#    mask = np.logical_and(z > -80, z < -10)
+#    x = x[mask]
+#    y = y[mask]
+#    z = z[mask]
+#    if dts is not None:
+#        dts = dts[mask]
     orgNum = len(z)
-    x = x[mask]
-    y = y[mask]
-    z = z[mask]
-    if dts is not None:
-        dts = dts[mask]
+    zLimit = -80    
+    x, y, z, dts = zLimitFilter(x, y, z, zLimit=zLimit)
     newNum = len(z)
     print("z - limit filtered out %d points below %5.2f and above -10" % ((orgNum - newNum), zLimit))
 
@@ -613,10 +635,10 @@ def processNewPTX(fpath,
                   rot=None,
                   sampleSize=None,
                   iFilter=False,
-                  radius=None,
                   rFilter=True,
                   addOffset=False,
                   filterClose=True,
+                  simSignal=None,
                   ellipse=[-8., 50., 49., 49., 0.]):
 
     # is there associated time data?
@@ -631,10 +653,8 @@ def processNewPTX(fpath,
     xyz, dts = processNewPTXData(ls,
                             dts=dts,
                             rot=rot,
-                            radius=radius,
                             sampleSize=sampleSize,
                             simSignal=simSignal,
-                            parabolaFit=parabolaFit,
                             iFilter=iFilter,
                             rFilter=rFilter,
                             addOffset=addOffset,

@@ -4,25 +4,28 @@ import random
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-def surfacePlot(x, y, z, vmin=-5e-3, vmax=5e-3):
+def surfacePlot(x, y, z, title=False, vMin=-5e-3, vMax=5e-3, colorbarLabel=False):
     """
     """
 
     extent = [plt.np.nanmin(x), plt.np.nanmax(x), plt.np.nanmin(y), plt.np.nanmax(y)]
 
-    fig = plt.figure(figsize=(5, 5), dpi=150)
+    fig = plt.figure(figsize=(5, 5), dpi=150, frameon=False)
     ax = fig.add_subplot(111)
 
-    im = ax.imshow(z, extent=extent, vmin=vmin, vmax=vmax)
+    im = ax.imshow(z, extent=extent, vmin=vMin, vmax=vMax)
 
-    cb = plt.colorbar(im)
+    cb = plt.colorbar(im, fraction=0.046, pad=0.04)
+    if colorbarLabel:
+        cb.ax.set_ylabel(colorbarLabel)
 
     ax.minorticks_on()
     ax.tick_params('both', which='both', direction='in', top=True, right=True, bottom=True, left=True)
 
     ax.set_xlabel('x axis (m)')
     ax.set_ylabel('y axis (m)')
-    plt.title('Surface')
+    if title:
+        plt.title(title)
 
 def barChartPlot(index, fitlist, expected=[]):
     """
