@@ -5,9 +5,12 @@ import time
 
 from ops.pyTLS import TLSaccess
 
+# TLSHost = "lassi.ad.nrao.edu"
+TLS_HOST = "galileo.gb.nrao.edu"
+
 def runScan(config):
 
-    a = TLSaccess("lassi.ad.nrao.edu")
+    a = TLSaccess(TLS_HOST)
 
     # wait till it's ready
     status = a.get_status()
@@ -27,6 +30,10 @@ def runScan(config):
     az_fov = 35
     el_fov = 35
     a.configure_scanner(proj, res, sensitivity, scan_mode, cntr_az, cntr_el, az_fov, el_fov)
+
+    simFile = "/home/scratch/pmargani/LASSI/scannerData/tmp/test.ptx"
+    print ("setting sim file to", simFile)
+    a.set_simulated_scan_data_file(simFile)
 
     # get the device scan started,
     a.start_scan()
@@ -155,7 +162,8 @@ def main():
         "refScanNum": 0,
         "filename": "1"
     }
-    runFakeScan(c)
+    runScan(c)
+    time.sleep(3)
     u = {
         "scanNum": 2,
         "refScan": "False",
@@ -163,7 +171,7 @@ def main():
         "filename": "2"
     }
     c.update(u)
-    runFakeScan(c)
+    runScan(c)
 
 if __name__ == '__main__':
     main()

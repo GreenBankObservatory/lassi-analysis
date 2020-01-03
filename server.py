@@ -42,6 +42,8 @@ filename = None
 
 # connect to the scanner
 # a = TLSaccess("lassi.ad.nrao.edu")
+# TLS_HOST = "lassi.ad.nrao.edu"
+TLS_HOST = "galileo.gb.nrao.edu"
 
 def getFITSFilePath(proj, filename):
     return os.path.join(DATADIR, proj, "LASSI", filename + ".fits")
@@ -219,7 +221,8 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
 def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
     print("starting process, with state: ", state.value)
 
-    test = True
+    # test = True
+    test = False
     if test:
         # skip all interactions with scanner
         processing(state, {}, proj, scanNum, refScan, refScanNum, refScanFile, filename)
@@ -227,7 +230,8 @@ def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
         print ("done, setting state: ", state.value)
         return
 
-    a = TLSaccess("lassi.ad.nrao.edu")
+    # a = TLSaccess("lassi.ad.nrao.edu")
+    a = TLSaccess(TLS_HOST)
 
     waitForScanEnd(state, a)
     r = waitForData(state, a)
