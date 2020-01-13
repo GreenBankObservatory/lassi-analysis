@@ -42,8 +42,8 @@ filename = None
 
 # connect to the scanner
 # a = TLSaccess("lassi.ad.nrao.edu")
-# TLS_HOST = "lassi.ad.nrao.edu"
-TLS_HOST = "galileo.gb.nrao.edu"
+TLS_HOST = "lassi.ad.nrao.edu"
+# TLS_HOST = "galileo.gb.nrao.edu"
 
 def getFITSFilePath(proj, filename):
     return os.path.join(DATADIR, proj, "LASSI", filename + ".fits")
@@ -246,7 +246,7 @@ def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
 port = "5557"
 #port = "9020"
 context = zmq.Context()
-socket = context.socket(zmq.PAIR)
+socket = context.socket(zmq.REP)
 socket.bind("tcp://*:%s" % port)
 
 # socket.send_string("Server ready for commands")
@@ -254,8 +254,12 @@ p = None
 
 scans = {}
 
+
+
 while True:
+    print ("waiting for message")
     msg = socket.recv()
+    print ("got msg")
     print (msg)
     msgStr = "".join( chr(x) for x in msg)
     if msg == b"process":
@@ -292,7 +296,9 @@ while True:
                               filename))
             p.start()
             #state.value = PROCESSING
-            socket.send_string("Started Processing")
+            # socket.send_string("Started Processing")
+            print("Started Processing")
+            socket.send_string("OK")
         else:
             print("processing already!")
             socket.send_string("Already processing")
@@ -304,12 +310,13 @@ while True:
                 print ("terminating process")
                 print (stateMap[state.value])
                 p.terminate()
-                socket.send_string("Stopped process")
                 state.value = READY
                 print ("process terminated")
+                socket.send_string("OK")
             else:
                 print ("can't terminate, p is none")
-    elif msg == b"get_state":
+                socket.send_string("can't terminate, p is none")
+    elif msg == b"get_state": # or msg == "get_state":
         #socket.send_string("READY" if state.value is 0 else "PROCESSING")    
         socket.send_string(stateMap[state.value])
     elif msgStr[:4] == "set:":
@@ -326,15 +333,21 @@ while True:
             elif key == 'scanNum':
                 scanNum = int(value)
             elif key == 'refScan':
-                refScan = value == 'True' 
+                # TBF: settle on bool or int type?
+                # refScan = value == 'True' 
+                refScan = int(value) == 1 
             elif key == 'refScanNum':
                 refScanNum = int(value)
             elif key == 'filename':
                 filename = value
             else:
                 print("unknonw key", key)                    
-            socket.send_string("setting %s to %s" % (key, value))    
+            # socket.send_string("setting %s to %s" % (key, value))    
+            print("setting %s to %s" % (key, value))
+            socket.send_string("OK")    
     else:
+        print("what?")
+        print(msg)
         socket.send_string("Dont' understand message")
 
     time.sleep(1)
