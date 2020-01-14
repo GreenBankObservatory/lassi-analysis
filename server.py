@@ -14,8 +14,11 @@ from processPTX import getRawXYZ
 from lassiAnalysis import processLeicaDataStream
 from lassiAnalysis import extractZernikesLeicaScanPair
 from ZernikeFITS import ZernikeFITS
+from ops.getConfigValue import getConfigValue
 
-DATADIR = "/home/sandboxes/pmargani/LASSI/data"
+# DATADIR = "/home/sandboxes/pmargani/LASSI/data"
+DATADIR = getConfigValue(".", "YGOR_DATA")
+print("Writing FITS files to YGOR_DATA: ", DATADIR)
 
 # states
 READY = 0 #"READY"
@@ -42,8 +45,10 @@ filename = None
 
 # connect to the scanner
 # a = TLSaccess("lassi.ad.nrao.edu")
-TLS_HOST = "lassi.ad.nrao.edu"
-# TLS_HOST = "galileo.gb.nrao.edu"
+# TLS_HOST = "lassi.ad.nrao.edu"
+TLS_HOST = "galileo.gb.nrao.edu"
+
+
 
 def getFITSFilePath(proj, filename):
     return os.path.join(DATADIR, proj, "LASSI", filename + ".fits")
