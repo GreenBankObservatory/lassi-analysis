@@ -30,8 +30,8 @@ PROCESS_STATES = [WAITING_FOR_SCAN_END, WAITING_FOR_DATA, PROCESSING]
 
 stateMap = {
         READY: "Ready",
-        WAITING_FOR_SCAN_END: "Waiting for scan end.",
-        WAITING_FOR_DATA: "Waiting for data.",
+        WAITING_FOR_SCAN_END: "Waiting for scan end",
+        WAITING_FOR_DATA: "Waiting for data",
         PROCESSING: "Processing"
         }
 
@@ -96,7 +96,7 @@ def waitForData(state, a):
 
     # here we call export to data, then wait until we actually see all of it
     # time.sleep(3)
-    a.export_data()
+    #a.export_data()
     keys = a.get_results().keys()
     while len(keys) < 5:
         print("not enough keys: ", keys)
@@ -262,10 +262,10 @@ scans = {}
 
 
 while True:
-    print ("waiting for message")
+    #print ("waiting for message")
     msg = socket.recv()
-    print ("got msg")
-    print (msg)
+    #print ("got msg")
+    #print (msg)
     msgStr = "".join( chr(x) for x in msg)
     if msg == b"process":
         if state.value == READY:
