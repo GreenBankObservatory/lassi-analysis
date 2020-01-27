@@ -52,7 +52,7 @@ def runScan(config):
     # connect to the process server
     port = "5557"
     context = zmq.Context()
-    socket = context.socket(zmq.PAIR)
+    socket = context.socket(zmq.REQ)
     socket.connect("tcp://localhost:%s" % port)
 
     # # see what state the server is in
