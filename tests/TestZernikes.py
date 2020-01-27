@@ -1,7 +1,7 @@
 import unittest
 
 import numpy as np
-import opticspy
+#import opticspy
 
 from zernikies import zernikePolar, getZernikeCoeffs
 
@@ -63,41 +63,42 @@ class TestZernikes(unittest.TestCase):
         t = zernikePolar(zs, 1., 1.)
         self.assertAlmostEquals(t, 1.3817732906760363, 5)
 
-
-    def TestGetZernikeCoeffs(self):
-        "Make sure opticspy zernike surfaces can be identified"
-        
-        # noll index of 11
-        zAmp = 1.0
-        Z = opticspy.zernike.Coefficient(Z11=zAmp)
-
-        surf = Z.zernikematrix()
-
-        order = 36
-        zs = getZernikeCoeffs(surf, order)
-
-        # shows up as expected asAnsi of 13?
-        expIdx = 13
-        tol = 5e-2
-        for i in range(order + 1):
-            if i != expIdx:
-                self.assertTrue(abs(zs[i]) < tol )
-            else:
-                self.assertTrue(abs(zAmp - zs[i]) < 0.1)    
-
-
-        # try noll index 3
-        Z = opticspy.zernike.Coefficient(Z3=zAmp)
-
-        surf = Z.zernikematrix()
-
-        zs = getZernikeCoeffs(surf, order)
-
-        # shows up as expected asAnsi of 3?
-        expIdx = 3
-        tol = 5e-2
-        for i in range(order + 1):
-            if i != expIdx:
-                self.assertTrue(abs(zs[i]) < tol )
-            else:
-                self.assertTrue(abs(zAmp - zs[i]) < 0.1)    
+    # We no longer use opticspy
+    # TBD: write a test for the methods we use now.
+#    def TestGetZernikeCoeffs(self):
+#        "Make sure opticspy zernike surfaces can be identified"
+#        
+#        # noll index of 11
+#        zAmp = 1.0
+#        Z = opticspy.zernike.Coefficient(Z11=zAmp)
+#
+#        surf = Z.zernikematrix()
+#
+#        order = 36
+#        zs = getZernikeCoeffs(surf, order)
+#
+#        # shows up as expected asAnsi of 13?
+#        expIdx = 13
+#        tol = 5e-2
+#        for i in range(order + 1):
+#            if i != expIdx:
+#                self.assertTrue(abs(zs[i]) < tol )
+#            else:
+#                self.assertTrue(abs(zAmp - zs[i]) < 0.1)    
+#
+#
+#        # try noll index 3
+#        Z = opticspy.zernike.Coefficient(Z3=zAmp)
+#
+#        surf = Z.zernikematrix()
+#
+#        zs = getZernikeCoeffs(surf, order)
+#
+#        # shows up as expected asAnsi of 3?
+#        expIdx = 3
+#        tol = 5e-2
+#        for i in range(order + 1):
+#            if i != expIdx:
+#                self.assertTrue(abs(zs[i]) < tol )
+#            else:
+#                self.assertTrue(abs(zAmp - zs[i]) < 0.1)    

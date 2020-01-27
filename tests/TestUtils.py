@@ -61,5 +61,5 @@ class TestUtils(unittest.TestCase):
         ymy = np.nanmax(y)
 
         mn, mx = gridLimits(x, y)
-        self.assertEqual(mn, 1)
-        self.assertEqual(mx, 4)
+        self.assertEqual(mn, 2)
+        self.assertEqual(mx, 3)

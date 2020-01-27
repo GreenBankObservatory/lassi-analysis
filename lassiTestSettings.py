@@ -16,11 +16,22 @@ This does not mean these are optimal parameters.
 For example, using a radius smaller than 49 results in a bias in the 
 recovered Zernike values during the October scans.
 """
+"""
+These were the original settings used.
 SETTINGS_12JUNE2019 = {
     'xOffset': -8.0,
     'yOffset': 50.0,
     'rot': -10.0,
     'radius': 47.0,
+    'dataPath': '/home/scratch/pmargani/LASSI/scannerData/'
+    }
+To keep a larger portion of the dish use the settings below.
+"""
+SETTINGS_12JUNE2019 = {
+    'xOffset': -7.0,
+    'yOffset': 52.,
+    'rot': -10.0,
+    'radius': 49.0,
     'dataPath': '/home/scratch/pmargani/LASSI/scannerData/'
     }
 SETTINGS_17SEPTEMBER2019 = {

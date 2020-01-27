@@ -53,11 +53,12 @@ class TestGpus(unittest.TestCase):
         cmds = smoothGPUMultiFile(gpuPaths, hosts, inFile, outFile, n, test=test)
 
         user = os.getlogin()
+        path = os.path.dirname( os.path.abspath(gpus.__file__) )
 
         exps = []
         for i in range(numGpus):
             exp = [
-                'runGpuParts',
+                '{}/runGpuParts'.format(path),
                 gpuPaths[i],
                 user,
                 hosts[i],
@@ -89,11 +90,12 @@ class TestGpus(unittest.TestCase):
         cmds = smoothGPUMulti(gpuPaths, hosts, inFiles, outFile, n, test=test)
 
         user = os.getlogin()
+        path = os.path.dirname( os.path.abspath(gpus.__file__) )
 
         exps = []
         for i in range(2):
             exp = [
-                'runGpuParts',
+                '{}/runGpuParts'.format(path),
                 gpuPath,
                 user,
                 hosts[i],

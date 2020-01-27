@@ -58,14 +58,6 @@ def rotateXYaboutZ(xyz, rotDegrees):
 
     new_xyz = new_rep.get_xyz().value
 
-    # get it back into original form
-    # TBF: must be a faster method!
-#    xyzNew = []
-#    x = new_xyz[0]
-#    y = new_xyz[1]
-#    z = new_xyz[2]
-#    for i in range(len(x)):
-#        xyzNew.append((x[i], y[i], z[i]))
     xyzNew = np.c_[new_xyz[0], new_xyz[1], new_xyz[2]]
 
     return xyzNew 
@@ -398,16 +390,44 @@ def ellipticalFilter(x, y, z, xOffset, yOffset, bMaj, bMin, angle, dts=None):
 
     return x[mask], y[mask], z[mask], dts
 
+def nearFilter(x, y, z, tol=10., dts=None):
+    """
+    Filter points that are closer than tol from the TLS.
+    """
+
+    r = np.sqrt(np.power(x, 2.) + np.power(y, 2.) + np.power(z, 2.))
+    mask = r > tol
+
+    if dts is not None:
+        dts = dts[mask]
+
+    return x[mask], y[mask], z[mask], dts
+
+def zLimitFilter(x, y, z, zLimit=-80, dts=None):
+    """
+    """
+    # z - filter: at this point we should have the
+    # dish, but with some things the radial filter didn't
+    # get rid of above or below the dish
+    mask = np.logical_and(z > zLimit, z < -10)
+    x = x[mask]
+    y = y[mask]
+    z = z[mask]
+
+    if dts is not None:
+        dts = dts[mask]
+
+    return x, y, z, dts
+
+
 def processNewPTXData(lines,
                       dts=None,
                       plotTest=True,
                       rot=None,
                       sampleSize=None,
-                      parabolaFit=None,
                       simSignal=None,
                       iFilter=False,
                       nFilter=True,
-                      radius=None,
                       rFilter=True,
                       addOffset=False,
                       filterClose=True,
@@ -512,14 +532,15 @@ def processNewPTXData(lines,
     # z - filter: at this point we should have the
     # dish, but with some things the radial filter didn't
     # get rid of above or below the dish
-    zLimit = -80
-    mask = np.logical_and(z > -80, z < -10)
+#    mask = np.logical_and(z > -80, z < -10)
+#    x = x[mask]
+#    y = y[mask]
+#    z = z[mask]
+#    if dts is not None:
+#        dts = dts[mask]
     orgNum = len(z)
-    x = x[mask]
-    y = y[mask]
-    z = z[mask]
-    if dts is not None:
-        dts = dts[mask]
+    zLimit = -80    
+    x, y, z, dts = zLimitFilter(x, y, z, zLimit=zLimit)
     newNum = len(z)
     print("z - limit filtered out %d points below %5.2f and above -10" % ((orgNum - newNum), zLimit))
 
@@ -547,7 +568,7 @@ def processNewPTXData(lines,
         newNum = xyz.shape[0]
         print("Removed {0:.0f} points closer than {1:.2f} m from the scanner.".format((orgNum - newNum), tooClose))
 
-    # If we want all points to be positive.
+    # If we want all points to have positive x and y coordinates.
     # This avoids the harmless distortion of the guitar pick.
     if addOffset:
         xmin = np.nanmin(xyz[:,0])
@@ -558,31 +579,6 @@ def processNewPTXData(lines,
         if ymin <= 0:
             print("Translating y axis.")
             xyz[:,1] -= ymin - 10.
-
-    # We should get rid of this.
-    # We do not use it ever.
-    if parabolaFit is not None:
-        pTol = 0.4
-        print("Using parabola fit to filter: ", parabolaFit)
-        x, y, z = splitXYZ(xyz)
-        orgLenX = len(x)
-        focus, v1x, v1y, v2 = parabolaFit
-        zPar = parabola(x, y, focus, v1x, v1y, v2)
-        res = z - zPar
-        scatter3dPlot(x, y, res, "sample of residuals from parabola fit", sample=0.1)
-        parMask = np.abs(res) < pTol 
-        x = x[parMask]
-        y = y[parMask]
-        z = z[parMask]
-        if dts is not None:
-            dts = dts[parMask]
-        xyz = aggregateXYZ(x, y, z)
-        res = res[parMask]
-        numFiltered = orgLenX - len(x)
-        print("After rejecting %d outliers (> %f), residuals look like:" % (numFiltered, pTol))
-        print("mean: %f, std: %f" % (np.mean(res), np.std(res)))
-        print("Now we have %d lines of data" % len(xyz))
-        scatter3dPlot(x, y, res, "residuals from parabola fit (no outliers)", sample=0.1)
 
     if plotTest:
         # we plotted stuff earlier, so let's get
@@ -638,13 +634,11 @@ def processNewPTX(fpath,
                   convertToDatetimes=False,
                   rot=None,
                   sampleSize=None,
-                  simSignal=None,
                   iFilter=False,
-                  parabolaFit=None,
-                  radius=None,
                   rFilter=True,
                   addOffset=False,
                   filterClose=True,
+                  simSignal=None,
                   ellipse=[-8., 50., 49., 49., 0.]):
 
     # is there associated time data?
@@ -659,22 +653,13 @@ def processNewPTX(fpath,
     xyz, dts = processNewPTXData(ls,
                             dts=dts,
                             rot=rot,
-                            radius=radius,
                             sampleSize=sampleSize,
                             simSignal=simSignal,
-                            parabolaFit=parabolaFit,
                             iFilter=iFilter,
                             rFilter=rFilter,
                             addOffset=addOffset,
                             filterClose=filterClose,
                             ellipse=ellipse)
-
-    # TBF: the old interface expects this 
-    # in a different format
-    # xyz = []
-    # for i in range(len(x)):
-    #     xyz.append((x[i], y[i], z[i]))
-    # xyz = np.array(xyz)
 
     # write to CSV file
     outf = fpath + ".csv"
