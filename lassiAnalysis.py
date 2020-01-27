@@ -22,8 +22,8 @@ from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loa
                       newParabola, rotateData, parabola
 
 from zernikeIndexing import noll2asAnsi, printZs
-from simulateSignal import addCenterBump, zernikeFour
-from simulateSignal import zernikeFive, gaussian
+from simulateSignal import addCenterBump
+from simulateSignal import gaussian
 from plotting import sampleXYZData, scatter3dPlot, surfacePlot
 from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits, splitXYZ
 from weightSmooth import weightSmooth
