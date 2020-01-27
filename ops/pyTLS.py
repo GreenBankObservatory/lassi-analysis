@@ -11,8 +11,8 @@ import inspect
 from datetime import datetime
 import sys
 
-CONTROL_PORT=':55560'
-DATAPUB_PORT=':55562'
+CONTROL_PORT=':35560'
+DATAPUB_PORT=':35562'
 
 SCAN_MODES = {"Speed" : 0, "Range" : 1, "Medium Range" : 2, "Long Range" : 3}
 SCANSENSITIVITY = {"Normal" : 0, "High" : 1}
@@ -81,6 +81,24 @@ class ScanHeaderInfo:
             if sensitivity in SENSITIVITYTOTEXT.keys():
                 self.tls_sensitivity = SENSITIVITYTOTEXT[sensitivity]
             self.tls_tilt_compensator = int(g[11])
+
+    def asdict(self):
+        d = {
+            "center_az" : self.center_az,
+            "center_el" : self.center_el,
+            "fov_az" : self.fov_az,
+            "fov_el" : self.fov_el,
+            "scan_number": self.scan_number,
+            "scan_time": self.scan_time,
+            "project": self.tls_project,
+            "resolution" : self.tls_resolution,
+            "scan_mode" : self.tls_scan_mode,
+            "tls_serial_number" : self.tls_serial_number,
+            "sensitivity" : self.tls_sensitivity,
+            "tls_tilt_compensator" : self.tls_tilt_compensator
+        }
+        return d
+
 
     def __str__(self):
         """
@@ -180,11 +198,8 @@ class TLSaccess(object):
         print("""set_scan_number""")
         print(self.set_scan_number.__doc__)
 
-        # print("""subscribe(which_array, callback=None)""")
-        # print(self.subscribe.__doc__)
-        #
-        # print("""unsubscribe(which_array)""")
-        # print(self.unsubscribe.__doc__)
+        print("""set_simulated_data_file(ptxdatafile""")
+        print(self.set_simulated_scan_data_file.__doc__)
 
         print("""add_callback(callback_name, cb_fun)""")
         print(self.add_callback.__doc__)
@@ -434,6 +449,18 @@ class TLSaccess(object):
         projects = self.parse_listScans(rtn)
         return projects
 
+    def set_simulated_scan_data_file(self, simfile):
+        """
+        Sets the ptx file which the lassi_daq will read when in simulation mode is enabled.
+        (i.e. run lassi_daq with the --simulate flag set)
+        Note: The file path must be relative to where the lassi_daq is running. For
+        example, running lassi_daq on windows and specifying a file in /home/sandboxes
+        will not work.
+        :param ptx file to use
+        :return: returns an OKStatus object
+        """
+        return self.simple_cmd('SetSimulatedScanFile', [simfile])
+
     def save_result(self, frame_type, data):
         """
         Saves a published array locally. Can be used (see get_results()) instead of
@@ -479,80 +506,6 @@ class TLSaccess(object):
             self._sub_task.join()
             del self._sub_task
             self._sub_task = None
-
-    # def subscribe(self, frame_type = None, cb_fun = None):
-    #     """Subscribes to one or more of the pipeline data frames.
-    #        Each frame is one vector from the latest TLS scan.
-    #        If frame_type is None, subscriptions for x,y,z,i and time are issued.
-    #        Frame types are:
-    #             * "X_ARRAY" - x measurement vector as numpy array
-    #             * "Y_ARRAY" - y measurement vector as numpy array
-    #             * "Z_ARRAY" - z measurement vector as numpy array
-    #             * "AZ_ARRAY" - az measurement vector as numpy array
-    #             * "EL_ARRAY" - el measurement vector as numpy array
-    #             * "R_ARRAY" - radial measurement vector as numpy array
-    #             * "I_ARRAY" - intensity measurement vector as numpy array
-    #             * "TIME_ARRAY - "MJD's for each pixel, as numpy array
-    #         Each frame is subscribed independently, and can be mixed and matched.
-    #
-    #     *frame_type:*
-    #       the frame_type of interest. Must be a one of the 8 types listed above
-    #
-    #     *cb_fun:*
-    #       the callback function, which must take 2 args: the key, and a 1-D numpy array
-    #
-    #     returns 'True' if the subscription was successful, 'False'
-    #     otherwise. The function will fail if 'frame_type' is already
-    #     subscribed.
-    #
-    #     """
-    #
-    #     if frame_type is None:
-    #         self.subscribe("X_ARRAY", cb_fun)
-    #         self.subscribe("Y_ARRAY", cb_fun)
-    #         self.subscribe("Z_ARRAY", cb_fun)
-    #         self.subscribe("I_ARRAY", cb_fun)
-    #         return self.subscribe("TIME_ARRAY", cb_fun)
-    #
-    #     # check to see if key exists
-    #     if not frame_type in self.array_names and frame_type != "OK_STATUS":
-    #         return (False, "'%s' is not a valid frame type." % frame_type)
-    #
-    #     if cb_fun is not None:
-    #         try:
-    #             x = inspect.getargspec(cb_fun)
-    #
-    #             # Should be a function that takes two parameters.
-    #             if len(x.args) != 2:
-    #                 return (False, 'Callback function must take 2 arguments')
-    #         except TypeError:
-    #             # not a function at all!
-    #             return (False, 'Callback object is not a function!')
-    #
-    #
-    #         # start the subscriber task if not already running
-    #     if not self._sub_task:
-    #         self._sub_task = TLSaccess.PipelineSubscriberThread(self)
-    #         self._sub_task.start()
-    #         sleep(1)  # give it time to start
-    #
-    #         # there is already a callback, fail.
-    #     if frame_type in self._sub_task._callbacks:
-    #         return (False, "'%s' is already registered for a callback." % frame_type)
-    #
-    #         # everything is good, set up the callback
-    #     self._sub_task._callbacks[frame_type] = cb_fun
-    #     pipe = self._ctx.socket(zmq.REQ)
-    #     pipe.connect(self._sub_task.pipe_url)
-    #     pipe.send_pyobj(self.SUBSCRIBE, zmq.SNDMORE)
-    #     pipe.send_pyobj(frame_type)
-    #
-    #     rval = pipe.recv_pyobj()
-    #     msg = pipe.recv_pyobj()
-    #
-    #     self.subscribe_array(frame_type)
-    #
-    #     return (rval, msg)
 
     def add_callback(self, callback_key, cb_fun):
         """
@@ -613,51 +566,6 @@ class TLSaccess(object):
         if callback_name in self._sub_task._callbacks.keys():
             self._sub_task._callbacks.pop(callback_name)
         return (True, None)
-
-    # def unsubscribe(self, frame_type):
-    #     """Unsubscribes a frame_type from the publishing interface
-    #
-    #     *frame_type:*
-    #       the frame_type of interest. Must be an array name as shown in
-    #       the subscribe() section.
-    #
-    #     returns 'True' if the frame_type was unsubscribed, 'False' if
-    #     not. The function will fail if the frame_type was not previously
-    #     subscribed.
-    #
-    #     """
-    #     self.unsubscribe_array(frame_type)
-    #
-    #     if self._sub_task:
-    #         pipe = self._ctx.socket(zmq.REQ)
-    #         pipe.connect(self._sub_task.pipe_url)
-    #         pipe.send_pyobj(self.UNSUBSCRIBE, zmq.SNDMORE)
-    #         pipe.send_pyobj(frame_type)
-    #         rval = pipe.recv_pyobj()
-    #         msg = pipe.recv_pyobj()
-    #
-    #         if frame_type in self.results.keys():
-    #             self.results.pop(frame_type)
-    #         return (rval, msg)
-    #     return (False, 'No subscriber thread running!')
-    #
-    # def unsubscribe_all(self):
-    #     """Causes all callbacks to be unsubscribed, and terminates the
-    #        subscriber thread. Next call to 'subscribe' will restart
-    #        it.
-    #
-    #     """
-    #     self.unsubscribe_array_all()
-    #
-    #     if self._sub_task:
-    #         pipe = self._ctx.socket(zmq.REQ)
-    #         pipe.connect(self._sub_task.pipe_url)
-    #         pipe.send_pyobj(self.UNSUBSCRIBE_ALL)
-    #         rval = pipe.recv_pyobj()
-    #         msg = pipe.recv_pyobj()
-    #         self._kill_subscriber_thread()
-    #         return (rval, msg)
-    #     return (False, 'No subscriber thread running!')
 
     def my_callback(key, val):
         "An example default callback"
@@ -795,37 +703,6 @@ class TLSaccess(object):
                         if sock == pipe:
                             msg = pipe.recv_pyobj()
 
-                            # if msg == self.SUBSCRIBE:
-                            #     frame_type = pipe.recv_pyobj()
-                            #     subsock.setsockopt(zmq.SUBSCRIBE, frame_type)
-                            #
-                            #     pipe.send_pyobj(True, zmq.SNDMORE)
-                            #     pipe.send_pyobj(frame_type)
-                            #
-                            # elif msg == self.UNSUBSCRIBE:
-                            #     frame_type = pipe.recv_pyobj()
-                            #
-                            #     if frame_type in self._callbacks:
-                            #         subsock.setsockopt(zmq.UNSUBSCRIBE, frame_type)
-                            #         self._callbacks.pop(frame_type)
-                            #
-                            #         pipe.send_pyobj(True, zmq.SNDMORE)
-                            #         pipe.send_pyobj("'%s' unsubscribed." % frame_type)
-                            #     else:
-                            #         pipe.send_pyobj(False, zmq.SNDMORE)
-                            #         pipe.send_pyobj("'%s': No such frame_type is subscribed." % frame_type)
-                            #
-                            #
-                            # elif msg == self.UNSUBSCRIBE_ALL:
-                            #     keys_cleared = self._callbacks.keys()
-                            #
-                            #     for frame_type in self._callbacks:
-                            #         subsock.setsockopt(zmq.UNSUBSCRIBE, frame_type)
-                            #
-                            #     self._callbacks.clear()
-                            #     pipe.send_pyobj(True, zmq.SNDMORE)
-                            #     pipe.send_pyobj('Keys cleared: %s' % ', '.join(keys_cleared))
-
                             if msg == self.QUIT:
                                 #pipe.send_pyobj(True)
                                 self.end_thread = True
@@ -885,9 +762,9 @@ class TLSaccess(object):
                 #print 'In subscriber thread, exception zmq.core.error.ZMQError:', e
                 print("pipe_url:", self.pipe_url)
                 print(" pub_url:", self.pub_url)
-            # except BaseException as e:
-            #     print("Exception in subscriber thread ", e)
-            #     self.end_thread = True
+            except BaseException as e:
+                print("Exception in subscriber thread ", e)
+                self.end_thread = True
 
             finally:
                 print("TLSaccess: Ending subscriber thread.")

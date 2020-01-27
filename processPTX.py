@@ -421,6 +421,7 @@ def zLimitFilter(x, y, z, zLimit=-80, dts=None):
 
 
 def processNewPTXData(lines,
+                      xyzi=None,
                       dts=None,
                       plotTest=True,
                       rot=None,
@@ -442,13 +443,16 @@ def processNewPTXData(lines,
 
     print("ProcessNewPTXData with: ", ellipse)
 
-    if plotTest:
+    if plotTest and lines is not None:
         # make some plots that ensure how we are doing
         # our radial filtering
         tryEllipticalOffsets(lines, ellipse)
 
-    # get the actual float values from the file contents
-    x, y, z, i = getRawXYZ(lines, sampleSize=sampleSize)
+    if lines is not None:
+        # get the actual float values from the file contents
+        x, y, z, i = getRawXYZ(lines, sampleSize=sampleSize)
+    else:
+        x, y, z, i = xyzi
 
     print("Starting with %d lines of data" % len(x))
 

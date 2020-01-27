@@ -15,20 +15,158 @@ from scipy.interpolate import griddata
 from astropy.stats import sigma_clip
 
 from zernikies import getZernikeCoeffs
-from processPTX import processPTX, processNewPTX, aggregateXYZ
+from processPTX import processPTX, processNewPTX, processNewPTXData, aggregateXYZ, getRawXYZ
+
 from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus,  smoothGPUParallel
 from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
                       newParabola, rotateData, parabola
-from plotting import sampleXYZData, scatter3dPlot
+
+from zernikeIndexing import noll2asAnsi, printZs
+from simulateSignal import addCenterBump, zernikeFour
+from simulateSignal import zernikeFive, gaussian
+from plotting import sampleXYZData, scatter3dPlot, surfacePlot
 from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits, splitXYZ
-import plotting
+from weightSmooth import weightSmooth
+from SmoothedFITS import SmoothedFITS
 import settings
+import lassiTestSettings as usettings
+from gpus import loadParallelGPUFiles
 
 # where is the code we'll be running?
 GPU_PATH = settings.GPU_PATH
 # where should we save the results from the GPU smoothing?
 GPU_OUTPUT_PATH = settings.GPU_OUTPUT_PATH
 
+
+def tryFit():
+
+    N = 512
+    
+    # path = "/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1"
+    path = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
+    
+    # file = "Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
+    file = "452_2019-10-11_04:26:55.ptx.csv"
+    x, y, z = loadParallelGPUFiles(file, [path])
+
+    diff, x, y = fitLeicaScan(None, 
+                              xyz=(x, y, z),
+                              N=N,
+                              rFilter=False,
+                              weights=None)
+
+   
+    xr, yr, zr = regridXYZ(x, y, diff, N)
+    print("done")
+
+def tryProcessLeicaDataStream():
+
+    s = usettings.SETTINGS_27MARCH2019
+
+    test = True
+    if test:
+        # read data from previous scans
+        path = s['dataPath']
+        fn = usettings.SCAN9
+
+        fpath = os.path.join(path, fn)
+        with open(fpath, 'r') as f:
+            ls = f.readlines()
+
+        # finally, substitue the data!
+        x, y, z, i = getRawXYZ(ls)
+
+        # fake the datetimes
+        dts = np.zeros(len(x))
+    
+    # TBF: in production this might come from config file?        
+    ellipse, rot = usettings.getData(s)
+
+    # TBF: we'll get these from the manager
+    proj = "TEST"
+    dataDir = "/home/sandboxes/pmargani/LASSI/data"
+    filename = "test2"
+
+    hdr = {'test': 1}
+    processLeicaDataStream(x,
+                           y,
+                           z,
+                           i,
+                           dts,
+                           hdr,
+                           ellipse,
+                           rot,
+                           proj,
+                           dataDir,
+                           filename)        
+def processLeicaDataStream(x,
+                           y,
+                           z,
+                           i,
+                           dts,
+                           hdr,
+                           ellipse,
+                           rot,
+                           project,
+                           dataDir,
+                           filename):
+    """
+    x, y, z: data streamed from scanner
+    i: intensity values
+    dts: datetime values
+    hdr: header dictionary from scanner stream
+    ellipse: used for filtering data (dependent on scanner position)
+    dataDir: where data files get written to (eg, /home/gbtdata)
+    project: same sense as GBT project (eg, TGBT19A_500_01)
+    filename: basename of file products (eg, 2019_09_26_01:35:43)
+    """
+
+    # do basic processing first: remove bad data, etc.
+    # TBF: backwards compatible (bad) interface
+    lines = None
+    xyzi = (x, y, z, i)
+    xyz, dts = processNewPTXData(lines,
+                                 xyzi=xyzi,
+                                 rot=rot,
+                                 ellipse=ellipse,
+                                 rFilter=True,
+                                 iFilter=False)
+
+
+    # TBF: refactor the GPU interface to not use files.
+    # for now we need to create this file as input to GPUs
+    fpathBase = os.path.join(dataDir, project, filename)
+    processedPath = "%s.csv" % fpathBase
+    print ("writing filtered data to CSV file: ", processedPath)
+    np.savetxt(processedPath, xyz, delimiter=",")
+
+    # We can lower this for testing purposes
+    # N = 512
+    N = 100
+
+    x, y, z = smoothGPUParallel(processedPath, N)
+
+    # save this off for later use
+    fitsio = SmoothedFITS()
+    fitsio.setData(x, y, z, N, hdr, dataDir, project, filename)
+    fitsio.write()
+
+    return fitsio.getFilePath()
+
+    # TBF: we need to create a visual of the scan,
+    # but the fitting routine below for this
+    # only hangs now, even though unit tests pass
+    # create a visual for validation purposes
+    # diff, x, y = fitLeicaScan(None, 
+    #                           xyz=(x, y, z),
+    #                           N=N,
+    #                           rFilter=False,
+    #                           weights=None)
+
+   
+    # xr, yr, zr = regridXYZ(x, y, diff, N)
+
+    # and save it off for use in GFM later
 
 def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.):
     """
@@ -196,7 +334,7 @@ def processLeicaScan(fpath,
         z.shape = (N,N)
         masked = maskXYZ(x, y, z, n=N, guess=[60., 0., 0., -49., 0., 0.], bounds=None, radialMask=True, maskRadius=49.)
         xx, yy, zz = regridXYZ(x, y, masked['fitResidual'], n=N)
-        plotting.surfacePlot(xx, yy, np.log10(abs(np.diff(zz.T))), title="Pixel by pixel difference", vMin=-5, vMax=0, colorbarLabel="Log10[m]")
+        surfacePlot(xx, yy, np.log10(abs(np.diff(zz.T))), title="Pixel by pixel difference", vMin=-5, vMax=0, colorbarLabel="Log10[m]")
         print("RMS on parabola subtracted scan: {} m".format(np.ma.std(zz)))
 
 def loadProcessedData(filename):
@@ -400,3 +538,141 @@ def regridXYZMasked(x, y, z, n=512, verbose=False, xmin=False, xmax=False, ymin=
 
     return xReg, yReg, zRegMasked
 
+def simulateSignal(sigFn,
+                   refFn,
+                   sigType,
+                   rScale=10., # for use with bump
+                   zScale=1.0, # for use with bump
+                   xOffset=-8., # for use with z's and guassian
+                   yOffset=53., # for use with z's and guassian
+                   zAmplitude=None, # for use with zernikes
+                   gAmplitude=.0017, # for use with gaussian
+                   gWidth=0.2, # for use with guassian
+                   ):
+    """
+    Like processLeicaScanPair, but instead we are 
+    injecting a simulated signal into the signal
+    file data after the smoothing stage.
+    The reference scan we will use processed already.
+    """
+
+    N = 512
+
+    # use the name of the signal scan to determine
+    # where to find the smoothed results
+    # GPU_PATH = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
+    sigFn2 = "%s.ptx.csv" % sigFn
+    sigPath = os.path.join(GPU_PATH, sigFn2)
+
+    # and fit them
+    diffSig, xSig, ySig = fitLeicaScan(sigPath,
+                                       numpy=False,
+                                       N=N,
+                                       rFilter=False)
+
+    # add a simulated signal
+    if sigType == 'bump':
+        from copy import copy
+        diffSigorg = copy(diffSig)
+        #from processPTX import addCenterBump
+        diffSigS = addCenterBump(xSig.flatten(),
+                                 ySig.flatten(),
+                                 diffSig.flatten(),
+                                 rScale=rScale,
+                                 zScale=zScale)
+        # print x18.shape, y18.shape, diff18.shape, diff18b1.shape
+        diffSigS.shape = diffSig.shape
+
+        imagePlot(diffSigS, 'diffSigsS (added bump)')
+        imagePlot(np.log(np.abs(np.diff(diffSigS))), 'diffSigS log (added bump)')
+        # scatter3dPlot(x18, y18, diff18b1, 'diff18b1', sample=10.)        
+    elif sigType == 'z5':
+
+        z5 = zernikeFive(xSig,
+                         ySig,
+                         -xOffset, #0., #-8,
+                         -yOffset, #0., #53.,
+                         amplitude=1e-4,
+                         scale=1.)
+        imagePlot(z5, 'z5')
+        surface3dPlot(xSig, ySig, z5, 'z5')
+        
+        diffSigS = diffSig + z5
+
+        imagePlot(diffSigS, 'diffSigsS (added z5)')
+        imagePlot(np.log(np.abs(np.diff(diffSigS))), 'diffSigS log (added z5)')
+
+    elif sigType == 'z4':
+
+        z4 = zernikeFour(xSig,
+                         ySig,
+                         -xOffset, #0., #-8,
+                         -yOffset,
+                         amplitude=zAmplitude)
+        imagePlot(z4, 'z4')
+        surface3dPlot(xSig, ySig, z4, 'z4')
+        
+        diffSigS = diffSig + z4
+
+        imagePlot(diffSigS, 'diffSigsS (added z4)')
+        imagePlot(np.log(np.abs(np.diff(diffSigS))), 'diffSigS log (added z4)')
+
+    elif sigType == 'gaussian':
+
+        zg = gaussian(xSig,
+                      ySig,
+                      gAmplitude,
+                      xOffset,
+                      yOffset,
+                      gWidth)
+
+        imagePlot(zg, 'gaussian')
+        surface3dPlot(xSig, ySig, zg, 'gaussian')
+
+        # add it to the signal
+        diffSigS = diffSig + zg
+
+        imagePlot(diffSigS, 'diffSigsS (added gaussian)')
+        imagePlot(np.log(np.abs(np.diff(diffSigS))), 'diffSigS log (added gaussian)')
+
+    else:
+        print("sigType not recognized: ", sigType)
+        diffSigS = diffSig
+
+    # regrid to get into evenly spaced x y
+    regridFn = "%s.%s.regridded" % (sigFn, sigType)
+    xSigr, ySigr, diffsSigS = smoothXYZGpu(xSig,
+                                           ySig,
+                                           diffSigS,
+                                           N,
+                                           filename=regridFn)
+
+    diffsSigS.shape = (N, N)
+    imagePlot(difflog(diffsSigS), 'sig + sim regridded')
+
+    
+    # now load the reference scan
+    from lassiAnalysis import loadProcessedData
+    refFn2 = "%s.ptx.processed.npz" % refFn
+    xsRef, ysRef, diffsRef = loadProcessedData(refFn2)
+    imagePlot(difflog(diffsRef), "%s: ref scan" % refFn)
+    
+    diffsRef.shape = (N, N)
+    diffData = diffsSigS - diffsRef
+    diffDataLog = np.log(np.abs(diffData))
+    imagePlot(diffData, "Surface Deformations")    
+    imagePlot(diffDataLog, "Surface Deformations Log")
+
+    print("Mean: ", np.nanmean(diffData))
+    print("Std; ", np.nanstd(diffData))
+    
+    return diffData
+
+def main():
+    fpath = "data/Baseline_STA10_HIGH_METERS.ptx"
+    #processLeicaScan(fpath)
+    tryProcessLeicaDataStream()
+    #tryFit()
+
+if __name__ == "__main__":
+    main()
