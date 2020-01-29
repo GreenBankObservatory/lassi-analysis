@@ -15,6 +15,7 @@ from lassiAnalysis import processLeicaDataStream
 from lassiAnalysis import extractZernikesLeicaScanPair
 from ZernikeFITS import ZernikeFITS
 from ops.getConfigValue import getConfigValue
+from plotting import plotZernikes
 
 # Get a number of settings from the config files:
 # DATADIR = "/home/sandboxes/pmargani/LASSI/data"
@@ -30,6 +31,7 @@ SIM_RESULTS = 1 == int(getConfigValue(".", "analysisResultsSimulated", configFil
 SIM_REF_SMOOTH_RESULT = getConfigValue(".", "analysisSmoothRefResult", configFile=lc)
 SIM_SIG_SMOOTH_RESULT = getConfigValue(".", "analysisSmoothSigResult", configFile=lc)
 SIM_ZERNIKE_RESULT = getConfigValue(".", "analysisZernikeResult", configFile=lc)
+SIM_ZERNIKE_PNG = getConfigValue(".", "analysisZernikePng", configFile=lc)
 PORT = int(getConfigValue(".", "analysisServerPort", configFile=lc))
 print("Starting analysis server using sim results: ", SIM_RESULTS)
 
@@ -203,7 +205,7 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
                            dataDir,
                            filename)
     else:
-        # cp the file to the right locatoin
+        # cp the smoothed file to the right locatoin
         dest = os.path.join(dataDir, proj, 'LASSI', filename)
         dest = dest + ".smoothed.fits"
         # which file?
@@ -244,12 +246,32 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         fitsio.setZernikes(zernikes)
         print ("Writing Zernikes to: ", fitsio.getFilePath())
         fitsio.write()
+
+        # now make sure there's a plot for this fits file too
+        zDict = {}
+        for i in range(len(zernikes)):
+            k = "Z%d" % (i + 1)
+            zDict[k] = zernikes[i]
+
+        p = plotZernikes(zDict)
+        
+        # change extension from .fits to .png
+        fn = fitsio.getFilePath()[:-4] + "png"
+        print ("Writing Zernikes png to: ", fn)
+        p.savefig(fn)    
+
     else:
-        # cp the file to the right locatoin
+        # cp the files to the right locatoin
+        # first the zernike FITS file
         dest = os.path.join(dataDir, proj, 'LASSI', filename)
         dest = dest + ".zernike.fits"
-        print("simulating zernike results from %s to %s" % (SIM_ZERNIKE_RESULT, dest))
+        print("simulating zernike FITS results from %s to %s" % (SIM_ZERNIKE_RESULT, dest))
         shutil.copy(SIM_ZERNIKE_RESULT, dest)
+
+        # then copy over the image file
+        dest = dest[:-4] + "png"
+        print("simulating zernike PNG results from %s to %s" % (SIM_ZERNIKE_PNG, dest))
+        shutil.copy(SIM_ZERNIKE_PNG, dest)
 
 def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
     print("starting process, with state: ", state.value)
