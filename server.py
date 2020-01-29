@@ -1,4 +1,4 @@
-
+import shutil
 import zmq
 import random
 import sys
@@ -16,9 +16,22 @@ from lassiAnalysis import extractZernikesLeicaScanPair
 from ZernikeFITS import ZernikeFITS
 from ops.getConfigValue import getConfigValue
 
+# Get a number of settings from the config files:
 # DATADIR = "/home/sandboxes/pmargani/LASSI/data"
+# from system.conf:
 DATADIR = getConfigValue(".", "YGOR_DATA")
 print("Writing FITS files to YGOR_DATA: ", DATADIR)
+
+# from LASSI.conf:
+# TLS_HOST = "galileo.gb.nrao.edu"
+lc = "LASSI.conf"
+TLS_HOST = getConfigValue(".", "tlsServerHost", configFile=lc)
+SIM_RESULTS = 1 == int(getConfigValue(".", "analysisResultsSimulated", configFile=lc))
+SIM_REF_SMOOTH_RESULT = getConfigValue(".", "analysisSmoothRefResult", configFile=lc)
+SIM_SIG_SMOOTH_RESULT = getConfigValue(".", "analysisSmoothSigResult", configFile=lc)
+SIM_ZERNIKE_RESULT = getConfigValue(".", "analysisZernikeResult", configFile=lc)
+PORT = int(getConfigValue(".", "analysisServerPort", configFile=lc))
+print("Starting analysis server using sim results: ", SIM_RESULTS)
 
 # states
 READY = 0 #"READY"
@@ -46,9 +59,6 @@ filename = None
 # connect to the scanner
 # a = TLSaccess("lassi.ad.nrao.edu")
 # TLS_HOST = "lassi.ad.nrao.edu"
-TLS_HOST = "galileo.gb.nrao.edu"
-
-
 
 def getFITSFilePath(proj, filename):
     return os.path.join(DATADIR, proj, "LASSI", filename + ".fits")
@@ -113,17 +123,17 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     # here we can finally process the data
     time.sleep(3)
 
-    test = True
+    # test = True
 
-    if test:
-        results = {
-            'X_ARRAY': None,
-            'Y_ARRAY': None,
-            'Z_ARRAY': None,
-            'TIME_ARRAY': None,
-            'I_ARRAY': None,
-            'HEADER': {},
-        }
+    # if test:
+    #     results = {
+    #         'X_ARRAY': None,
+    #         'Y_ARRAY': None,
+    #         'Z_ARRAY': None,
+    #         'TIME_ARRAY': None,
+    #         'I_ARRAY': None,
+    #         'HEADER': {},
+    #     }
 
     # get x, y, z and intesity from results
     x = results['X_ARRAY']
@@ -133,7 +143,8 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     dts = results['TIME_ARRAY']
     hdrObj = results['HEADER']
 
-    hdr = hdrObj.asdict() if not test else {}
+    # hdr = hdrObj.asdict() if not test else {}
+    hdr = hdrObj.asdict()
 
     # update the header with more metadata
     hdr['mc_project'] = proj
@@ -152,23 +163,23 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
 
     s = settings.SETTINGS_27MARCH2019
 
-    if test:
-        # read data from previous scans
-        path = s['dataPath']
+    # if test:
+    #     # read data from previous scans
+    #     path = s['dataPath']
 
-        # determine which scan to read depending on
-        # whether this is a reference or signal scan
-        fn = settings.SCAN9 if refScan else settings.SCAN11
+    #     # determine which scan to read depending on
+    #     # whether this is a reference or signal scan
+    #     fn = settings.SCAN9 if refScan else settings.SCAN11
 
-        fpath = os.path.join(path, fn)
-        with open(fpath, 'r') as f:
-            ls = f.readlines()
+    #     fpath = os.path.join(path, fn)
+    #     with open(fpath, 'r') as f:
+    #         ls = f.readlines()
 
-        # finally, substitue the data!
-        x, y, z, i = getRawXYZ(ls)
+    #     # finally, substitue the data!
+    #     x, y, z, i = getRawXYZ(ls)
 
-        # fake the datetimes
-        dts = np.zeros(len(x))
+    #     # fake the datetimes
+    #     dts = np.zeros(len(x))
     
     # TBF: in production this might come from config file?        
     ellipse, rot = settings.getData(s)
@@ -179,7 +190,8 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     dataDir = DATADIR
     # filename = "test"
 
-    fitsFile = processLeicaDataStream(x,
+    if not SIM_RESULTS:
+        fitsFile = processLeicaDataStream(x,
                            y,
                            z,
                            i,
@@ -190,6 +202,14 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
                            proj,
                            dataDir,
                            filename)
+    else:
+        # cp the file to the right locatoin
+        dest = os.path.join(dataDir, proj, 'LASSI', filename)
+        dest = dest + ".smoothed.fits"
+        # which file?
+        simFile = SIM_REF_SMOOTH_RESULT if refScan else SIM_SIG_SMOOTH_RESULT
+        print("simulating smoothed results from %s to %s" % (simFile, dest))
+        shutil.copy(simFile, dest)
 
     # any more processing?
     if refScan:
@@ -203,25 +223,33 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     # find the previous refscan:
     # print("look for file for scan", refScanNum)
     sigScanFile = filename
-    N = 100
+    #N = 100
+    N = 512
 
-    print("files: ", refScanFile, sigScanFile, fitsFile)
 
-    #testSig = '/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1/1.csv'
-    #testRef = '/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1/2.csv'
-    # extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.)
-    # extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=N, nZern=36)
-    xs, ys, zs, zernikes = extractZernikesLeicaScanPair(refScanFile,
-                                                        fitsFile,
-                                                        n=N,
-                                                        nZern=36)
+    if not SIM_RESULTS:
+        print("files: ", refScanFile, sigScanFile, fitsFile)
+        #testSig = '/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1/1.csv'
+        #testRef = '/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1/2.csv'
+        # extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.)
+        # extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=N, nZern=36)
+        xs, ys, zs, zernikes = extractZernikesLeicaScanPair(refScanFile,
+                                                            fitsFile,
+                                                            n=N,
+                                                            nZern=36)
 
-    # write results to final fits file                                                        nZern=36)
-    fitsio = ZernikeFITS()
-    fitsio.setData(xs, ys, zs, N, hdr, dataDir, proj, filename)
-    fitsio.setZernikes(zernikes)
-    print ("Writing Zernikes to: ", fitsio.getFilePath())
-    fitsio.write()
+        # write results to final fits file                                                        nZern=36)
+        fitsio = ZernikeFITS()
+        fitsio.setData(xs, ys, zs, N, hdr, dataDir, proj, filename)
+        fitsio.setZernikes(zernikes)
+        print ("Writing Zernikes to: ", fitsio.getFilePath())
+        fitsio.write()
+    else:
+        # cp the file to the right locatoin
+        dest = os.path.join(dataDir, proj, 'LASSI', filename)
+        dest = dest + ".zernike.fits"
+        print("simulating zernike results from %s to %s" % (SIM_ZERNIKE_RESULT, dest))
+        shutil.copy(SIM_ZERNIKE_RESULT, dest)
 
 def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
     print("starting process, with state: ", state.value)
@@ -248,7 +276,8 @@ def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
     state.value = READY
     print ("done, setting state: ", state.value)
 
-port = "5557"
+port = PORT
+# port = "5557"
 #port = "9020"
 context = zmq.Context()
 socket = context.socket(zmq.REP)
