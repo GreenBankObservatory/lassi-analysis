@@ -141,8 +141,8 @@ def processLeicaDataStream(x,
     np.savetxt(processedPath, xyz, delimiter=",")
 
     # We can lower this for testing purposes
-    # N = 512
-    N = 100
+    N = 512
+    # N = 100
 
     x, y, z = smoothGPUParallel(processedPath, N)
 
