@@ -21,7 +21,8 @@ class TestGpus(unittest.TestCase):
 
         cmd = smoothGPUs(gpuPath, inFile, outFile, n, test=test)
 
-        user = os.getlogin()
+        #user = os.getlogin()
+        user = "test" #os.getlogin()
         host = settings.GPU_HOST
         path = os.path.dirname( os.path.abspath(gpus.__file__) )
         exp = "%s/runGpuSmooth gpuPath %s %s inFile outFile 512 0.00100" % (path, user, host)
@@ -52,7 +53,8 @@ class TestGpus(unittest.TestCase):
 
         cmds = smoothGPUMultiFile(gpuPaths, hosts, inFile, outFile, n, test=test)
 
-        user = os.getlogin()
+        #user = os.getlogin()
+        user = "test" #os.getlogin()
         path = os.path.dirname( os.path.abspath(gpus.__file__) )
 
         exps = []
@@ -89,7 +91,8 @@ class TestGpus(unittest.TestCase):
 
         cmds = smoothGPUMulti(gpuPaths, hosts, inFiles, outFile, n, test=test)
 
-        user = os.getlogin()
+        #user = os.getlogin()
+        user = "test" #os.getlogin()
         path = os.path.dirname( os.path.abspath(gpus.__file__) )
 
         exps = []
