@@ -4,6 +4,7 @@ import random
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+
 def surfacePlot(x, y, z, title=False, vMin=-5e-3, vMax=5e-3, colorbarLabel=False):
     """
     """
@@ -26,6 +27,7 @@ def surfacePlot(x, y, z, title=False, vMin=-5e-3, vMax=5e-3, colorbarLabel=False
     ax.set_ylabel('y axis (m)')
     if title:
         plt.title(title)
+
 
 def barChartPlot(index, fitlist, expected=[]):
     """
@@ -57,6 +59,7 @@ def barChartPlot(index, fitlist, expected=[]):
     plt.gca().tick_params('y', which='minor', direction='in', left=True, right=True)
     plt.gca().tick_params('x', which='minor', bottom=False)
 
+
 def zernikeResiduals2DPlot(xx, yy, zz):
     """
     Plots the residuals of a Zernike fit.
@@ -70,12 +73,14 @@ def zernikeResiduals2DPlot(xx, yy, zz):
     plt.title('Remaining Aberration', fontsize=18)
     ax.set_aspect('equal', 'datalim')
 
+
 def linePlot(y, title):
     fig = plt.figure()
     ax = fig.gca()
     ax.plot(range(len(y)), y)
     plt.title(title)
-    
+
+
 def imagePlot(z, title):
     """
     """
@@ -87,7 +92,11 @@ def imagePlot(z, title):
     fig.colorbar(cax)
     plt.title(title)
 
+
 def surface3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
+    """
+    """
+
     fig = plt.figure()
     ax = Axes3D(fig)
 
@@ -104,6 +113,7 @@ def surface3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
         plt.xlim(xlim)
     if ylim is not None:
         plt.ylim(ylim)
+
 
 def scatter3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
 

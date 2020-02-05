@@ -309,7 +309,8 @@ def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfe
 
     if method is None:
         if weights is None:
-            print("Using parabola.fitParabola for fit.")
+            if verbose:
+                print("Using parabola.fitParabola for fit.")
             method = fitParabola
             args = (x.flatten(), y.flatten(), z.flatten())
         else:
