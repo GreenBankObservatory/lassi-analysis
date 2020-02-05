@@ -6,9 +6,13 @@ import logging.config
 import numpy as np
 from datetime import datetime
 
-from . import runTLSLogging
+#from . import runTLSLogging
+import runTLSLogging
 
-from .pyTLS import TLSaccess
+#from .pyTLS import TLSaccess
+
+from pyTLS import TLSaccess
+# import lassiTestSettings
 
 # Initialize the logging configuration
 logging.config.dictConfig(runTLSLogging.config)
@@ -235,8 +239,10 @@ def runThisScan():
 
 
     a=TLSaccess("lassi.ad.nrao.edu")
+    print("initial connection")
 
     status = a.get_status()
+    print(status)
     if status.state != 'Ready':
         logger.debug("Is not ready, not running scan")
         a.cntrl_exit()
@@ -253,7 +259,7 @@ def runThisScan():
     #proj = "11jun2019_24hrTests"
     #proj = "14aug2019_test"
     # proj = "17sep2019_test"
-    proj = "test"
+    proj = "TEST"
     res = "63mm@100m"
     #res = "31mm@100m"
     sensitivity = "Normal"
@@ -266,8 +272,8 @@ def runThisScan():
     # scans > 15
     cntr_az = 270
     cntr_el = 45
-    az_fov = 45
-    el_fov = 45
+    az_fov = 15
+    el_fov = 15
 
     # make this a short scan
     #az_fov = 30
@@ -293,8 +299,71 @@ def runThisScan():
     a.cntrl_exit()
     sys.exit(1)
 
+def runSimScan():
+
+    a=TLSaccess("lassi.ad.nrao.edu")
+    # a=TLSaccess("galileo.gb.nrao.edu")
+    print("initial connection")
+
+    status = a.get_status()
+    print(status)
+    if status.state != 'Ready':
+        logger.debug("Is not ready, not running scan")
+        a.cntrl_exit()
+        sys.exit(1)
+
+    proj = "TEST"
+    res = "63mm@100m"
+    sensitivity = "Normal"
+    scan_mode = "Speed"
+    cntr_az = 270
+    cntr_el = 45
+    az_fov = 15
+    el_fov = 15
+    msg = "Proj: %s, Resolution: %s, Sensitivity: %s, Scan Mode: %s, cntr_az: %f, cntr_el: %f, az_fov: %f, el_fov: %f" % (proj, res, sensitivity, scan_mode, cntr_az, cntr_el, az_fov, el_fov)
+    logger.debug(msg)
+    configureScanner(a, proj, res, sensitivity, scan_mode, cntr_az, cntr_el, az_fov, el_fov)
+
+    # get back scan 9 from 27 march data
+    # s = lassiTestSettings.SETTINGS_27MARCH2019
+    # path = s['dataPath']
+    # fn = lassiTestSettings.SCAN9
+    # simFile = os.path.join(s['dataPath'], fn)
+    # simFile = "/home/sandboxes/jbrandt/Telescope27Mar2019/Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx"
+    # simFile = "Z:\LASSI\scannerData\tmp\Scan9.ptx"
+    simFile = "/home/scratch/pmargani/LASSI/scannerData/tmp/test.ptx"
+    print ("setting sim file to", simFile)
+    a.set_simulated_scan_data_file(simFile)
+
+    try:
+        logger.debug("Running Scans!")
+        #runOneScan(a)
+        print("simply sending start scan cmd")
+        a.start_scan()
+        #a.export_data()
+
+        state = "unknown"
+        while state != "Ready":
+            status = a.get_status()
+            state = status.state
+            print("State: ", state)
+            time.sleep(1)
+    
+        print ("Scan Done")
+    
+        time.sleep(5)
+        #a.export_data()
+        
+    except KeyboardInterrupt:
+        a.cntrl_exit()
+    finally:
+        a.cntrl_exit()
+
+    a.cntrl_exit()
+    sys.exit(1)
+
 def main():
-    runThisScan()
+    runSimScan()
     
 if __name__=='__main__':
     main()

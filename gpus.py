@@ -200,7 +200,7 @@ def smoothGPUMulti(gpuPaths,
     gpuMultiScript = "{0}/runGpuParts".format(scriptDir)
 
     # first just try it with two GPUs
-    user = os.getlogin()
+    user = os.getlogin() if not test else "test"
     # host1 = settings.GPU_HOST
     # host2 = settings.GPU_HOST_2
     # hosts = [host1, host2]
@@ -265,7 +265,7 @@ def smoothGPUs(gpuPath,
         sigAzEl = 0.001
     
     # get ssh credentials and target
-    user = os.getlogin()
+    user = os.getlogin() if not test else "test"
 
     if host is None:
         host = settings.GPU_HOST

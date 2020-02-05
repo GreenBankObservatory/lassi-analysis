@@ -3,6 +3,10 @@ import random
 
 import matplotlib.pylab as plt
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm 
+
+import numpy as np
+import opticspy
 
 
 def surfacePlot(x, y, z, title=False, vMin=-5e-3, vMax=5e-3, colorbarLabel=False):
@@ -176,3 +180,39 @@ def sampleXYZData(x, y, z, samplePercentage, seed=None):
     idx = random.sample(range(lenx), sampleSize)
 
     return copy(x[idx]), copy(y[idx]), copy(z[idx])
+
+def plotZernikes(zDict, title=None, xlabel=False):
+    "{'Z1': 1, 'Z2: 0.5} -> zernike surface plot"
+
+    zn = opticspy.zernike.Coefficient(**zDict)
+
+    # this can't be saved to a file, so do it here
+    # zn.zernikemap() 
+
+    
+    theta = np.linspace(0, 2*np.pi, 400)
+    rho = np.linspace(0, 1, 400)
+    [u,r] = np.meshgrid(theta,rho)
+    X = r*np.cos(u)
+    Y = r*np.sin(u)
+    Z = opticspy.interferometer_zenike.__zernikepolar__(zn.__coefficients__,r,u)
+    fig = plt.figure(figsize=(12, 8), dpi=80)
+    ax = fig.gca()
+    im = plt.pcolormesh(X, Y, Z, cmap=cm.RdYlGn)
+
+    if title is not None:
+        plt.title(title)
+
+    # this only makes sense if you only have a few zernikes,
+    # not they typical 27
+    if xlabel:
+        ax.set_xlabel(zn.listcoefficient()[1], fontsize=10)    
+        
+    # if label == True:
+    #         __plt__.title('Zernike Polynomials Surface Heat Map',fontsize=18)
+    #         ax.set_xlabel(self.listcoefficient()[1],fontsize=18)
+    plt.colorbar()
+    ax.set_aspect('equal', 'datalim')
+    # __plt__.show()
+
+    return plt

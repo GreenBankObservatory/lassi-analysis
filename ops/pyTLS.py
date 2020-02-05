@@ -9,9 +9,10 @@ import numpy as np
 import msgpack_numpy
 import inspect
 from datetime import datetime
+import sys
 
-CONTROL_PORT=':55560'
-DATAPUB_PORT=':55562'
+CONTROL_PORT=':35560'
+DATAPUB_PORT=':35562'
 
 SCAN_MODES = {"Speed" : 0, "Range" : 1, "Medium Range" : 2, "Long Range" : 3}
 SCANSENSITIVITY = {"Normal" : 0, "High" : 1}
@@ -23,6 +24,7 @@ RESOLUTIONTOTEXT = { 0: "500mm@100m", 1: "250mm@100m", 2:"125mm@100m", \
 SENSITIVITYTOTEXT = {0: "Normal", 1: "High" }
 SCANMODETOTEXT = {0: "Speed", 1: "Range", 2: "Medium Range", 3: "Long Range" }
 
+
 def mycb(a, b):
     if a in "OK_STATUS":
         print("\nScanner State=", b.state)
@@ -31,10 +33,10 @@ def mycb(a, b):
 
 class OKStatus:
     def __init__(self, g):
-        self.error_msg = g[0]
+        self.error_msg = g[0].decode()
         self.is_ok = g[1]
         self.scan_number = g[2]
-        self.state = g[3]
+        self.state = g[3].decode()
         self.state_id = g[4]
 
     def __str__(self):
@@ -65,7 +67,7 @@ class ScanHeaderInfo:
             self.scan_number = int(g[4])
             ns_since_1970 = int(g[5])
             self.scan_time = datetime.fromtimestamp(ns_since_1970/1.0E9) # DateTime from long
-            self.tls_project = g[6]
+            self.tls_project = g[6].decode()
             resolution = int(g[7])
             if resolution in RESOLUTIONTOTEXT.keys():
                 self.tls_resolution = RESOLUTIONTOTEXT[resolution]
@@ -78,6 +80,25 @@ class ScanHeaderInfo:
             sensitivity = int(g[10]) # convert to string
             if sensitivity in SENSITIVITYTOTEXT.keys():
                 self.tls_sensitivity = SENSITIVITYTOTEXT[sensitivity]
+            self.tls_tilt_compensator = int(g[11])
+
+    def asdict(self):
+        d = {
+            "center_az" : self.center_az,
+            "center_el" : self.center_el,
+            "fov_az" : self.fov_az,
+            "fov_el" : self.fov_el,
+            "scan_number": self.scan_number,
+            "scan_time": self.scan_time,
+            "project": self.tls_project,
+            "resolution" : self.tls_resolution,
+            "scan_mode" : self.tls_scan_mode,
+            "tls_serial_number" : self.tls_serial_number,
+            "sensitivity" : self.tls_sensitivity,
+            "tls_tilt_compensator" : self.tls_tilt_compensator
+        }
+        return d
+
 
     def __str__(self):
         """
@@ -96,9 +117,10 @@ class ScanHeaderInfo:
         scan_mode = %s
         tls_serial_number = %d
         sensitivity = %s
+        tls_tilt_compensator = %d
         """ % (self.center_az, self.center_el, self.fov_az, self.fov_el, self.scan_number, \
                self.scan_time, self.tls_project, self.tls_resolution, self.tls_scan_mode, \
-               self.tls_serial_number, self.tls_sensitivity)
+               self.tls_serial_number, self.tls_sensitivity, self.tls_tilt_compensator)
         return s
 
 
@@ -176,11 +198,8 @@ class TLSaccess(object):
         print("""set_scan_number""")
         print(self.set_scan_number.__doc__)
 
-        # print("""subscribe(which_array, callback=None)""")
-        # print(self.subscribe.__doc__)
-        #
-        # print("""unsubscribe(which_array)""")
-        # print(self.unsubscribe.__doc__)
+        print("""set_simulated_data_file(ptxdatafile""")
+        print(self.set_simulated_scan_data_file.__doc__)
 
         print("""add_callback(callback_name, cb_fun)""")
         print(self.add_callback.__doc__)
@@ -209,7 +228,14 @@ class TLSaccess(object):
         print("""export_csv_results(filename)""")
         print(self.export_csv_results.__doc__)
 
-      
+        print("""list_projects()""")
+        print(self.list_projects.__doc__)
+
+        print("""list_scan_names(project_name)""")
+        print(self.list_scan_names.__doc__)
+
+        print("""export_scan_from_project(project, scan)""")
+        print(self.export_scan_from_project.__doc__)
 
     def parse_OKStatus(self, msg):
         if msg is None:
@@ -218,6 +244,13 @@ class TLSaccess(object):
         kk = msgpack.unpackb(msg[1])
         status = OKStatus(kk)
         return status
+
+    def parse_listScans(self, msg):
+        bin_scanlist = msgpack.unpackb(msg[1])
+        scanlist = []
+        for k in bin_scanlist:
+            scanlist.append(k.decode())
+        return scanlist
 
     def encode_MoveAz(self, azcmd):
         return msgpack.packb([azcmd], use_bin_type=True)
@@ -229,16 +262,22 @@ class TLSaccess(object):
         #Note: this order must match the ordering in lassi_daq
         return msgpack.packb([ctr_az, ctr_el, fov_az, fov_el, project, res, mode, sensitivity])
 
-    def simple_cmd(self, cmd):
-        self.csock.send_string(cmd)
+    def simple_cmd(self, cmd, args=None):
+        if args is None:
+            self.csock.send_string(cmd)
+        else:
+            self.csock.send_string(cmd, zmq.SNDMORE)
+            for i in range(0,  len(args)):
+                if i < len(args)-1:
+                    self.csock.send_string(args[i], zmq.SNDMORE)
+                else:
+                    self.csock.send_string(args[i])
+
         rtn = self.csock.recv_multipart()
         return self.parse_OKStatus(rtn)
 
-    def encode_string(self, string):
-        return msgpack.packb([string])
 
     # API methods below
-
     def configure_scanner(self, project, resolution, sensitivity, scan_mode, center_az, center_el, fov_az, fov_el):
         """
         Sends a configuration to the scanner. Fields are:
@@ -291,7 +330,7 @@ class TLSaccess(object):
 
         msg = self.encode_Config(project, _resolution, _sensitivity, _scan_mode, \
                                  center_az, center_el, fov_az, fov_el)
-        self.csock.send('Configure', zmq.SNDMORE)
+        self.csock.send_string('Configure', zmq.SNDMORE)
         self.csock.send(msg)
 
         rtn = self.csock.recv_multipart()
@@ -304,7 +343,7 @@ class TLSaccess(object):
         returns an OKStatus object
         """
         msg = self.encode_MoveAz(az)
-        self.csock.send('MoveAz', zmq.SNDMORE)
+        self.csock.send_string('MoveAz', zmq.SNDMORE)
         self.csock.send(msg)
 
         rtn = self.csock.recv_multipart()
@@ -318,7 +357,7 @@ class TLSaccess(object):
             print(a.get_status().scan_number) also works.
         """
         msg = self.encode_ScanNumber(scannum)
-        self.csock.send('SetScanNumber', zmq.SNDMORE)
+        self.csock.send_string('SetScanNumber', zmq.SNDMORE)
         self.csock.send(msg)
 
         rtn = self.csock.recv_multipart()
@@ -374,8 +413,53 @@ class TLSaccess(object):
         """
         # clear the buffer first!
         self.results.clear()
-        
         return self.simple_cmd("Export")
+
+    def export_scan_from_project(self, project, scan):
+        """
+        Sends the command to publish a specific scan from a specific project
+        :param project: string name of project
+        :param scan: string name of scan e.g 'Scan-21'
+        :return: returns an OKStatus object
+        """
+        self.results.clear()
+        return self.simple_cmd('ExportScanFromProject', [project, scan])
+
+    def list_scan_names(self, project_name):
+        """
+        Requests a list of the scans in project named project_name.
+        Use list_projects() to query the available projects.
+        :param project_name: string, name of project on scanner
+        :return: list of string scan names
+        """
+        self.csock.send_string('ListScansFromProject', zmq.SNDMORE)
+        self.csock.send_string(project_name)
+
+        rtn = self.csock.recv_multipart()
+        scans = self.parse_listScans(rtn)
+        return scans
+
+    def list_projects(self):
+        """
+        Query the scanner for a list of the stored project names on the TLS.
+        :return: list of string project names
+        """
+        self.csock.send_string('ListProjects')
+        rtn = self.csock.recv_multipart()
+        projects = self.parse_listScans(rtn)
+        return projects
+
+    def set_simulated_scan_data_file(self, simfile):
+        """
+        Sets the ptx file which the lassi_daq will read when in simulation mode is enabled.
+        (i.e. run lassi_daq with the --simulate flag set)
+        Note: The file path must be relative to where the lassi_daq is running. For
+        example, running lassi_daq on windows and specifying a file in /home/sandboxes
+        will not work.
+        :param ptx file to use
+        :return: returns an OKStatus object
+        """
+        return self.simple_cmd('SetSimulatedScanFile', [simfile])
 
     def save_result(self, frame_type, data):
         """
@@ -422,80 +506,6 @@ class TLSaccess(object):
             self._sub_task.join()
             del self._sub_task
             self._sub_task = None
-
-    # def subscribe(self, frame_type = None, cb_fun = None):
-    #     """Subscribes to one or more of the pipeline data frames.
-    #        Each frame is one vector from the latest TLS scan.
-    #        If frame_type is None, subscriptions for x,y,z,i and time are issued.
-    #        Frame types are:
-    #             * "X_ARRAY" - x measurement vector as numpy array
-    #             * "Y_ARRAY" - y measurement vector as numpy array
-    #             * "Z_ARRAY" - z measurement vector as numpy array
-    #             * "AZ_ARRAY" - az measurement vector as numpy array
-    #             * "EL_ARRAY" - el measurement vector as numpy array
-    #             * "R_ARRAY" - radial measurement vector as numpy array
-    #             * "I_ARRAY" - intensity measurement vector as numpy array
-    #             * "TIME_ARRAY - "MJD's for each pixel, as numpy array
-    #         Each frame is subscribed independently, and can be mixed and matched.
-    #
-    #     *frame_type:*
-    #       the frame_type of interest. Must be a one of the 8 types listed above
-    #
-    #     *cb_fun:*
-    #       the callback function, which must take 2 args: the key, and a 1-D numpy array
-    #
-    #     returns 'True' if the subscription was successful, 'False'
-    #     otherwise. The function will fail if 'frame_type' is already
-    #     subscribed.
-    #
-    #     """
-    #
-    #     if frame_type is None:
-    #         self.subscribe("X_ARRAY", cb_fun)
-    #         self.subscribe("Y_ARRAY", cb_fun)
-    #         self.subscribe("Z_ARRAY", cb_fun)
-    #         self.subscribe("I_ARRAY", cb_fun)
-    #         return self.subscribe("TIME_ARRAY", cb_fun)
-    #
-    #     # check to see if key exists
-    #     if not frame_type in self.array_names and frame_type != "OK_STATUS":
-    #         return (False, "'%s' is not a valid frame type." % frame_type)
-    #
-    #     if cb_fun is not None:
-    #         try:
-    #             x = inspect.getargspec(cb_fun)
-    #
-    #             # Should be a function that takes two parameters.
-    #             if len(x.args) != 2:
-    #                 return (False, 'Callback function must take 2 arguments')
-    #         except TypeError:
-    #             # not a function at all!
-    #             return (False, 'Callback object is not a function!')
-    #
-    #
-    #         # start the subscriber task if not already running
-    #     if not self._sub_task:
-    #         self._sub_task = TLSaccess.PipelineSubscriberThread(self)
-    #         self._sub_task.start()
-    #         sleep(1)  # give it time to start
-    #
-    #         # there is already a callback, fail.
-    #     if frame_type in self._sub_task._callbacks:
-    #         return (False, "'%s' is already registered for a callback." % frame_type)
-    #
-    #         # everything is good, set up the callback
-    #     self._sub_task._callbacks[frame_type] = cb_fun
-    #     pipe = self._ctx.socket(zmq.REQ)
-    #     pipe.connect(self._sub_task.pipe_url)
-    #     pipe.send_pyobj(self.SUBSCRIBE, zmq.SNDMORE)
-    #     pipe.send_pyobj(frame_type)
-    #
-    #     rval = pipe.recv_pyobj()
-    #     msg = pipe.recv_pyobj()
-    #
-    #     self.subscribe_array(frame_type)
-    #
-    #     return (rval, msg)
 
     def add_callback(self, callback_key, cb_fun):
         """
@@ -556,51 +566,6 @@ class TLSaccess(object):
         if callback_name in self._sub_task._callbacks.keys():
             self._sub_task._callbacks.pop(callback_name)
         return (True, None)
-
-    # def unsubscribe(self, frame_type):
-    #     """Unsubscribes a frame_type from the publishing interface
-    #
-    #     *frame_type:*
-    #       the frame_type of interest. Must be an array name as shown in
-    #       the subscribe() section.
-    #
-    #     returns 'True' if the frame_type was unsubscribed, 'False' if
-    #     not. The function will fail if the frame_type was not previously
-    #     subscribed.
-    #
-    #     """
-    #     self.unsubscribe_array(frame_type)
-    #
-    #     if self._sub_task:
-    #         pipe = self._ctx.socket(zmq.REQ)
-    #         pipe.connect(self._sub_task.pipe_url)
-    #         pipe.send_pyobj(self.UNSUBSCRIBE, zmq.SNDMORE)
-    #         pipe.send_pyobj(frame_type)
-    #         rval = pipe.recv_pyobj()
-    #         msg = pipe.recv_pyobj()
-    #
-    #         if frame_type in self.results.keys():
-    #             self.results.pop(frame_type)
-    #         return (rval, msg)
-    #     return (False, 'No subscriber thread running!')
-    #
-    # def unsubscribe_all(self):
-    #     """Causes all callbacks to be unsubscribed, and terminates the
-    #        subscriber thread. Next call to 'subscribe' will restart
-    #        it.
-    #
-    #     """
-    #     self.unsubscribe_array_all()
-    #
-    #     if self._sub_task:
-    #         pipe = self._ctx.socket(zmq.REQ)
-    #         pipe.connect(self._sub_task.pipe_url)
-    #         pipe.send_pyobj(self.UNSUBSCRIBE_ALL)
-    #         rval = pipe.recv_pyobj()
-    #         msg = pipe.recv_pyobj()
-    #         self._kill_subscriber_thread()
-    #         return (rval, msg)
-    #     return (False, 'No subscriber thread running!')
 
     def my_callback(key, val):
         "An example default callback"
@@ -727,7 +692,7 @@ class TLSaccess(object):
 
                 # sytactic sugar
                 subsock = self.subsock
-                subsock.setsockopt(zmq.SUBSCRIBE, "HEADER")
+                subsock.setsockopt(zmq.SUBSCRIBE, "".encode())
 
                 while not self.end_thread:
                     event = poller.poll(200)
@@ -737,37 +702,6 @@ class TLSaccess(object):
 
                         if sock == pipe:
                             msg = pipe.recv_pyobj()
-
-                            # if msg == self.SUBSCRIBE:
-                            #     frame_type = pipe.recv_pyobj()
-                            #     subsock.setsockopt(zmq.SUBSCRIBE, frame_type)
-                            #
-                            #     pipe.send_pyobj(True, zmq.SNDMORE)
-                            #     pipe.send_pyobj(frame_type)
-                            #
-                            # elif msg == self.UNSUBSCRIBE:
-                            #     frame_type = pipe.recv_pyobj()
-                            #
-                            #     if frame_type in self._callbacks:
-                            #         subsock.setsockopt(zmq.UNSUBSCRIBE, frame_type)
-                            #         self._callbacks.pop(frame_type)
-                            #
-                            #         pipe.send_pyobj(True, zmq.SNDMORE)
-                            #         pipe.send_pyobj("'%s' unsubscribed." % frame_type)
-                            #     else:
-                            #         pipe.send_pyobj(False, zmq.SNDMORE)
-                            #         pipe.send_pyobj("'%s': No such frame_type is subscribed." % frame_type)
-                            #
-                            #
-                            # elif msg == self.UNSUBSCRIBE_ALL:
-                            #     keys_cleared = self._callbacks.keys()
-                            #
-                            #     for frame_type in self._callbacks:
-                            #         subsock.setsockopt(zmq.UNSUBSCRIBE, frame_type)
-                            #
-                            #     self._callbacks.clear()
-                            #     pipe.send_pyobj(True, zmq.SNDMORE)
-                            #     pipe.send_pyobj('Keys cleared: %s' % ', '.join(keys_cleared))
 
                             if msg == self.QUIT:
                                 #pipe.send_pyobj(True)
@@ -780,7 +714,7 @@ class TLSaccess(object):
 
                         if sock == subsock:
                             msg = subsock.recv_multipart()
-                            message_header = msg[0]
+                            message_header = msg[0].decode()
                             # print("KEY=", message_header)
                             if message_header in "OK_STATUS":
                                 status = self.tls_access.parse_OKStatus(msg)
@@ -799,8 +733,13 @@ class TLSaccess(object):
 
                                 self.tls_access.hdr_info = ScanHeaderInfo(msgpack.unpackb(msg[1]))
                                 self.tls_access.save_result(message_header, self.tls_access.hdr_info)
+                                if self.tls_access.hdr_info.tls_tilt_compensator != 0:
+                                    print("******** ERROR **********")
+                                    print("** Tilt Compensator is ON **")
+                                    print("This will cause bad data when used in inverted position - you have been warned")
+                                    print("*************************")
                                 for i in range(2, len(msg), 2):
-                                    key = msg[i]
+                                    key = msg[i].decode()
                                     if key in self.tls_access.array_names:
                                         numpy_array = msgpack.unpackb(msg[i+1], object_hook=msgpack_numpy.decode)
                                         self.tls_access.save_result(key, numpy_array)

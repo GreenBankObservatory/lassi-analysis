@@ -87,7 +87,8 @@ def runTLSandGBTscans(zernikes,
                       scan_number=None,
                       res=None,
                       scan_mode=None,
-                      sensitivity=None):
+                      sensitivity=None,
+                      process=True):
 
     lassiPath = "/home/sandboxes/pmargani/LASSI/data/9oct2019"
 
@@ -126,11 +127,16 @@ def runTLSandGBTscans(zernikes,
     asm.TurnOnThermalZernikes()
     asm.ZeroThermalZernikes()
 
+    # configure the processing
+    # Parameters for processing (segmenting and smoothing) the raw PTX data.
+    n = 512
+    xOffset = -44; yOffset=-6.5; rot=80.; radius=49.
+
     keepGoing = True
     while keepGoing:
         try:    
-            if twoFlat:
-                runTwoFlatMntScans(a=a)
+            # if twoFlat:
+                # runTwoFlatMntScans(a=a)
 
             for zi, zValue in zernikes:
                 
@@ -147,7 +153,12 @@ def runTLSandGBTscans(zernikes,
                 logger.debug("Active Surface ref scan number: %d" % asScanNumber)
 
                 logger.debug("Running reference scan")
-                runOneScan(a, path=lassiPath)
+                refPtxFile = runOneScan(a, path=lassiPath)
+
+                # process the ref scan - this just creates smoothed csv file
+                if process:
+                    processLeicaScan2(refPtxFile, N=n, rot=rot, ellipse=[xOffset, yOffset, radius, radius, 0.],
+                              maskRetro=False, regrid=False, save=False, returnData=False)
 
                 # Signal scan:
                 checkOnConditions(asm)
@@ -163,7 +174,26 @@ def runTLSandGBTscans(zernikes,
                 logger.debug("Active Surface ref scan number: %d" % asScanNumber)
 
                 logger.debug("Running signal scan")
-                runOneScan(a, path=lassiPath)
+                sigPtxFile = runOneScan(a, path=lassiPath)
+
+                # process the signal scan - this just creates smoothed csv file
+                if process:
+                    processLeicaScan2(sigPtxFile, N=n, rot=rot, ellipse=[xOffset, yOffset, radius, radius, 0.],
+                              maskRetro=False, regrid=False, save=False, returnData=False)
+
+                    # in theory, this reproduces the zernike we sent in above
+                    refFile = refPtxFile + ".csv"
+                    sigFile = sigPtxFile + ".csv"
+                    x, y, diff, fitlist = extractZernikesLeicaScanPair(refFile, sigFile)
+
+                    # now send the difference of the commanded and calculates z's
+                    # to the active surface
+                    # TBF:
+                    diffZs = []
+                    asm.SendZernikesList(zs)
+
+                    # now run a third lassi scan - no real time processing needing!
+                    thirdPtxFile = runOneScan(a, path=lassiPath)
 
                 # keep going?
                 if not repeat:
