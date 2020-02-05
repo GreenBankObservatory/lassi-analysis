@@ -238,25 +238,26 @@ def getRawXYZ(ls, sampleSize=None):
 
     numLines = 0
 
-    # for i, l in enumerate(ls):
     for i in lsIdx:
         l = ls[i]
 
-        # print i, l
         if "Line" in l:
-            # print l
             numLines += 1
             continue
 
         ll = l.split(' ')
-        x = float(ll[0])
-        y = float(ll[1])
-        z = float(ll[2])
-        i = float(ll[3])
-        xs.append(x)
-        ys.append(y)
-        zs.append(z)
-        it.append(i)
+        try:
+            x = float(ll[0])
+            y = float(ll[1])
+            z = float(ll[2])
+            i = float(ll[3])
+            xs.append(x)
+            ys.append(y)
+            zs.append(z)
+            it.append(i)
+        except IndexError:
+            print("Line {0} is missing columns.".format(i))
+            continue
 
     print("Skipped %d non-data lines" % numLines)
 
