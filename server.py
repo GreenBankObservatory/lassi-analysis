@@ -4,6 +4,7 @@ import random
 import sys
 import os
 import time
+from datetime import datetime
 from multiprocessing import Process, Value
 
 import numpy  as np
@@ -71,6 +72,28 @@ def getRefScanFileName(scans, proj, refScanNum):
         print ("Proj not in scans: ", proj, scans.keys())
         return None
 
+    # if the ref scan number HAS NOT BEEN specified
+    if refScanNum is None or refScanNum == 0:
+        # then we need to find the most recent ref scan
+        pScans = scans[proj]
+        newestRefScan = None
+        for scanNum, scanInfo in pScans.items():
+            # if it's a refScan, how old is it?
+            if bool(scanInfo['refScan']):
+                if newestRefScan is None:
+                    newestRefScan = scanInfo
+                
+                elif scanInfo['timestamp'] > newestRefScan['timestamp']:
+                    newestRefScan = scanInfo
+        if newestRefScan is None:
+            # TBF: go to the file system to look for it?
+            print("ERROR: cannot find refScan from", proj, refScanNum, scans)
+            return None
+        else:
+            print("getRefScanFileName: ", newestRefScan)
+            return newestRefScan['filepathSmoothed']
+
+    # if it has, can we use it?
     if refScanNum not in scans[proj]:
         print ("Scan not in proj: ", refScanNum, scans[proj].keys())
         return None            
@@ -212,6 +235,7 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         simFile = SIM_REF_SMOOTH_RESULT if refScan else SIM_SIG_SMOOTH_RESULT
         print("simulating smoothed results from %s to %s" % (simFile, dest))
         shutil.copy(simFile, dest)
+        fitsFile = dest
 
     # any more processing?
     if refScan:
@@ -229,8 +253,9 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     N = 512
 
 
+    print("files: ", refScanFile, sigScanFile, fitsFile)
+
     if not SIM_RESULTS:
-        print("files: ", refScanFile, sigScanFile, fitsFile)
         #testSig = '/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1/1.csv'
         #testRef = '/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1/2.csv'
         # extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.)
@@ -242,6 +267,8 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
 
         # write results to final fits file                                                        nZern=36)
         fitsio = ZernikeFITS()
+        # make it clear where the ref scan came from
+        hdr['REFSCNFN'] = os.path.basename(refScanFile)
         fitsio.setData(xs, ys, zs, N, hdr, dataDir, proj, filename)
         fitsio.setZernikes(zernikes)
         print ("Writing Zernikes to: ", fitsio.getFilePath())
@@ -326,6 +353,8 @@ while True:
             if proj not in scans:
                 scans[proj] = {}
             scans[proj][scanNum] = {
+                "scanNum": scanNum,
+                "timestamp": datetime.now(),
                 "refScan": refScan,
                 "refScanNum": refScanNum,
                 "filename": filename,
