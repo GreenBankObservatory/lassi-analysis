@@ -17,6 +17,7 @@ from lassiAnalysis import extractZernikesLeicaScanPair
 from ZernikeFITS import ZernikeFITS
 from ops.getConfigValue import getConfigValue
 from plotting import plotZernikes
+from SmoothedFITS import SmoothedFITS
 
 # Get a number of settings from the config files:
 # DATADIR = "/home/sandboxes/pmargani/LASSI/data"
@@ -29,12 +30,16 @@ print("Writing FITS files to YGOR_DATA: ", DATADIR)
 lc = "LASSI.conf"
 TLS_HOST = getConfigValue(".", "tlsServerHost", configFile=lc)
 SIM_RESULTS = 1 == int(getConfigValue(".", "analysisResultsSimulated", configFile=lc))
+SIM_INPUTS = 1 == int(getConfigValue(".", "analysisInputsSimulated", configFile=lc))
+SIM_REF_INPUT = getConfigValue(".", "analysisRefInput", configFile=lc)
+SIM_SIG_INPUT = getConfigValue(".", "analysisSigInput", configFile=lc)
 SIM_REF_SMOOTH_RESULT = getConfigValue(".", "analysisSmoothRefResult", configFile=lc)
 SIM_SIG_SMOOTH_RESULT = getConfigValue(".", "analysisSmoothSigResult", configFile=lc)
 SIM_ZERNIKE_RESULT = getConfigValue(".", "analysisZernikeResult", configFile=lc)
 SIM_ZERNIKE_PNG = getConfigValue(".", "analysisZernikePng", configFile=lc)
 PORT = int(getConfigValue(".", "analysisServerPort", configFile=lc))
 print("Starting analysis server using sim results: ", SIM_RESULTS)
+print("Starting analysis server using sim  inputs: ", SIM_INPUTS)
 
 # states
 READY = 0 #"READY"
@@ -161,15 +166,29 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     #     }
 
     # get x, y, z and intesity from results
-    x = results['X_ARRAY']
-    y = results['Y_ARRAY']
-    z = results['Z_ARRAY']
-    i = results['I_ARRAY']
-    dts = results['TIME_ARRAY']
-    hdrObj = results['HEADER']
+    if not SIM_INPUTS:
+        x = results['X_ARRAY']
+        y = results['Y_ARRAY']
+        z = results['Z_ARRAY']
+        i = results['I_ARRAY']
+        dts = results['TIME_ARRAY']
+        hdrObj = results['HEADER']
 
-    # hdr = hdrObj.asdict() if not test else {}
-    hdr = hdrObj.asdict()
+        # hdr = hdrObj.asdict() if not test else {}
+        hdr = hdrObj.asdict()
+    else:
+        simFile = SIM_REF_INPUT if bool(refScan) else SIM_SIG_INPUT
+        print("Using simulated input: ", simFile)
+        # this is not smoothed data, but it still can be read
+        f = SmoothedFITS()
+        f.read(simFile)
+
+        x = f.x      
+        y = f.y      
+        z = f.z
+        i = f.hdus[1].data.field("INTENSIT")
+        dts = f.hdus[1].data.field('DMJD')
+        hdr = dict(f.hdr)      
 
     # update the header with more metadata
     hdr['mc_project'] = proj

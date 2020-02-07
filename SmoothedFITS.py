@@ -70,7 +70,8 @@ class SmoothedFITS:
         for k, v in self.hdr.items():
             if k == "scan_time":
                 v = v.strftime("%Y-%m-%d %H:%M:%S")
-            header[k] = v
+            if k != 'COMMENT':    
+                header[k] = v
         # additional header info
         if "N" not in self.hdr:
             header["N"] = self.N
@@ -88,11 +89,11 @@ class SmoothedFITS:
 
     def read(self, filepath):
 
-        hdus = fits.open(filepath)
+        self.hdus = fits.open(filepath)
 
-        self.hdr = hdus[0].header
+        self.hdr = self.hdus[0].header
 
-        data = hdus[1].data
+        data = self.hdus[1].data
 
         self.x = data.field('x')
         self.y = data.field('y')
@@ -114,14 +115,32 @@ def tryWrite():
     f.write()
 
 def tryRead():
-    fn = "/home/sandboxes/pmargani/LASSI/data/TEST/LASSI/test.smoothed.fits"
+    # fn = "/home/sandboxes/pmargani/LASSI/data/TEST/LASSI/test.smoothed.fits"
+    fn = "/export/simdata/JUNK/LASSI/2020_02_07_18:26:20.fits"
     f = SmoothedFITS()
     f.read(fn)
+    x = f.x      
+    y = f.y      
+    z = f.z
+    i = f.hdus[1].data.field("INTENSIT")
+    dts = f.hdus[1].data.field('DMJD')
+    hdr = dict(f.hdr)
+    print ("hdr:", hdr)     
     print (f.x.shape)
-    print (f.hdr)
-    print (f.hdr['N'])
+    for k, v in f.hdr.items():
+        print (k, v)
+    # print (f.hdr['N'])
     
+    N = 512
+    dataDir = "/users/pmargani/tmp"
+    proj = "TEST"
+    filenameBase = "test"
+
+    f2 = SmoothedFITS()
+    f2.setData(x, y, z, N, hdr, dataDir, proj, filenameBase)
+    f2.write()
+
 if __name__ == '__main__':
     # main()
-    # tryRead()
-    tryWrite()
+    tryRead()
+    #tryWrite()
