@@ -109,7 +109,8 @@ def processLeicaDataStream(x,
                            rot,
                            project,
                            dataDir,
-                           filename):
+                           filename,
+                           plot=True):
     """
     x, y, z: data streamed from scanner
     i: intensity values
@@ -150,6 +151,16 @@ def processLeicaDataStream(x,
     fitsio = SmoothedFITS()
     fitsio.setData(x, y, z, N, hdr, dataDir, project, filename)
     fitsio.write()
+
+    smoothedFitsFilename = fitsio.getFilePath()
+
+    if plot:
+        # how should we save the image of our processed data?
+        ext = "smoothed.fits"
+        fn = smoothedFitsFilename[:-len(ext)] + "processed.png"
+        print("Processing smoothed data, imaging to:", fn)
+        # process a little more and create a surface plot for diagnosis
+        imageSmoothedData(x, y, z, N, filename=fn)
 
     return fitsio.getFilePath()
 
@@ -329,19 +340,36 @@ def processLeicaScan(fpath,
     print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
     
     if plot:
-        x.shape = (N,N)
-        y.shape = (N,N)
-        z.shape = (N,N)
-        masked = maskXYZ(x, y, z, n=N, guess=[60., 0., 0., -49., 0., 0.], bounds=None, radialMask=True, maskRadius=49.)
-        xx, yy, zz = regridXYZ(x, y, masked['fitResidual'], n=N)
-        surfacePlot(xx, yy, np.log10(abs(np.diff(zz.T))), title="Pixel by pixel difference", vMin=-5, vMax=0, colorbarLabel="Log10[m]")
-        print("RMS on parabola subtracted scan: {} m".format(np.ma.std(zz)))
+        imageSmoothedData(x, y, z, N)
+        # x.shape = (N,N)
+        # y.shape = (N,N)
+        # z.shape = (N,N)
+        # masked = maskXYZ(x, y, z, n=N, guess=[60., 0., 0., -49., 0., 0.], bounds=None, radialMask=True, maskRadius=49.)
+        # xx, yy, zz = regridXYZ(x, y, masked['fitResidual'], n=N)
+        # surfacePlot(xx, yy, np.log10(abs(np.diff(zz.T))), title="Pixel by pixel difference", vMin=-5, vMax=0, colorbarLabel="Log10[m]")
+        # print("RMS on parabola subtracted scan: {} m".format(np.ma.std(zz)))
 
 def loadProcessedData(filename):
     "Loads the results of processLeicaScan from file"
     d = np.load(filename)
     return d["xs"], d["ys"], d["diffs"], d["retroMask"]
 
+def imageSmoothedData(x, y, z, N, filename=None):
+    x.shape = (N,N)
+    y.shape = (N,N)
+    z.shape = (N,N)
+    masked = maskXYZ(x, y, z, n=N, guess=[60., 0., 0., -49., 0., 0.], bounds=None, radialMask=True, maskRadius=49.)
+    xx, yy, zz = regridXYZ(x, y, masked['fitResidual'], n=N)
+    surfacePlot(xx,
+                yy,
+                np.log10(abs(np.diff(zz.T))),
+                title="Pixel by pixel difference",
+                vMin=-5,
+                vMax=0,
+                colorbarLabel="Log10[m]",
+                filename=filename)
+
+    print("RMS on parabola subtracted scan: {} m".format(np.ma.std(zz)))
 
 def maskXYZ(x, y, z, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radialMask=True, maskRadius=40., **kwargs):
     """
