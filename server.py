@@ -299,7 +299,8 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
             k = "Z%d" % (i + 1)
             zDict[k] = zernikes[i]
 
-        p = plotZernikes(zDict)
+        title = "%s:%s" % (proj, scanNum)
+        p = plotZernikes(zDict, title=title)
         
         # change extension from .fits to .png
         fn = fitsio.getFilePath()[:-4] + "png"
