@@ -288,6 +288,9 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         fitsio = ZernikeFITS()
         # make it clear where the ref scan came from
         hdr['REFSCNFN'] = os.path.basename(refScanFile)
+        # make sure the zernikes are in microns, not meters
+        hdr['ZUNITS'] = 'microns'
+        zernikes = zernikes * 1e6
         fitsio.setData(xs, ys, zs, N, hdr, dataDir, proj, filename)
         fitsio.setZernikes(zernikes)
         print ("Writing Zernikes to: ", fitsio.getFilePath())
