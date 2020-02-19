@@ -80,7 +80,13 @@ def viewLassiTestScans(path):
 
 def main():
     # path = "/export/simdata/TINT_200203"
-    path = "/export/simdata/TINT_3"
+    # path = "/export/simdata/TINT_3"
+    # path = "/export/simdata/TINT_200210"
+    #path = "/export/simdata/TINT_200211"
+    # path = "/home/gbtdata/TINT_200214"
+    # path = "/home/gbtdata/TLASSI_200219"
+    import sys
+    path = sys.argv[1]
     viewLassiTestScans(path)
 
 if __name__ == '__main__':
