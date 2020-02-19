@@ -55,6 +55,13 @@ SETTINGS_11OCTOBER2019 = {
     'radius': 49.0,
     'dataPath': '/home/sandboxes/pmargani/LASSI/data/9oct2019'
     }
+SETTINGS_19FEB2020 = {
+    'xOffset': -42.0,
+    'yOffset': -6.5,
+    'rot': 80.0,
+    'radius': 49.0,
+    'dataPath': '/home/gbtdata/TLASSI_200219'
+    }
 
 DATA_UNIT_TESTS = "/home/scratch/pmargani/LASSI/unitTestData/"
 

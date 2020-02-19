@@ -18,6 +18,7 @@ from ZernikeFITS import ZernikeFITS
 from ops.getConfigValue import getConfigValue
 from plotting import plotZernikes
 from SmoothedFITS import SmoothedFITS
+from settings import GPU_MULTI_HOSTS, GPU_MULTI_PATHS
 
 # Get a number of settings from the config files:
 # DATADIR = "/home/sandboxes/pmargani/LASSI/data"
@@ -40,6 +41,8 @@ SIM_ZERNIKE_PNG = getConfigValue(".", "analysisZernikePng", configFile=lc)
 PORT = int(getConfigValue(".", "analysisServerPort", configFile=lc))
 print("Starting analysis server using sim results: ", SIM_RESULTS)
 print("Starting analysis server using sim  inputs: ", SIM_INPUTS)
+print("For smoothing using these hosts: ", GPU_MULTI_HOSTS)
+print("from these installations: ", GPU_MULTI_PATHS)
 
 # states
 READY = 0 #"READY"
@@ -205,7 +208,8 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     #                   dts=dts,
     #                   plotTest=False)
 
-    s = settings.SETTINGS_27MARCH2019
+    # s = settings.SETTINGS_27MARCH2019
+    s = settings.SETTINGS_19FEB2020
 
     # if test:
     #     # read data from previous scans
@@ -290,7 +294,10 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         hdr['REFSCNFN'] = os.path.basename(refScanFile)
         # make sure the zernikes are in microns, not meters
         hdr['ZUNITS'] = 'microns'
-        zernikes = zernikes * 1e6
+        print(zernikes)
+        print(type(zernikes))
+        # zernikes = zernikes * 1e6
+        zernikes = [z * 1e6 for z in zernikes]
         fitsio.setData(xs, ys, zs, N, hdr, dataDir, proj, filename)
         fitsio.setZernikes(zernikes)
         print ("Writing Zernikes to: ", fitsio.getFilePath())
