@@ -1,14 +1,16 @@
-from copy import copy
-import random
-import os
 
+import os
+import random
 import numpy as np
+
+from copy import copy
 from scipy.optimize import least_squares
-from scipy.optimize import leastsq
+
 # Do this if you run into the dreaded Tkinter import error
 #import matplotlib
 #matplotlib.use('agg')
 import matplotlib.pylab as plt
+
 from mpl_toolkits.mplot3d import Axes3D
 
 from utils.utils import sph2cart, cart2sph
@@ -16,6 +18,14 @@ from utils.utils import sph2cart, cart2sph
 from rotate import *
 
 from SmoothedFITS import SmoothedFITS
+
+"""
+TODO: 
+- move plotting methods to the plotting module.
+- clean up unused methods.
+- devise a method that can fit for the parabola focus
+  while producing accurate rotation parameters (robust).
+"""
 
 def parabola(xdata, ydata, focus, v1x=0, v1y=0, v2=0, heavy=False):
     if heavy:
@@ -177,7 +187,8 @@ def fitLeicaScan(fn,
                  xyz=None,
                  inSpherical=False,
                  weights=None,
-                 plot=True):
+                 plot=True,
+                 guess=None):
 
     # TBF: ignore weights for now!
 
@@ -225,11 +236,12 @@ def fitLeicaScan(fn,
             scatter3dPlot(x, y, z, "Leica Data Radial Filtered")
 
     # assemble initial guess
-    f = 60.
-    v1x = v1y = v2 = 0
-    xTheta = 0. #-np.pi / 2.
-    yTheta = 0.
-    guess = [f, v1x, v1y, v2, 0., 0.]
+    if guess is None:
+        f = 60.
+        v1x = v1y = v2 = 0
+        xTheta = 0. #-np.pi / 2.
+        yTheta = 0.
+        guess = [f, v1x, v1y, v2, 0., 0.]
 
     if weights is not None:
         print("Weights: ", weights.shape, weights)

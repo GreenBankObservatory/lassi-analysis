@@ -59,6 +59,7 @@ def tryFit():
     xr, yr, zr = regridXYZ(x, y, diff, N)
     print("done")
 
+
 def tryProcessLeicaDataStream():
 
     s = usettings.SETTINGS_27MARCH2019
@@ -99,6 +100,7 @@ def tryProcessLeicaDataStream():
                            proj,
                            dataDir,
                            filename)        
+
 
 def processLeicaDataStream(x,
                            y,
@@ -180,9 +182,11 @@ def processLeicaDataStream(x,
 
     # and save it off for use in GFM later
 
+
 def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.):
     """
     Takes two smoothed Leica scans and extracts Zernike coefficients from their difference, reference - signal.
+
     :param refScanFile: File with the smoothed reference scan. <scan_name>.ptx.csv
     :param sigScanFile: File with the smoothed signal scan. <scan_name>.ptx.csv
     :param n: Number of elements per side in the smoothed data.
@@ -347,27 +351,48 @@ def processLeicaScan(fpath,
         # surfacePlot(xx, yy, np.log10(abs(np.diff(zz.T))), title="Pixel by pixel difference", vMin=-5, vMax=0, colorbarLabel="Log10[m]")
         # print("RMS on parabola subtracted scan: {} m".format(np.ma.std(zz)))
 
+
 def loadProcessedData(filename):
     "Loads the results of processLeicaScan from file"
     d = np.load(filename)
     return d["xs"], d["ys"], d["diffs"], d["retroMask"]
 
+
 def imageSmoothedData(x, y, z, N, filename=None):
+    """
+    Prepares the data to produce the diagnostic plots shown by GFM.
+
+    :param x: x coordinates of the point cloud.
+    :param y: y coordinates of the point cloud.
+    :param z: z coordinates of the point cloud.
+    :param N: number of points per side in the smoothed data.
+    :param filename: save the plot to this location.
+    """
+
+    # Reshape the coordinates before masking.
     x.shape = (N,N)
     y.shape = (N,N)
     z.shape = (N,N)
-    masked = maskXYZ(x, y, z, n=N, guess=[60., 0., 0., -49., 0., 0.], bounds=None, radialMask=True, maskRadius=49.)
-    xx, yy, zz = regridXYZ(x, y, masked['fitResidual'], n=N)
+
+    # Mask deviant points in the z coordinate.
+    masked = maskXYZ(x, y, z, n=N, guess=[60., 0., 0., -49., 0., 0.], 
+                     bounds=None, radialMask=True, maskRadius=49.)
+    
+    # Regrid to a uniformly sampled grid in cartesian coordinates, keeping the mask.
+    xx, yy, zz = regridXYZMasked(x, y, masked['fitResidual'], n=N)
+
+    # Plot the surface.
     surfacePlot(xx,
                 yy,
-                np.log10(abs(np.diff(zz.T))),
-                title="Pixel by pixel difference",
+                np.log10(abs(np.diff(zz))),
+                title="Column by column difference",
                 vMin=-5,
-                vMax=0,
+                vMax=-3,
                 colorbarLabel="Log10[m]",
                 filename=filename)
 
     print("RMS on parabola subtracted scan: {} m".format(np.ma.std(zz)))
+
 
 def maskXYZ(x, y, z, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radialMask=True, maskRadius=40., **kwargs):
     """
