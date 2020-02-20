@@ -99,6 +99,7 @@ def tryProcessLeicaDataStream():
                            proj,
                            dataDir,
                            filename)        
+
 def processLeicaDataStream(x,
                            y,
                            z,
@@ -282,10 +283,7 @@ def processLeicaScan(fpath,
     High level function for processing leica data:
        * processes PTX file
        * smoothes it by calling gpu code
-       * fits parabolas to data
-       * regrids final data
-    Final processed scan is ready for difference between
-    this and a ref or signal scan.   
+    Smoothed scan has to be masked and reggrided. 
     """
     
     assert os.path.isfile(fpath)
@@ -302,13 +300,13 @@ def processLeicaScan(fpath,
 
     processedPath = fpath + ".csv"
     
-    xyz, dts = processNewPTX(fpath,
-                             rot=rot,
-                             ellipse=ellipse,
-                             rFilter=True,
-                             iFilter=False,
-                             sampleSize=sampleSize,
-                             addOffset=addOffset)
+    xyz, dts, intensity = processNewPTX(fpath,
+                                        rot=rot,
+                                        ellipse=ellipse,
+                                        rFilter=True,
+                                        iFilter=False,
+                                        sampleSize=sampleSize,
+                                        addOffset=addOffset)
 
     e = time.time()
     print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
