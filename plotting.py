@@ -32,6 +32,9 @@ def surfacePlot(x, y, z, title=False, vMin=-5e-3, vMax=5e-3, colorbarLabel=False
     if title:
         plt.title(title)
 
+    if filename is not None:
+        plt.savefig(filename)
+        
 
 def barChartPlot(index, fitlist, expected=[]):
     """

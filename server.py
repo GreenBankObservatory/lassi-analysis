@@ -4,6 +4,7 @@ import random
 import sys
 import os
 import time
+from datetime import datetime
 from multiprocessing import Process, Value
 
 import numpy  as np
@@ -16,6 +17,8 @@ from lassiAnalysis import extractZernikesLeicaScanPair
 from ZernikeFITS import ZernikeFITS
 from ops.getConfigValue import getConfigValue
 from plotting import plotZernikes
+from SmoothedFITS import SmoothedFITS
+from settings import GPU_MULTI_HOSTS, GPU_MULTI_PATHS
 
 # Get a number of settings from the config files:
 # DATADIR = "/home/sandboxes/pmargani/LASSI/data"
@@ -28,12 +31,18 @@ print("Writing FITS files to YGOR_DATA: ", DATADIR)
 lc = "LASSI.conf"
 TLS_HOST = getConfigValue(".", "tlsServerHost", configFile=lc)
 SIM_RESULTS = 1 == int(getConfigValue(".", "analysisResultsSimulated", configFile=lc))
+SIM_INPUTS = 1 == int(getConfigValue(".", "analysisInputsSimulated", configFile=lc))
+SIM_REF_INPUT = getConfigValue(".", "analysisRefInput", configFile=lc)
+SIM_SIG_INPUT = getConfigValue(".", "analysisSigInput", configFile=lc)
 SIM_REF_SMOOTH_RESULT = getConfigValue(".", "analysisSmoothRefResult", configFile=lc)
 SIM_SIG_SMOOTH_RESULT = getConfigValue(".", "analysisSmoothSigResult", configFile=lc)
 SIM_ZERNIKE_RESULT = getConfigValue(".", "analysisZernikeResult", configFile=lc)
 SIM_ZERNIKE_PNG = getConfigValue(".", "analysisZernikePng", configFile=lc)
 PORT = int(getConfigValue(".", "analysisServerPort", configFile=lc))
 print("Starting analysis server using sim results: ", SIM_RESULTS)
+print("Starting analysis server using sim  inputs: ", SIM_INPUTS)
+print("For smoothing using these hosts: ", GPU_MULTI_HOSTS)
+print("from these installations: ", GPU_MULTI_PATHS)
 
 # states
 READY = 0 #"READY"
@@ -71,6 +80,28 @@ def getRefScanFileName(scans, proj, refScanNum):
         print ("Proj not in scans: ", proj, scans.keys())
         return None
 
+    # if the ref scan number HAS NOT BEEN specified
+    if refScanNum is None or refScanNum == 0:
+        # then we need to find the most recent ref scan
+        pScans = scans[proj]
+        newestRefScan = None
+        for scanNum, scanInfo in pScans.items():
+            # if it's a refScan, how old is it?
+            if bool(scanInfo['refScan']):
+                if newestRefScan is None:
+                    newestRefScan = scanInfo
+                
+                elif scanInfo['timestamp'] > newestRefScan['timestamp']:
+                    newestRefScan = scanInfo
+        if newestRefScan is None:
+            # TBF: go to the file system to look for it?
+            print("ERROR: cannot find refScan from", proj, refScanNum, scans)
+            return None
+        else:
+            print("getRefScanFileName: ", newestRefScan)
+            return newestRefScan['filepathSmoothed']
+
+    # if it has, can we use it?
     if refScanNum not in scans[proj]:
         print ("Scan not in proj: ", refScanNum, scans[proj].keys())
         return None            
@@ -138,15 +169,29 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     #     }
 
     # get x, y, z and intesity from results
-    x = results['X_ARRAY']
-    y = results['Y_ARRAY']
-    z = results['Z_ARRAY']
-    i = results['I_ARRAY']
-    dts = results['TIME_ARRAY']
-    hdrObj = results['HEADER']
+    if not SIM_INPUTS:
+        x = results['X_ARRAY']
+        y = results['Y_ARRAY']
+        z = results['Z_ARRAY']
+        i = results['I_ARRAY']
+        dts = results['TIME_ARRAY']
+        hdrObj = results['HEADER']
 
-    # hdr = hdrObj.asdict() if not test else {}
-    hdr = hdrObj.asdict()
+        # hdr = hdrObj.asdict() if not test else {}
+        hdr = hdrObj.asdict()
+    else:
+        simFile = SIM_REF_INPUT if bool(refScan) else SIM_SIG_INPUT
+        print("Using simulated input: ", simFile)
+        # this is not smoothed data, but it still can be read
+        f = SmoothedFITS()
+        f.read(simFile)
+
+        x = f.x      
+        y = f.y      
+        z = f.z
+        i = f.hdus[1].data.field("INTENSIT")
+        dts = f.hdus[1].data.field('DMJD')
+        hdr = dict(f.hdr)      
 
     # update the header with more metadata
     hdr['mc_project'] = proj
@@ -163,7 +208,8 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     #                   dts=dts,
     #                   plotTest=False)
 
-    s = settings.SETTINGS_27MARCH2019
+    # s = settings.SETTINGS_27MARCH2019
+    s = settings.SETTINGS_19FEB2020
 
     # if test:
     #     # read data from previous scans
@@ -212,6 +258,7 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         simFile = SIM_REF_SMOOTH_RESULT if refScan else SIM_SIG_SMOOTH_RESULT
         print("simulating smoothed results from %s to %s" % (simFile, dest))
         shutil.copy(simFile, dest)
+        fitsFile = dest
 
     # any more processing?
     if refScan:
@@ -229,8 +276,9 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     N = 512
 
 
+    print("files: ", refScanFile, sigScanFile, fitsFile)
+
     if not SIM_RESULTS:
-        print("files: ", refScanFile, sigScanFile, fitsFile)
         #testSig = '/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1/1.csv'
         #testRef = '/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1/2.csv'
         # extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.)
@@ -242,6 +290,14 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
 
         # write results to final fits file                                                        nZern=36)
         fitsio = ZernikeFITS()
+        # make it clear where the ref scan came from
+        hdr['REFSCNFN'] = os.path.basename(refScanFile)
+        # make sure the zernikes are in microns, not meters
+        hdr['ZUNITS'] = 'microns'
+        print(zernikes)
+        print(type(zernikes))
+        # zernikes = zernikes * 1e6
+        zernikes = [z * 1e6 for z in zernikes]
         fitsio.setData(xs, ys, zs, N, hdr, dataDir, proj, filename)
         fitsio.setZernikes(zernikes)
         print ("Writing Zernikes to: ", fitsio.getFilePath())
@@ -253,7 +309,8 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
             k = "Z%d" % (i + 1)
             zDict[k] = zernikes[i]
 
-        p = plotZernikes(zDict)
+        title = "%s:%s" % (proj, scanNum)
+        p = plotZernikes(zDict, title=title)
         
         # change extension from .fits to .png
         fn = fitsio.getFilePath()[:-4] + "png"
@@ -326,6 +383,8 @@ while True:
             if proj not in scans:
                 scans[proj] = {}
             scans[proj][scanNum] = {
+                "scanNum": scanNum,
+                "timestamp": datetime.now(),
                 "refScan": refScan,
                 "refScanNum": refScanNum,
                 "filename": filename,
