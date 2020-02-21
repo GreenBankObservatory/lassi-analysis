@@ -8,29 +8,26 @@ import time
 import numpy as np
 from copy import copy
 from shutil import copyfile
-from scipy.interpolate import griddata
 # import matplotlib
 # matplotlib.use('agg')
 
 from astropy.stats import sigma_clip
 
-from zernikies import getZernikeCoeffs
-from processPTX import processPTX, processNewPTX, processNewPTXData, aggregateXYZ, getRawXYZ
+import settings
+import lassiTestSettings as usettings
 
-from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus,  smoothGPUParallel
+from grid import regridXYZMasked
+from weightSmooth import weightSmooth
+from SmoothedFITS import SmoothedFITS
+from zernikies import getZernikeCoeffs
+from simulateSignal import addCenterBump, gaussian
+from plotting import sampleXYZData, scatter3dPlot, surfacePlot
+from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus,  smoothGPUParallel, loadParallelGPUFiles
+from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits, splitXYZ
+from processPTX import processPTX, processNewPTX, processNewPTXData, aggregateXYZ, getRawXYZ
 from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
                       newParabola, rotateData, parabola
 
-from zernikeIndexing import noll2asAnsi, printZs
-from simulateSignal import addCenterBump
-from simulateSignal import gaussian
-from plotting import sampleXYZData, scatter3dPlot, surfacePlot
-from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits, splitXYZ
-from weightSmooth import weightSmooth
-from SmoothedFITS import SmoothedFITS
-import settings
-import lassiTestSettings as usettings
-from gpus import loadParallelGPUFiles
 
 # where is the code we'll be running?
 GPU_PATH = settings.GPU_PATH
@@ -56,7 +53,7 @@ def tryFit():
                               weights=None)
 
    
-    xr, yr, zr = regridXYZ(x, y, diff, N)
+    xr, yr, zr = regridXYZMasked(x, y, diff, N)
     print("done")
 
 
@@ -522,72 +519,6 @@ def maskLeicaData(filename, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None,
 
     return outData 
 
-
-def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False, ymax=False, method='linear'):
-    """
-    Regrids the XYZ data to a regularly sampled grid.
-
-    :param x: vector with the x coordinates.
-    :param y: vector with the y coordinates.
-    :param z: vector with the z coordinates.
-    :param n: number of samples in the grid.
-    :param verbose: verbose output?
-    """
-    
-    # Set the grid limits.
-    if not xmin:
-        xmin = np.nanmin(x)
-    if not xmax:
-        xmax = np.nanmax(x)
-    if not ymin:
-        ymin = np.nanmin(y)
-    if not ymax:
-        ymax = np.nanmax(y)
-
-    if verbose:
-        print("Limits: ", xmin, xmax, ymin, ymax)
-
-    # Set the grid spacing.
-    dx = (xmax - xmin)/n
-    dy = (ymax - ymin)/n
-    
-    # Make the grid.
-    grid_xy = np.mgrid[xmin:xmax:dx,
-                       ymin:ymax:dy]
-    if verbose:
-        print("New grid shape: ", grid_xy[0].shape)
-
-    # Regrid the data.
-    reg_z = griddata(np.array([x[~np.isnan(z)].flatten(),y[~np.isnan(z)].flatten()]).T, 
-                     z[~np.isnan(z)].flatten(), 
-                     (grid_xy[0], grid_xy[1]), method=method, fill_value=np.nan)
-
-    # We need to flip the reggrided data in the abscisa axis 
-    # so that it has the same orientation as the input.
-    return grid_xy[0], grid_xy[1], reg_z.T
-
-
-def regridXYZMasked(x, y, z, n=512, verbose=False, xmin=False, xmax=False, ymin=False, ymax=False):
-    """
-    """
-
-    outMask = np.ma.masked_invalid(x).mask
-
-    xReg,yReg,zReg = regridXYZ(x[~outMask],
-                               y[~outMask],
-                               z[~outMask],
-                               n=n, verbose=verbose,
-                               xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
-
-    _,_,retroMask = regridXYZ(x[~outMask],
-                              y[~outMask],
-                              z.mask.astype(float)[~outMask],
-                              n=n, verbose=verbose,
-                              xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
-
-    zRegMasked = np.ma.masked_where(retroMask, zReg)
-
-    return xReg, yReg, zRegMasked
 
 def simulateSignal(sigFn,
                    refFn,
