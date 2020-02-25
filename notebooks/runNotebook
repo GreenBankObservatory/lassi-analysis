@@ -1,1 +1,15 @@
-jupyter notebook --ip=galileo.gb.nrao.edu --port=9015 --NotebookApp.token='' --NotebookApp.password='' --no-browser
+HOST=`hostname`
+PORT=$1
+
+re=''
+if [[ ${PORT} =~ re ]] ; then
+   echo "No port specified. Will default to 9020."
+   PORT=9020
+fi
+
+re='^[0-9]+$'
+if ! [[ ${PORT} =~ ${re} ]] ; then
+   echo "error: Not a number" >&2; exit 1
+fi
+
+jupyter notebook --ip=${HOST}.gb.nrao.edu --port=${PORT} --NotebookApp.token='' --NotebookApp.password='' --no-browser
