@@ -14,6 +14,30 @@ from utils.utils import midPoint
 from simulateSignal import zernikePoly
 
 
+class MidpointNormalize(matplotlib.colors.Normalize):
+    """
+    Normalise the colorbar so that diverging bars work 
+    their way either side from a prescribed midpoint value.
+
+    e.g. im=ax1.imshow(array, norm=MidpointNormalize(midpoint=0., vmin=-100, vmax=100))
+
+    :Example:
+
+    >>> import pylab as plt
+    >>> array = [[50,100,50],[-100,-50,-100],[50,100,50]]
+    >>> im = plt.imshow(array, norm=MidpointNormalize(midpoint=0., vmin=-100, vmax=100))
+    """
+    def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+        self.midpoint = midpoint
+        matplotlib.colors.Normalize.__init__(self, vmin, vmax, clip)
+
+    def __call__(self, value, clip=None):
+        # I'm ignoring masked values and all kinds of edge cases to make a
+        # simple example...
+        x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+        return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
+
+
 def surfacePlot(x, y, z, title=False, vMin=-5e-3, vMax=5e-3, colorbarLabel=False, filename=None):
     """
     """
