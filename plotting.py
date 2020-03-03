@@ -1,5 +1,5 @@
 import matplotlib
-matplotlib.use('agg')
+#matplotlib.use('agg')
 
 import random
 import numpy as np
@@ -10,8 +10,8 @@ from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 
 from grid import regridXYZ
-from utils.utils import midPoint
 from simulateSignal import zernikePoly
+from utils.utils import midPoint, sampleXYZData
 
 
 class MidpointNormalize(matplotlib.colors.Normalize):
@@ -27,13 +27,13 @@ class MidpointNormalize(matplotlib.colors.Normalize):
     >>> array = [[50,100,50],[-100,-50,-100],[50,100,50]]
     >>> im = plt.imshow(array, norm=MidpointNormalize(midpoint=0., vmin=-100, vmax=100))
     """
+
     def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
         self.midpoint = midpoint
         matplotlib.colors.Normalize.__init__(self, vmin, vmax, clip)
 
     def __call__(self, value, clip=None):
-        # I'm ignoring masked values and all kinds of edge cases to make a
-        # simple example...
+        # This ignores masked values and edge cases.
         x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
         return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
 
@@ -42,12 +42,16 @@ def surfacePlot(x, y, z, title=False, vMin=-5e-3, vMax=5e-3, colorbarLabel=False
     """
     """
 
+    cmap = plt.matplotlib.cm.coolwarm
+    cmap.set_bad(color='white')
+
     extent = [plt.np.nanmin(x), plt.np.nanmax(x), plt.np.nanmin(y), plt.np.nanmax(y)]
 
-    fig = plt.figure(figsize=(5, 5), dpi=150, frameon=False)
+    fig = plt.figure(figsize=(6, 5), dpi=150, frameon=False)
     ax = fig.add_subplot(111)
 
-    im = ax.imshow(z, extent=extent, vmin=vMin, vmax=vMax)
+    norm = MidpointNormalize(midpoint=0., vmin=vMin, vmax=vMax)
+    im = ax.imshow(z, extent=extent, vmin=vMin, vmax=vMax, norm=norm, cmap=cmap)
 
     cb = plt.colorbar(im, fraction=0.046, pad=0.04)
     if colorbarLabel:
@@ -123,7 +127,6 @@ def imagePlot(z, title):
     
     fig = plt.figure()
     ax = fig.gca()
-    #cax = ax.imshow(np.log(np.abs(np.diff(zrr - newZ))))
     cax = ax.imshow(z)
     fig.colorbar(cax)
     plt.title(title)
@@ -151,7 +154,9 @@ def surface3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
         plt.ylim(ylim)
 
 
-def scatter3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
+def scatter3dPlot(x, y, z, title=None, xlim=None, ylim=None, sample=None, fig=None, axes=None):
+    """
+    """
 
     # plot all the data, or just some?
     if sample is not None:
@@ -159,41 +164,52 @@ def scatter3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
         x, y, z = sampleXYZData(x, y, z, sample)
         print("Now length of data is %d" % len(x))
 
-
-    fig = plt.figure()
-    ax = Axes3D(fig)
-    ax.scatter(x, y, z)
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.title(title)
+    if fig is None:
+        fig = plt.figure()
+    
+    if axes is None:
+        axes = Axes3D(fig)
+    axes.scatter(x, y, z)
+    
+    axes.set_xlabel("x")
+    axes.set_ylabel("y")
+    
+    if title is not None:
+        plt.title(title)
+    
     if xlim is not None:
-        plt.xlim(xlim)
+        axes.set_xlim(xlim)
+    
     if ylim is not None:
-        plt.ylim(ylim)    
+        axes.set_ylim(ylim)    
 
-def scatterPlot(x, y, title, xlim=None, ylim=None, sample=None):
+
+def scatterPlot(x, y, title=None, xlim=None, ylim=None, sample=None):
 
     # plot all the data, or just some?
     if sample is not None:
-        # TBD
         z = copy(y)
         print("Plotting %5.2f percent of data" % sample)
         x, y, z = sampleXYZData(x, y, z, sample)
         print("Now length of data is %d" % len(x))
 
-
     fig = plt.figure()
-    # ax = Axes3D(fig)
+    
     ax = fig.gca()
+    
     ax.scatter(x, y)
+    
     plt.xlabel("x")
     plt.ylabel("y")
-    plt.title(title)
+
+    if title is not None:
+        plt.title(title)
+    
     if xlim is not None:
         plt.xlim(xlim)
+    
     if ylim is not None:
-        plt.ylim(ylim)    
-
+        plt.ylim(ylim)
 
 
 def sampleXYZData(x, y, z, samplePercentage, seed=None):
