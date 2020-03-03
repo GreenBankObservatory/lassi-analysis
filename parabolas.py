@@ -6,18 +6,10 @@ import numpy as np
 from copy import copy
 from scipy.optimize import least_squares
 
-# Do this if you run into the dreaded Tkinter import error
-#import matplotlib
-#matplotlib.use('agg')
-import matplotlib.pylab as plt
-
-from mpl_toolkits.mplot3d import Axes3D
-
-from utils.utils import sph2cart, cart2sph
-
 from rotate import *
-
 from SmoothedFITS import SmoothedFITS
+from utils.utils import sph2cart, cart2sph, sampleXYZData
+from plotting import scatter3dPlot, surface3dPlot, imagePlot
 
 """
 TODO: 
@@ -288,15 +280,6 @@ def fitLeicaScan(fn,
     return diff, newX, newY
 
 
-def imagePlot(z, title):
-    fig = plt.figure()
-    ax = fig.gca()
-    #cax = ax.imshow(np.log(np.abs(np.diff(zrr - newZ))))
-    cax = ax.imshow(z)
-    fig.colorbar(cax)
-    plt.title(title)
-
-
 def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfev=10000, ftol=1e-12, xtol=1e-12, verbose=False):
 
     if verbose:
@@ -366,12 +349,12 @@ def loadLeicaDataFromNumpy(fn):
     
     return (x, y, z), (xx, yy, zz)
 
+
 def loadSmoothedFits(fn):
     f = SmoothedFITS()
     f.read(fn)
     return f.x, f.y, f.z
 
-    #return xyzs['x'], xyzs['y'], xyzs['z']
 
 def loadLeicaDataFromGpus(fn):
     """
@@ -427,21 +410,6 @@ def loadLeicaData(fn, n=None, numpy=True):
     return (x, y, z), (xxn, yyn, zzn)
 
 
-def sampleXYZData(x, y, z, samplePercentage):
-    "Return a random percentage of the data"
-
-    assert len(x) == len(y)
-    assert len(y) == len(z)
-
-    lenx = len(x)
-
-    sampleSize = int((lenx * samplePercentage) / 100.)
-
-    idx = random.sample(range(lenx), sampleSize)
-
-    return copy(x[idx]), copy(y[idx]), copy(z[idx])
-
-
 def radialReplace(x, y, z, xOffset, yOffset, radius, replacement):
     "Replace z values outside of given radius with a new value"
 
@@ -455,45 +423,6 @@ def radialReplace(x, y, z, xOffset, yOffset, radius, replacement):
     print("radialReplace replaced %d points with %s" % (cnt, replacement))
     # only z gets changed
     return z
-
-
-def surface3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
-    fig = plt.figure()
-    ax = Axes3D(fig)
-
-    # plot all the data, or just some?
-    if sample is not None:
-        print("Plotting %5.2f percent of data" % sample)
-        x, y, z = sampleXYZData(x, y, z, sample)
-
-    ax.plot_surface(x, y, z)
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.title(title)
-    if xlim is not None:
-        plt.xlim(xlim)
-    if ylim is not None:
-        plt.ylim(ylim)
-
-
-def scatter3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
-
-    # plot all the data, or just some?
-    if sample is not None:
-        print("Plotting %5.2f percent of data" % sample)
-        x, y, z = sampleXYZData(x, y, z, sample)
-        print("Now length of data is %d" % len(x))
-
-    fig = plt.figure()
-    ax = Axes3D(fig)
-    ax.scatter(x, y, z)
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.title(title)
-    if xlim is not None:
-        plt.xlim(xlim)
-    if ylim is not None:
-        plt.ylim(ylim)
 
 
 def fitNoRot():
