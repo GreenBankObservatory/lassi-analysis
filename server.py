@@ -8,16 +8,22 @@ from datetime import datetime
 from multiprocessing import Process, Value
 
 import numpy  as np
+import msgpack
+import msgpack_numpy
 
 import lassiTestSettings as settings
 from ops.pyTLS import TLSaccess
-from processPTX import getRawXYZ
-from lassiAnalysis import processLeicaDataStream
+from processPTX import getRawXYZ, processNewPTXData
+# from lassiAnalysis import processLeicaDataStream
 from lassiAnalysis import extractZernikesLeicaScanPair
 from ZernikeFITS import ZernikeFITS
 from ops.getConfigValue import getConfigValue
 from plotting import plotZernikes
 from SmoothedFITS import SmoothedFITS
+from utils.utils import splitXYZ
+from gpus import loadParallelGPUFiles
+from lassiAnalysis import imageSmoothedData
+
 from settings import GPU_MULTI_HOSTS, GPU_MULTI_PATHS
 
 # Get a number of settings from the config files:
@@ -59,17 +65,161 @@ stateMap = {
         PROCESSING: "Processing"
         }
 
-state = Value('i', READY)
+def setupServerSocket(port):
 
-proj = None
-scanNum = None
-refScan = True
-refScanNum = None
-filename = None
+    # pubPort = 9001
+    # pubUrl = "tcp://%s:%d" % (pubHost, pubPort)
+    pubUrl = "tcp://*:%d" % (port)
+    print("Publishing from: ", pubUrl)
 
-# connect to the scanner
-# a = TLSaccess("lassi.ad.nrao.edu")
-# TLS_HOST = "lassi.ad.nrao.edu"
+    ctx = zmq.Context()
+    # pubck = zmq.Socket(ctx, zmq.PUB)
+    pubck = ctx.socket(zmq.PUB)
+    # pubck.connect(pubUrl) 
+    pubck.bind(pubUrl)
+
+    return pubck
+
+def publishData(x, y, z, pubSocket):
+
+    # print ("splitting data")
+    # x, y, z = splitXYZ(xyz)
+
+    # print("size of x array: ", len(x))
+
+    port = 9001
+    pubSocket = setupServerSocket(port)
+
+    # x = np.array([1., 2., 3.])
+    # y = np.array([1., 2., 3.])
+    # z = np.array([1., 2., 3.])
+
+    x = msgpack.packb(x, default=msgpack_numpy.encode)
+    y = msgpack.packb(y, default=msgpack_numpy.encode)
+    z = msgpack.packb(z, default=msgpack_numpy.encode)
+    
+    print("publishing primer")
+    pubSocket.send_multipart([b"PRIMER"])
+    time.sleep(3)
+
+    print ("publishing data")
+    # pubSocket.send_multipart([b"HEADER",
+    data = [b"HEADER",
+                          b"HEADER_DATA",
+
+                          b"TIME_ARRAY",
+                          b"TIME_ARRAY_DATA",
+
+                          b"X_ARRAY",
+                          # b"X_ARRAY_DATA",
+                          x,
+
+                          b"Y_ARRAY",
+                          # b"Y_ARRAY_DATA",
+                          y, 
+
+                          b"Z_ARRAY",
+                          # b"Z_ARRAY_DATA",
+                          z,
+
+                          b"I_ARRAY",
+                          # b"I_ARRAY_DATA",
+                          x,
+                          ]
+                          
+    pubSocket.send_multipart(data)
+    print("published!")
+    # pubSocket.send_multipart(data)
+    # print("published again!")
+
+def processLeicaDataStream(x,
+                           y,
+                           z,
+                           i,
+                           dts,
+                           hdr,
+                           ellipse,
+                           rot,
+                           project,
+                           dataDir,
+                           filename,
+                           pubSocket,
+                           plot=True):
+    """
+    x, y, z: data streamed from scanner
+    i: intensity values
+    dts: datetime values
+    hdr: header dictionary from scanner stream
+    ellipse: used for filtering data (dependent on scanner position)
+    dataDir: where data files get written to (eg, /home/gbtdata)
+    project: same sense as GBT project (eg, TGBT19A_500_01)
+    filename: basename of file products (eg, 2019_09_26_01:35:43)
+    """
+
+    # do basic processing first: remove bad data, etc.
+    # TBF: backwards compatible (bad) interface
+    lines = None
+    xyzi = (x, y, z, i)
+    xyz, dts = processNewPTXData(lines,
+                                 xyzi=xyzi,
+                                 rot=rot,
+                                 ellipse=ellipse,
+                                 rFilter=True,
+                                 iFilter=False)
+
+    print("done pre-processing data, ready to smooth")
+
+    # fpathBase = os.path.join(dataDir, project, "LASSI", filename)
+    # processedPath = "%s.csv" % fpathBase
+    # print ("writing filtered data to CSV file: ", processedPath)
+    # np.savetxt(processedPath, xyz, delimiter=",")
+
+    # Next: smooth
+    # where will the smoothing output go?
+    # TBF: don't hard code the file output path!!!
+    outFile = "outfile"
+    outPath = "/users/pmargani/tmp"
+    fn = os.path.join(outPath, outFile)
+    fn = "%s.x.csv" % fn
+    # make sure that output isn't there yet
+    if os.path.isfile(fn):
+        os.remove(fn)
+    
+    # now publish the input to smoothing
+    print("splitting data")
+    x, y, z = splitXYZ(xyz)
+    publishData(x, y, z, pubSocket)
+
+    # We can lower this for testing purposes
+    N = 512
+
+    #x, y, z = smoothGPUParallel(processedPath, N)
+
+    # and wait for it to show up.
+    # TBF: how to handle mutliple parallel GPUs???
+    while not os.path.isfile(fn):
+        print("Waiting on smoothing", fn)
+        time.sleep(5)
+
+    # read in those files
+    x, y, z = loadParallelGPUFiles(outFile, [outPath])
+
+    # save this off for later use
+    fitsio = SmoothedFITS()
+    fitsio.setData(x, y, z, N, hdr, dataDir, project, filename)
+    fitsio.write()
+
+    smoothedFitsFilename = fitsio.getFilePath()
+
+    if plot:
+        # how should we save the image of our processed data?
+        ext = "smoothed.fits"
+        fn = smoothedFitsFilename[:-len(ext)] + "processed.png"
+        print("Processing smoothed data, imaging to:", fn)
+        # process a little more and create a surface plot for diagnosis
+        imageSmoothedData(x, y, z, N, filename=fn)
+
+    return fitsio.getFilePath()
 
 def getFITSFilePath(proj, filename):
     return os.path.join(DATADIR, proj, "LASSI", filename + ".fits")
@@ -149,7 +299,7 @@ def waitForData(state, a):
     return a.get_results()
     # return None
 
-def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, filename):
+def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, filename, pubSocket):
     state.value = PROCESSING
     print(stateMap[PROCESSING])
 
@@ -208,8 +358,9 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     #                   dts=dts,
     #                   plotTest=False)
 
-    # s = settings.SETTINGS_27MARCH2019
-    s = settings.SETTINGS_19FEB2020
+    s = settings.SETTINGS_27MARCH2019
+    # s = settings.SETTINGS_19FEB2020
+    # s = settings.SETTINGS_11OCTOBER2019
 
     # if test:
     #     # read data from previous scans
@@ -249,7 +400,8 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
                            rot,
                            proj,
                            dataDir,
-                           filename)
+                           filename,
+                           pubSocket)
     else:
         # cp the smoothed file to the right locatoin
         dest = os.path.join(dataDir, proj, 'LASSI', filename)
@@ -330,7 +482,7 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         print("simulating zernike PNG results from %s to %s" % (SIM_ZERNIKE_PNG, dest))
         shutil.copy(SIM_ZERNIKE_PNG, dest)
 
-def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
+def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename, pubSocket):
     print("starting process, with state: ", state.value)
 
     # test = True
@@ -349,121 +501,203 @@ def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
     r = waitForData(state, a)
 
     a.cntrl_exit()
-    processing(state, r, proj, scanNum, refScan, refScanNum, refScanFile, filename)
+    processing(state, r, proj, scanNum, refScan, refScanNum, refScanFile, filename, pubSocket)
 
     # done!
     state.value = READY
     print ("done, setting state: ", state.value)
 
-port = PORT
-# port = "5557"
-#port = "9020"
-context = zmq.Context()
-socket = context.socket(zmq.REP)
-socket.bind("tcp://*:%s" % port)
 
-# socket.send_string("Server ready for commands")
-p = None
+def serve():
 
-scans = {}
+    # x = y = z = np.array(range(int(4e6)))
+    # publishData(x, y, z, None)
+    # return
 
+    state = Value('i', READY)
 
+    proj = None
+    scanNum = None
+    refScan = True
+    refScanNum = None
+    filename = None
 
-while True:
-    #print ("waiting for message")
-    msg = socket.recv()
-    #print ("got msg")
-    #print (msg)
-    msgStr = "".join( chr(x) for x in msg)
-    if msg == b"process":
-        if state.value == READY:
-            # record the current state of all parameters so
-            # we know what scans are being processed
-            filepath = getFITSFilePath(proj, filename)
-            if proj not in scans:
-                scans[proj] = {}
-            scans[proj][scanNum] = {
-                "scanNum": scanNum,
-                "timestamp": datetime.now(),
-                "refScan": refScan,
-                "refScanNum": refScanNum,
-                "filename": filename,
-                "filepath": filepath,
-                "filepathSmoothed": filepath.replace(".fits", ".smoothed.fits")
-            }
+    # setup the server REPLY socket
+    port = PORT
+    context = zmq.Context()
+    socket = context.socket(zmq.REP)
+    socket.bind("tcp://*:%s" % port)
 
-            print("scans list:", scans)
-            if not refScan:
-                # this is a signal scan, so get the filename of our 
-                # reference scan
-                refScanFile = getRefScanFileName(scans, proj, refScanNum)
-            else:
-                refScanFile = None
-                
-            print("processing!")
-            p = Process(target=process, 
-                        args=(state,
-                              proj, 
-                              scanNum, 
-                              refScan,
-                              refScanNum, 
-                              refScanFile, 
-                              filename))
-            p.start()
-            #state.value = PROCESSING
-            # socket.send_string("Started Processing")
-            print("Started Processing")
-            socket.send_string("OK")
-        else:
-            print("processing already!")
-            socket.send_string("Already processing")
-    elif msg == b"stop":
-        if state.value not in PROCESS_STATES:
-            socket.send_string("Nothing to stop")
-        else:
-            if p is not None:
-                print ("terminating process")
-                print (stateMap[state.value])
-                p.terminate()
-                state.value = READY
-                print ("process terminated")
+    # initialize the Process object
+    p = None
+
+    # initialize our 'memory' of what scans we
+    # have processed
+    scans = {}
+
+    # pubSocket = setupServerSocket(9001)
+    pubSocket = None
+
+    while True:
+        #print ("waiting for message")
+        msg = socket.recv()
+        #print ("got msg")
+        #print (msg)
+        msgStr = "".join( chr(x) for x in msg)
+
+        # ************ Process Data
+        if msg == b"process":
+            if state.value == READY:
+                # record the current state of all parameters so
+                # we know what scans are being processed
+                filepath = getFITSFilePath(proj, filename)
+                if proj not in scans:
+                    scans[proj] = {}
+                scans[proj][scanNum] = {
+                    "scanNum": scanNum,
+                    "timestamp": datetime.now(),
+                    "refScan": refScan,
+                    "refScanNum": refScanNum,
+                    "filename": filename,
+                    "filepath": filepath,
+                    "filepathSmoothed": filepath.replace(".fits", ".smoothed.fits")
+                }
+
+                print("scans list:", scans)
+                if not refScan:
+                    # this is a signal scan, so get the filename of our 
+                    # reference scan
+                    refScanFile = getRefScanFileName(scans, proj, refScanNum)
+                else:
+                    refScanFile = None
+                    
+                print("processing!")
+                p = Process(target=process, 
+                            args=(state,
+                                  proj, 
+                                  scanNum, 
+                                  refScan,
+                                  refScanNum, 
+                                  refScanFile, 
+                                  filename,
+                                  pubSocket))
+                p.start()
+                #state.value = PROCESSING
+                # socket.send_string("Started Processing")
+                print("Started Processing")
                 socket.send_string("OK")
             else:
-                print ("can't terminate, p is none")
-                socket.send_string("can't terminate, p is none")
-    elif msg == b"get_state": # or msg == "get_state":
-        #socket.send_string("READY" if state.value is 0 else "PROCESSING")    
-        socket.send_string(stateMap[state.value])
-    elif msgStr[:4] == "set:":
-        # set what to what?
-        # set: key=value
-        ps = msgStr[4:].split("=")
-        if len(ps) != 2:
-            socket.send_string("Cant understand: %s" % msgStr)
-        else:
-            key = ps[0]
-            value = ps[1]
-            if key == 'proj':
-                proj = value
-            elif key == 'scanNum':
-                scanNum = int(value)
-            elif key == 'refScan':
-                # TBF: settle on bool or int type?
-                # refScan = value == 'True' 
-                refScan = int(value) == 1 
-            elif key == 'refScanNum':
-                refScanNum = int(value)
-            elif key == 'filename':
-                filename = value
+                print("processing already!")
+                socket.send_string("Already processing")
+
+        # ******** STOP processing data        
+        elif msg == b"stop":
+            if state.value not in PROCESS_STATES:
+                socket.send_string("Nothing to stop")
             else:
-                print("unknonw key", key)                    
-            # socket.send_string("setting %s to %s" % (key, value))    
-            print("setting %s to %s" % (key, value))
-            socket.send_string("OK")    
-    else:
-        print("what?")
-        print(msg)
-        socket.send_string("Dont' understand message")
+                if p is not None:
+                    print ("terminating process")
+                    print (stateMap[state.value])
+                    p.terminate()
+                    state.value = READY
+                    print ("process terminated")
+                    socket.send_string("OK")
+                else:
+                    print ("can't terminate, p is none")
+                    socket.send_string("can't terminate, p is none")
 
-    time.sleep(1)
+        # ************ return our current STATE            
+        elif msg == b"get_state": # or msg == "get_state":
+            #socket.send_string("READY" if state.value is 0 else "PROCESSING")    
+            socket.send_string(stateMap[state.value])
 
+        # ************* SET a parameter    
+        elif msgStr[:4] == "set:":
+            # set what to what?
+            # set: key=value
+            ps = msgStr[4:].split("=")
+            if len(ps) != 2:
+                socket.send_string("Cant understand: %s" % msgStr)
+            else:
+                key = ps[0]
+                value = ps[1]
+                if key == 'proj':
+                    proj = value
+                elif key == 'scanNum':
+                    scanNum = int(value)
+                elif key == 'refScan':
+                    # TBF: settle on bool or int type?
+                    # refScan = value == 'True' 
+                    refScan = int(value) == 1 
+                elif key == 'refScanNum':
+                    refScanNum = int(value)
+                elif key == 'filename':
+                    filename = value
+                else:
+                    print("unknonw key", key)                    
+                # socket.send_string("setting %s to %s" % (key, value))    
+                print("setting %s to %s" % (key, value))
+                socket.send_string("OK")
+
+        # ********* RAISE an ERROR!            
+        else:
+            print("what?")
+            print(msg)
+            socket.send_string("Dont' understand message")
+
+        time.sleep(1)
+
+def tryPublishFromThread():
+
+    p = Process(target=tryPublishPreSmoothedData)
+
+    p.start()
+
+    while True:
+        time.sleep(1)
+
+def tryPublishPreSmoothedData():
+
+    # # pubHost = "galileo.gb.nrao.edu"
+    # # pubPort = 35564
+    # pubPort = 9001
+    # # pubUrl = "tcp://%s:%d" % (pubHost, pubPort)
+    # pubUrl = "tcp://*:%d" % (pubPort)
+    # print("Publishing from: ", pubUrl)
+
+    # ctx = zmq.Context()
+    # # pubck = zmq.Socket(ctx, zmq.PUB)
+    # pubck = ctx.socket(zmq.PUB)
+    # # pubck.connect(pubUrl) 
+    # pubck.bind(pubUrl)
+    
+    # while True:
+    #     print("publish!")
+    #     # pubck.send_string("topic data")
+    #     pubck.send_multipart([b"HEADER", b"DATA"])
+    #     time.sleep(10)  
+
+    port = 9001
+    # pubSocket = setupServerSocket(port)
+    pubSocket = None
+
+    x = np.array([float(0.) for i in range(4019821)])
+    y = np.array([float(0.) for i in range(4019821)])
+    z = np.array([float(0.) for i in range(4019821)])
+
+    print("len of x data", len(x))
+    
+    # # x = msgpack.packb(data)
+    # x = msgpack.packb(xdata, default=msgpack_numpy.encode)
+    # y = msgpack.packb(ydata, default=msgpack_numpy.encode)
+    # z = msgpack.packb(zdata, default=msgpack_numpy.encode)
+
+    publishData(x, y, z, pubSocket)
+
+def main():
+    serve()
+    # tryPublishFromThread()
+    # tryPublishPreSmoothedData()
+
+if __name__ == '__main__':
+    main()
