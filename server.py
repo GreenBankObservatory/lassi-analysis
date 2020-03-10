@@ -45,6 +45,7 @@ SIM_SIG_SMOOTH_RESULT = getConfigValue(".", "analysisSmoothSigResult", configFil
 SIM_ZERNIKE_RESULT = getConfigValue(".", "analysisZernikeResult", configFile=lc)
 SIM_ZERNIKE_PNG = getConfigValue(".", "analysisZernikePng", configFile=lc)
 PORT = int(getConfigValue(".", "analysisServerPort", configFile=lc))
+PUB_PORT = int(getConfigValue(".", "analysisPublishPort", configFile=lc))
 print("Starting analysis server using sim results: ", SIM_RESULTS)
 print("Starting analysis server using sim  inputs: ", SIM_INPUTS)
 print("For smoothing using these hosts: ", GPU_MULTI_HOSTS)
@@ -66,6 +67,7 @@ stateMap = {
         }
 
 def setupServerSocket(port):
+    "Returns a ZMQ publishing socket using the given port"
 
     # pubPort = 9001
     # pubUrl = "tcp://%s:%d" % (pubHost, pubPort)
@@ -73,64 +75,49 @@ def setupServerSocket(port):
     print("Publishing from: ", pubUrl)
 
     ctx = zmq.Context()
-    # pubck = zmq.Socket(ctx, zmq.PUB)
     pubck = ctx.socket(zmq.PUB)
-    # pubck.connect(pubUrl) 
     pubck.bind(pubUrl)
 
     return pubck
 
-def publishData(x, y, z, pubSocket):
+def publishData(x, y, z):
+    "Publishes the given data over a ZMQ socket"
 
-    # print ("splitting data")
-    # x, y, z = splitXYZ(xyz)
-
-    # print("size of x array: ", len(x))
-
-    port = 9001
-    pubSocket = setupServerSocket(port)
-
-    # x = np.array([1., 2., 3.])
-    # y = np.array([1., 2., 3.])
-    # z = np.array([1., 2., 3.])
+    # we must create our server socket here because
+    # everything must be in the same thread.  We can't
+    # create this socket in the main thread, pass it
+    # in here and use it.
+    pubSocket = setupServerSocket(PUB_PORT)
 
     x = msgpack.packb(x, default=msgpack_numpy.encode)
     y = msgpack.packb(y, default=msgpack_numpy.encode)
     z = msgpack.packb(z, default=msgpack_numpy.encode)
-    
+
+    # TBF: this is a kluge to 'wake up' the client subscriber,
+    # which often doesn't receive the first thing published
     print("publishing primer")
     pubSocket.send_multipart([b"PRIMER"])
     time.sleep(3)
 
     print ("publishing data")
-    # pubSocket.send_multipart([b"HEADER",
     data = [b"HEADER",
-                          b"HEADER_DATA",
-
-                          b"TIME_ARRAY",
-                          b"TIME_ARRAY_DATA",
-
-                          b"X_ARRAY",
-                          # b"X_ARRAY_DATA",
-                          x,
-
-                          b"Y_ARRAY",
-                          # b"Y_ARRAY_DATA",
-                          y, 
-
-                          b"Z_ARRAY",
-                          # b"Z_ARRAY_DATA",
-                          z,
-
-                          b"I_ARRAY",
-                          # b"I_ARRAY_DATA",
-                          x,
-                          ]
+      # TBF: replace with actual header info
+      b"HEADER_DATA",
+      # the time info is not used, but must be here
+      b"TIME_ARRAY",
+      b"TIME_ARRAY_DATA",
+      b"X_ARRAY",
+      x,
+      b"Y_ARRAY",
+      y, 
+      b"Z_ARRAY",
+      z,
+      # This data is not used, but must be present,
+      b"I_ARRAY",
+      x]
                           
     pubSocket.send_multipart(data)
     print("published!")
-    # pubSocket.send_multipart(data)
-    # print("published again!")
 
 def processLeicaDataStream(x,
                            y,
@@ -143,7 +130,6 @@ def processLeicaDataStream(x,
                            project,
                            dataDir,
                            filename,
-                           pubSocket,
                            plot=True):
     """
     x, y, z: data streamed from scanner
@@ -188,7 +174,7 @@ def processLeicaDataStream(x,
     # now publish the input to smoothing
     print("splitting data")
     x, y, z = splitXYZ(xyz)
-    publishData(x, y, z, pubSocket)
+    publishData(x, y, z)
 
     # We can lower this for testing purposes
     N = 512
@@ -299,7 +285,7 @@ def waitForData(state, a):
     return a.get_results()
     # return None
 
-def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, filename, pubSocket):
+def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, filename):
     state.value = PROCESSING
     print(stateMap[PROCESSING])
 
@@ -358,6 +344,7 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     #                   dts=dts,
     #                   plotTest=False)
 
+    # TBF: pass this in?  From settings file?
     s = settings.SETTINGS_27MARCH2019
     # s = settings.SETTINGS_19FEB2020
     # s = settings.SETTINGS_11OCTOBER2019
@@ -400,8 +387,7 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
                            rot,
                            proj,
                            dataDir,
-                           filename,
-                           pubSocket)
+                           filename)
     else:
         # cp the smoothed file to the right locatoin
         dest = os.path.join(dataDir, proj, 'LASSI', filename)
@@ -482,7 +468,7 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         print("simulating zernike PNG results from %s to %s" % (SIM_ZERNIKE_PNG, dest))
         shutil.copy(SIM_ZERNIKE_PNG, dest)
 
-def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename, pubSocket):
+def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
     print("starting process, with state: ", state.value)
 
     # test = True
@@ -501,7 +487,7 @@ def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename, pu
     r = waitForData(state, a)
 
     a.cntrl_exit()
-    processing(state, r, proj, scanNum, refScan, refScanNum, refScanFile, filename, pubSocket)
+    processing(state, r, proj, scanNum, refScan, refScanNum, refScanFile, filename)
 
     # done!
     state.value = READY
@@ -509,10 +495,6 @@ def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename, pu
 
 
 def serve():
-
-    # x = y = z = np.array(range(int(4e6)))
-    # publishData(x, y, z, None)
-    # return
 
     state = Value('i', READY)
 
@@ -534,9 +516,6 @@ def serve():
     # initialize our 'memory' of what scans we
     # have processed
     scans = {}
-
-    # pubSocket = setupServerSocket(9001)
-    pubSocket = None
 
     while True:
         #print ("waiting for message")
@@ -579,8 +558,7 @@ def serve():
                                   refScan,
                                   refScanNum, 
                                   refScanFile, 
-                                  filename,
-                                  pubSocket))
+                                  filename))
                 p.start()
                 #state.value = PROCESSING
                 # socket.send_string("Started Processing")
@@ -677,9 +655,6 @@ def tryPublishPreSmoothedData():
     #     pubck.send_multipart([b"HEADER", b"DATA"])
     #     time.sleep(10)  
 
-    port = 9001
-    # pubSocket = setupServerSocket(port)
-    pubSocket = None
 
     x = np.array([float(0.) for i in range(4019821)])
     y = np.array([float(0.) for i in range(4019821)])
@@ -692,7 +667,7 @@ def tryPublishPreSmoothedData():
     # y = msgpack.packb(ydata, default=msgpack_numpy.encode)
     # z = msgpack.packb(zdata, default=msgpack_numpy.encode)
 
-    publishData(x, y, z, pubSocket)
+    publishData(x, y, z)
 
 def main():
     serve()
