@@ -130,6 +130,64 @@ def loadParallelGPUFiles(outFile, gpuPaths):
 
     return x, y, z
 
+def loadGPUFiles(outfiles):
+    "Given list of paths to file names w/ out [x,y,z].csv extension, load them"
+    # numGpus = len(gpuPaths)
+    numGpus = len(outfiles)
+
+    # now collect the multiple results into one
+    # outfiles = []
+    # xyzs = []
+    # initialize what will become our final results
+    x = np.array([])
+    y = np.array([])
+    z = np.array([])
+
+    dimFiles = []
+
+    # for i, gpuPath in enumerate(gpuPaths):
+    for i, gpuPath in enumerate(outfiles):
+        for dim in ['x', 'y', 'z']:
+            # there's a little confusion over how to handle
+            # this parallel stuff if we just specified one GPU
+            # if numGpus == 1:
+            #     dimFile = "%s.%s.csv" % (outFile, dim)
+            # else:    
+            #     dimFile = "%s.%d.%s.csv" % (outFile, (i+1), dim)
+            # if numGpus == 1:
+            #     dimFile = "%s.%s.csv" % (gpuPath, dim)
+            # else:
+            #     dimFile = "%s.%d.%s.csv" % (gpuPath, (i+1), dim)
+            dimFile = "%s.%s.csv" % (gpuPath, dim)    
+            # dimPath = os.path.join(gpuPath, dimFile)
+            # outfiles.append(dimPath)
+            dimFiles.append(dimFile)
+            print(dimFile)
+            assert os.path.isfile(dimFile)
+            print("GPUs created file: ", dimFile)
+        # now load the data using the base name shared by all dimensions
+        # if numGpus == 1:    
+        #     loadFile = os.path.join(gpuPath, outFile)    
+        # else:    
+        #     loadFile = os.path.join(gpuPath, "%s.%d" % (outFile, (i+1)))
+        loadFile = gpuPath    
+        print("Loading from basename: ", loadFile)
+        xyz = loadLeicaDataFromGpus(loadFile)
+        # xyzs.append(xyz)
+        xn, yn, zn = xyz
+        x = np.concatenate((x, xn))
+        y = np.concatenate((y, yn))
+        z = np.concatenate((z, zn))
+
+    # x1, y1, z1 = xyzs[0]
+    # x2, y2, z2 = xyzs[1]
+
+    # x = np.concatenate((x1, x2))
+    # y = np.concatenate((y1, y2))
+    # z = np.concatenate((z1, z2))
+
+    return x, y, z
+
 def smoothGPUMultiFile(gpuPath, hosts, inFile, outFile, n, test=False):
     "Prepare the input for processing by multiple GPUs"
 

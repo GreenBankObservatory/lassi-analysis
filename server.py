@@ -6,6 +6,7 @@ import os
 import time
 from datetime import datetime
 from multiprocessing import Process, Value
+import subprocess
 
 import numpy  as np
 import msgpack
@@ -21,7 +22,7 @@ from ops.getConfigValue import getConfigValue
 from plotting import plotZernikes
 from SmoothedFITS import SmoothedFITS
 from utils.utils import splitXYZ
-from gpus import loadParallelGPUFiles
+from gpus import loadParallelGPUFiles, loadGPUFiles
 from lassiAnalysis import imageSmoothedData
 
 from settings import GPU_MULTI_HOSTS, GPU_MULTI_PATHS
@@ -119,6 +120,14 @@ def publishData(x, y, z):
     pubSocket.send_multipart(data)
     print("published!")
 
+def getMissingFiles(files):
+    "Which of the given files does not exist?"
+    missing = []
+    for f in files:
+        if not os.path.isfile(f):
+            missing.append(f)
+    return missing
+            
 def processLeicaDataStream(x,
                            y,
                            z,
@@ -163,13 +172,18 @@ def processLeicaDataStream(x,
     # Next: smooth
     # where will the smoothing output go?
     # TBF: don't hard code the file output path!!!
-    outFile = "outfile"
-    outPath = "/users/pmargani/tmp"
-    fn = os.path.join(outPath, outFile)
-    fn = "%s.x.csv" % fn
+    # outFile = "outfile"
+    # outPath = "/users/pmargani/tmp"
+    # fn = os.path.join(outPath, outFile)
+    # fn = "%s.x.csv" % fn
+    outputs = getGpuOutputPaths(GPU_MULTI_PATHS, "outfile")
+    xOutputs = ["%s.x.csv" % f for f in outputs]
+    print("xOutputs: ", xOutputs)
     # make sure that output isn't there yet
-    if os.path.isfile(fn):
-        os.remove(fn)
+    for fn in xOutputs:
+        if os.path.isfile(fn):
+            print ("Removing previous results: ", fn)
+            os.remove(fn)
     
     # now publish the input to smoothing
     print("splitting data")
@@ -183,12 +197,15 @@ def processLeicaDataStream(x,
 
     # and wait for it to show up.
     # TBF: how to handle mutliple parallel GPUs???
-    while not os.path.isfile(fn):
-        print("Waiting on smoothing", fn)
+    missing = getMissingFiles(xOutputs)
+    while len(missing) > 0:
+        print("Waiting on smoothing file", missing[0])
         time.sleep(5)
+        missing = getMissingFiles(xOutputs)
 
     # read in those files
-    x, y, z = loadParallelGPUFiles(outFile, [outPath])
+    x, y, z = loadGPUFiles(outputs)
+    # x, y, z = loadParallelGPUFiles(outFile, [outPath])
 
     # save this off for later use
     fitsio = SmoothedFITS()
@@ -517,113 +534,130 @@ def serve():
     # have processed
     scans = {}
 
-    while True:
-        #print ("waiting for message")
-        msg = socket.recv()
-        #print ("got msg")
-        #print (msg)
-        msgStr = "".join( chr(x) for x in msg)
+    # before we go further, spawn the processes that
+    # will smooth via GPUs
+    gpus = spawnGpus()
 
-        # ************ Process Data
-        if msg == b"process":
-            if state.value == READY:
-                # record the current state of all parameters so
-                # we know what scans are being processed
-                filepath = getFITSFilePath(proj, filename)
-                if proj not in scans:
-                    scans[proj] = {}
-                scans[proj][scanNum] = {
-                    "scanNum": scanNum,
-                    "timestamp": datetime.now(),
-                    "refScan": refScan,
-                    "refScanNum": refScanNum,
-                    "filename": filename,
-                    "filepath": filepath,
-                    "filepathSmoothed": filepath.replace(".fits", ".smoothed.fits")
-                }
+    run = True
+    while run:
+        try:
+            #print ("waiting for message")
+            msg = socket.recv()
+            #print ("got msg")
+            #print (msg)
+            msgStr = "".join( chr(x) for x in msg)
 
-                print("scans list:", scans)
-                if not refScan:
-                    # this is a signal scan, so get the filename of our 
-                    # reference scan
-                    refScanFile = getRefScanFileName(scans, proj, refScanNum)
-                else:
-                    refScanFile = None
-                    
-                print("processing!")
-                p = Process(target=process, 
-                            args=(state,
-                                  proj, 
-                                  scanNum, 
-                                  refScan,
-                                  refScanNum, 
-                                  refScanFile, 
-                                  filename))
-                p.start()
-                #state.value = PROCESSING
-                # socket.send_string("Started Processing")
-                print("Started Processing")
-                socket.send_string("OK")
-            else:
-                print("processing already!")
-                socket.send_string("Already processing")
+            # ************ Process Data
+            if msg == b"process":
+                if state.value == READY:
+                    # record the current state of all parameters so
+                    # we know what scans are being processed
+                    filepath = getFITSFilePath(proj, filename)
+                    if proj not in scans:
+                        scans[proj] = {}
+                    scans[proj][scanNum] = {
+                        "scanNum": scanNum,
+                        "timestamp": datetime.now(),
+                        "refScan": refScan,
+                        "refScanNum": refScanNum,
+                        "filename": filename,
+                        "filepath": filepath,
+                        "filepathSmoothed": filepath.replace(".fits", ".smoothed.fits")
+                    }
 
-        # ******** STOP processing data        
-        elif msg == b"stop":
-            if state.value not in PROCESS_STATES:
-                socket.send_string("Nothing to stop")
-            else:
-                if p is not None:
-                    print ("terminating process")
-                    print (stateMap[state.value])
-                    p.terminate()
-                    state.value = READY
-                    print ("process terminated")
+                    print("scans list:", scans)
+                    if not refScan:
+                        # this is a signal scan, so get the filename of our 
+                        # reference scan
+                        refScanFile = getRefScanFileName(scans, proj, refScanNum)
+                    else:
+                        refScanFile = None
+                        
+                    print("processing!")
+                    p = Process(target=process, 
+                                args=(state,
+                                      proj, 
+                                      scanNum, 
+                                      refScan,
+                                      refScanNum, 
+                                      refScanFile, 
+                                      filename))
+                    p.start()
+                    #state.value = PROCESSING
+                    # socket.send_string("Started Processing")
+                    print("Started Processing")
                     socket.send_string("OK")
                 else:
-                    print ("can't terminate, p is none")
-                    socket.send_string("can't terminate, p is none")
+                    print("processing already!")
+                    socket.send_string("Already processing")
 
-        # ************ return our current STATE            
-        elif msg == b"get_state": # or msg == "get_state":
-            #socket.send_string("READY" if state.value is 0 else "PROCESSING")    
-            socket.send_string(stateMap[state.value])
-
-        # ************* SET a parameter    
-        elif msgStr[:4] == "set:":
-            # set what to what?
-            # set: key=value
-            ps = msgStr[4:].split("=")
-            if len(ps) != 2:
-                socket.send_string("Cant understand: %s" % msgStr)
-            else:
-                key = ps[0]
-                value = ps[1]
-                if key == 'proj':
-                    proj = value
-                elif key == 'scanNum':
-                    scanNum = int(value)
-                elif key == 'refScan':
-                    # TBF: settle on bool or int type?
-                    # refScan = value == 'True' 
-                    refScan = int(value) == 1 
-                elif key == 'refScanNum':
-                    refScanNum = int(value)
-                elif key == 'filename':
-                    filename = value
+            # ******** STOP processing data        
+            elif msg == b"stop":
+                if state.value not in PROCESS_STATES:
+                    socket.send_string("Nothing to stop")
                 else:
-                    print("unknonw key", key)                    
-                # socket.send_string("setting %s to %s" % (key, value))    
-                print("setting %s to %s" % (key, value))
-                socket.send_string("OK")
+                    if p is not None:
+                        print ("terminating process")
+                        print (stateMap[state.value])
+                        p.terminate()
+                        state.value = READY
+                        print ("process terminated")
+                        socket.send_string("OK")
+                    else:
+                        print ("can't terminate, p is none")
+                        socket.send_string("can't terminate, p is none")
 
-        # ********* RAISE an ERROR!            
-        else:
-            print("what?")
-            print(msg)
-            socket.send_string("Dont' understand message")
+            # ************ return our current STATE            
+            elif msg == b"get_state": # or msg == "get_state":
+                #socket.send_string("READY" if state.value is 0 else "PROCESSING")    
+                socket.send_string(stateMap[state.value])
 
-        time.sleep(1)
+            # ************* SET a parameter    
+            elif msgStr[:4] == "set:":
+                # set what to what?
+                # set: key=value
+                ps = msgStr[4:].split("=")
+                if len(ps) != 2:
+                    socket.send_string("Cant understand: %s" % msgStr)
+                else:
+                    key = ps[0]
+                    value = ps[1]
+                    if key == 'proj':
+                        proj = value
+                    elif key == 'scanNum':
+                        scanNum = int(value)
+                    elif key == 'refScan':
+                        # TBF: settle on bool or int type?
+                        # refScan = value == 'True' 
+                        refScan = int(value) == 1 
+                    elif key == 'refScanNum':
+                        refScanNum = int(value)
+                    elif key == 'filename':
+                        filename = value
+                    else:
+                        print("unknonw key", key)                    
+                    # socket.send_string("setting %s to %s" % (key, value))    
+                    print("setting %s to %s" % (key, value))
+                    socket.send_string("OK")
+
+            # ********* RAISE an ERROR!            
+            else:
+                print("what?")
+                print(msg)
+                socket.send_string("Dont' understand message")
+
+            time.sleep(1)
+        except KeyboardInterrupt:
+            print("KeyboardInterrupt")
+            for p in gpus:
+                print("terminating GPU smoothing process", p.pid)
+                p.terminate()
+            ps = []
+            run = False
+
+        
+    for p in gpus:
+        p.terminate()    
 
 def tryPublishFromThread():
 
@@ -668,6 +702,67 @@ def tryPublishPreSmoothedData():
     # z = msgpack.packb(zdata, default=msgpack_numpy.encode)
 
     publishData(x, y, z)
+
+def getGpuOutputPaths(paths, outfile):
+    "Where will the output go?"
+    # Ex: [/home/sandboxes/pmargani/gpus/gpu1/outfile.1]
+    return ["%s.%d" % (os.path.join(path,outfile), i+1) for i, path in enumerate(paths)]
+
+def spawnGpus():
+
+    outfile = "outfile"
+
+    print (GPU_MULTI_PATHS)
+    print (GPU_MULTI_HOSTS)
+
+    hosts = GPU_MULTI_HOSTS
+    paths = GPU_MULTI_PATHS
+    user = os.getlogin()
+
+    thisHost = os.uname()[1]
+
+    scriptDir = os.path.dirname(os.path.realpath(__file__))
+    gpuStreamScript = "{0}/runGpuStream".format(scriptDir)
+
+    # ./runGpuStream /home/sandboxes/pmargani/LASSI/gpus/versions/gpuStreams 
+    # pmargani devenv-hpc1 1 8 devenv-hpc1.gb.nrao.edu 35564 outfile
+
+    # keep track of the processes we'll be spawning
+    ps = []
+
+    # where will the output go?
+    # Ex: /home/sandboxes/pmargani/gpus/gpu1/outfile.1
+    # outputs = ["%s.%d" % (os.path.join(path,outfile), i+1) for i, path in enumerate(paths)]
+    # outputs = getGpuOutputPaths(paths, outfile)
+    outputs = [os.path.join(path, outfile) for path in paths]
+
+    part = 0
+    parts = len(hosts)
+
+    # for host, path in zip(hosts, paths):
+    for i in range(len(hosts)):
+        host = hosts[i]
+        path = paths[i]
+        part = i + 1
+        # thisOutfile = "%s.%d" % (outfile, part)
+        cmd = [
+            gpuStreamScript,
+            path,
+            user,
+            host,
+            str(part),
+            str(parts),
+            thisHost,
+            str(PUB_PORT),
+            os.path.basename(outputs[i])
+        ]
+
+        print ("cmd: ", " ".join(cmd))
+
+        p = subprocess.Popen(cmd)
+        ps.append(p)
+
+    return ps
 
 def main():
     serve()
