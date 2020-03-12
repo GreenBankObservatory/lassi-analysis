@@ -458,19 +458,28 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         print ("Writing Zernikes to: ", fitsio.getFilePath())
         fitsio.write()
 
+        """
+        # Confirm with Paul that it is alright to get rid of this.
         # now make sure there's a plot for this fits file too
         zDict = {}
         for i in range(len(zernikes)):
             k = "Z%d" % (i + 1)
             zDict[k] = zernikes[i]
+        """
 
+        # Ask for Paul's approval.
+        fn = fitsio.getFilePath()[:-4] + "png"
+        print ("Plotting and writing Zernikes png to: ", fn)
         title = "%s:%s" % (proj, scanNum)
-        p = plotZernikes(zDict, title=title)
+        plotZernikes(xs, ys, zernikes, n=N, title=title, filename=fn)
+        
+        #p = plotZernikes(zDict, title=title)
+        #p = plotZernikes(zernikes, title=title)
         
         # change extension from .fits to .png
-        fn = fitsio.getFilePath()[:-4] + "png"
-        print ("Writing Zernikes png to: ", fn)
-        p.savefig(fn)    
+        #fn = fitsio.getFilePath()[:-4] + "png"
+        #print ("Writing Zernikes png to: ", fn)
+        #p.savefig(fn)    
 
     else:
         # cp the files to the right locatoin

@@ -316,26 +316,26 @@ class TestProcessPTX(unittest.TestCase):
         ellipse = [xOffset, yOffset, radius, radius, 0]
 
         # remove as little data as possible
-        xyz, _ = processNewPTXData(ls,
-                                   ellipse=ellipse,
-                                   rot=rot,
-                                   plotTest=False,
-                                   nFilter=False,
-                                   iFilter=False,
-                                   rFilter=False,
-                                   filterClose=False)
+        xyz, _, _ = processNewPTXData(ls,
+                                      ellipse=ellipse,
+                                      rot=rot,
+                                      plotTest=False,
+                                      nFilter=False,
+                                      iFilter=False,
+                                      rFilter=False,
+                                      filterClose=False)
 
         # check 
         self.assertEqual(len(xyz), 10032308)
 
         # OK, do it again, but with the sensible filters on
-        xyz, _ = processNewPTXData(ls,
-                                   ellipse=ellipse,
-                                   rot=rot,
-                                   plotTest=False,
-                                   nFilter=True,
-                                   iFilter=True,
-                                   rFilter=True,
-                                   filterClose=False)        
+        xyz, _, _ = processNewPTXData(ls,
+                                      ellipse=ellipse,
+                                      rot=rot,
+                                      plotTest=False,
+                                      nFilter=True,
+                                      iFilter=True,
+                                      rFilter=True,
+                                      filterClose=False)        
 
         self.assertEqual(len(xyz), 6928318)

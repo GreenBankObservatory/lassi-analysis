@@ -1,7 +1,5 @@
 import numpy as np
 
-#import opticspy
-
 import zernikies
 
 def addCenterBump(x, y, z, rScale=10., zScale=0.05):
@@ -54,8 +52,7 @@ def addCenterBump(x, y, z, rScale=10., zScale=0.05):
 
 def zernikePoly(x, y, xOffset, yOffset, coefficients, xMax=-1e22, yMax=-1e22, verbose=False):
     """
-
-    Wrapper around opticspy.interferometer_zenike.__zernikepolar__
+    Returns a Zernike polynomial.
     """
 
     if len(coefficients) > zernikies.nMax + 1:
@@ -80,32 +77,6 @@ def zernikePoly(x, y, xOffset, yOffset, coefficients, xMax=-1e22, yMax=-1e22, ve
 
     return z
 
-def zernikePolyOpticspy(x, y, xOffset, yOffset, coefficients, verbose=False):
-    """
-
-    Wrapper around opticspy.interferometer_zenike.__zernikepolar__
-    """
-
-    if len(coefficients) > 38:
-        raise ValueError('coefficients must have less than {} items.'.format(zernikies.nMax+1))
-
-    xcn = (x - xOffset)/np.nanmax(x - xOffset)
-    ycn = (y - yOffset)/np.nanmax(y - yOffset)
-
-    # Flip x and y when evaluating the radius and angle.
-    rcn = np.sqrt(xcn**2. + ycn**2.)
-    ucn = np.arctan2(ycn, xcn)
-
-    
-    import opticspy
-    #z = opticspy.interferometer_zenike.__zernikepolar__(amplitude, rcn, ucn)
-    z = opticspy.interferometer_zenike.__zernikepolar__(coefficients, rcn, ucn)
-
-    if verbose:
-        print("Zernike polynomials with coefficients", coefficients)
-        print("Their linear combination has mean: {0:.2e}, min: {1:.2e}, max: {2:.2e}".format(np.mean(z), np.nanmin(z), np.nanmax(z)))
-
-    return z
 
 def gaussian(x, y, amplitude, xOffset, yOffset, width):
     # https://en.wikipedia.org/wiki/Gaussian_function#Two-dimensional_Gaussian_function

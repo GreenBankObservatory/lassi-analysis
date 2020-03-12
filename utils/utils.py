@@ -1,9 +1,13 @@
 import csv
-
+import random
 import numpy as np
+
+from copy import copy
+
 from astropy.coordinates import cartesian_to_spherical
 from astropy.coordinates import spherical_to_cartesian
 from astropy.time import Time
+
 
 def mjd2utc(mjd):
     "Converts MJD values to UTC datetime objects"
@@ -11,11 +15,13 @@ def mjd2utc(mjd):
     t.format = 'datetime'
     return t.value
 
+
 def utc2mjd(dt):
     "Converts MJD values to UTC datetime objects"
     t = Time(dt, format='datetime')
     t.format = 'mjd'
     return t.value
+
 
 def cart2sph(x, y, z, verbose=True):
     "Wrapper around astropy's cartesian_to_spherical"
@@ -33,6 +39,7 @@ def cart2sph(x, y, z, verbose=True):
         print("lngs supposed range (radians)", 0, 2*np.pi)
 
     return rs, lats, lngs
+
 
 def sph2cart(az, el, r, verbose=True):
     "Wrapper around astropy's spherical_to_cartesian"
@@ -53,12 +60,14 @@ def sph2cart(az, el, r, verbose=True):
 
     return xs, ys, zs 
 
+
 def aggregateXYZ(x, y, z):
     "x, y, z -> [(x0, y0, z0), (x1, y1, z1), ...]"
     xyz = []
     for i in range(len(x)):
         xyz.append((x[i], y[i], z[i]))
     return np.array(xyz)
+
 
 def splitXYZ(xyz):
     "[(x0, y0, z0), (x1, y1, z1), ...] -> x, y, z"
@@ -75,17 +84,21 @@ def splitXYZ(xyz):
     y = np.array(y)    
     return x, y, z
 
+
 def log(x):
     "short cut to numpy log"
     return np.log(np.abs(x))
+
 
 def difflog(x):
     "short cut to tnumpy log and diff"
     return np.log(np.abs(np.diff(x)))
 
+
 def log10(x):
-    "short cup to numpy log10"
+    "short cut to numpy log10"
     return np.log10(np.abs(x))
+
 
 def circular_mask(shape, centre, radius, angle_range):
     """
@@ -117,6 +130,7 @@ def circular_mask(shape, centre, radius, angle_range):
 
     return circmask*anglemask
 
+
 def midPoint(x):
     """
     Returns the midpoint of an array:
@@ -124,6 +138,7 @@ def midPoint(x):
     """
 
     return (np.nanmax(x) - np.nanmin(x))/2. + np.nanmin(x)
+
 
 def gridLimits(arr0, arr1):
     """
@@ -134,6 +149,7 @@ def gridLimits(arr0, arr1):
     vmax = np.min([np.nanmax(arr0), np.nanmax(arr1)])
 
     return vmin, vmax
+
 
 def dishLimits(maskedDish):
     """
@@ -148,8 +164,11 @@ def dishLimits(maskedDish):
 
     return [np.min(xnm), np.max(xnm), np.min(ynm), np.max(ynm)]
 
+
 def importCsv(filename):
-    "Import x,y,z values from CSV file"
+    """
+    Import x,y,z values from CSV file
+    """
 
 
     fieldnames = ['x', 'y', 'z']
@@ -168,3 +187,21 @@ def importCsv(filename):
 
 
     return np.array(xs), np.array(ys), np.array(zs)
+
+
+def sampleXYZData(x, y, z, samplePercentage):
+    """
+    Return a random percentage of the data.
+    """
+
+    assert len(x) == len(y)
+    assert len(y) == len(z)
+
+    lenx = len(x)
+
+    sampleSize = int((lenx * samplePercentage) / 100.)
+
+    idx = random.sample(range(lenx), sampleSize)
+
+    return copy(x[idx]), copy(y[idx]), copy(z[idx])
+

@@ -8,29 +8,26 @@ import time
 import numpy as np
 from copy import copy
 from shutil import copyfile
-from scipy.interpolate import griddata
 # import matplotlib
 # matplotlib.use('agg')
 
 from astropy.stats import sigma_clip
 
-from zernikies import getZernikeCoeffs
-from processPTX import processPTX, processNewPTX, processNewPTXData, aggregateXYZ, getRawXYZ
+import settings
+import lassiTestSettings as usettings
 
-from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus,  smoothGPUParallel
+from grid import regridXYZMasked
+from weightSmooth import weightSmooth
+from SmoothedFITS import SmoothedFITS
+from zernikies import getZernikeCoeffs
+from simulateSignal import addCenterBump, gaussian
+from plotting import sampleXYZData, scatter3dPlot, surfacePlot
+from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus,  smoothGPUParallel, loadParallelGPUFiles
+from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits, splitXYZ
+from processPTX import processPTX, processNewPTX, processNewPTXData, aggregateXYZ, getRawXYZ
 from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
                       newParabola, rotateData, parabola
 
-from zernikeIndexing import noll2asAnsi, printZs
-from simulateSignal import addCenterBump
-from simulateSignal import gaussian
-from plotting import sampleXYZData, scatter3dPlot, surfacePlot
-from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits, splitXYZ
-from weightSmooth import weightSmooth
-from SmoothedFITS import SmoothedFITS
-import settings
-import lassiTestSettings as usettings
-from gpus import loadParallelGPUFiles
 
 # where is the code we'll be running?
 GPU_PATH = settings.GPU_PATH
@@ -56,8 +53,9 @@ def tryFit():
                               weights=None)
 
    
-    xr, yr, zr = regridXYZ(x, y, diff, N)
+    xr, yr, zr = regridXYZMasked(x, y, diff, N)
     print("done")
+
 
 def tryProcessLeicaDataStream():
 
@@ -99,6 +97,8 @@ def tryProcessLeicaDataStream():
                            proj,
                            dataDir,
                            filename)        
+
+
 def processLeicaDataStream(x,
                            y,
                            z,
@@ -179,9 +179,11 @@ def processLeicaDataStream(x,
 
     # and save it off for use in GFM later
 
+
 def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.):
     """
     Takes two smoothed Leica scans and extracts Zernike coefficients from their difference, reference - signal.
+
     :param refScanFile: File with the smoothed reference scan. <scan_name>.ptx.csv
     :param sigScanFile: File with the smoothed signal scan. <scan_name>.ptx.csv
     :param n: Number of elements per side in the smoothed data.
@@ -293,10 +295,7 @@ def processLeicaScan(fpath,
     High level function for processing leica data:
        * processes PTX file
        * smoothes it by calling gpu code
-       * fits parabolas to data
-       * regrids final data
-    Final processed scan is ready for difference between
-    this and a ref or signal scan.   
+    Smoothed scan has to be masked and reggrided. 
     """
     
     assert os.path.isfile(fpath)
@@ -313,13 +312,13 @@ def processLeicaScan(fpath,
 
     processedPath = fpath + ".csv"
     
-    xyz, dts = processNewPTX(fpath,
-                             rot=rot,
-                             ellipse=ellipse,
-                             rFilter=True,
-                             iFilter=False,
-                             sampleSize=sampleSize,
-                             addOffset=addOffset)
+    xyz, dts, intensity = processNewPTX(fpath,
+                                        rot=rot,
+                                        ellipse=ellipse,
+                                        rFilter=True,
+                                        iFilter=False,
+                                        sampleSize=sampleSize,
+                                        addOffset=addOffset)
 
     e = time.time()
     print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
@@ -349,27 +348,48 @@ def processLeicaScan(fpath,
         # surfacePlot(xx, yy, np.log10(abs(np.diff(zz.T))), title="Pixel by pixel difference", vMin=-5, vMax=0, colorbarLabel="Log10[m]")
         # print("RMS on parabola subtracted scan: {} m".format(np.ma.std(zz)))
 
+
 def loadProcessedData(filename):
     "Loads the results of processLeicaScan from file"
     d = np.load(filename)
     return d["xs"], d["ys"], d["diffs"], d["retroMask"]
 
+
 def imageSmoothedData(x, y, z, N, filename=None):
+    """
+    Prepares the data to produce the diagnostic plots shown by GFM.
+
+    :param x: x coordinates of the point cloud.
+    :param y: y coordinates of the point cloud.
+    :param z: z coordinates of the point cloud.
+    :param N: number of points per side in the smoothed data.
+    :param filename: save the plot to this location.
+    """
+
+    # Reshape the coordinates before masking.
     x.shape = (N,N)
     y.shape = (N,N)
     z.shape = (N,N)
-    masked = maskXYZ(x, y, z, n=N, guess=[60., 0., 0., -49., 0., 0.], bounds=None, radialMask=True, maskRadius=49.)
-    xx, yy, zz = regridXYZ(x, y, masked['fitResidual'], n=N)
+
+    # Mask deviant points in the z coordinate.
+    masked = maskXYZ(x, y, z, n=N, guess=[60., 0., 0., -49., 0., 0.], 
+                     bounds=None, radialMask=True, maskRadius=49.)
+    
+    # Regrid to a uniformly sampled grid in cartesian coordinates, keeping the mask.
+    xx, yy, zz = regridXYZMasked(x, y, masked['fitResidual'], n=N)
+
+    # Plot the surface.
     surfacePlot(xx,
                 yy,
-                np.log10(abs(np.diff(zz.T))),
-                title="Pixel by pixel difference",
+                np.log10(abs(np.diff(zz))),
+                title="Column by column difference",
                 vMin=-5,
-                vMax=0,
+                vMax=-3,
                 colorbarLabel="Log10[m]",
                 filename=filename)
 
     print("RMS on parabola subtracted scan: {} m".format(np.ma.std(zz)))
+
 
 def maskXYZ(x, y, z, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radialMask=True, maskRadius=40., **kwargs):
     """
@@ -499,72 +519,6 @@ def maskLeicaData(filename, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None,
 
     return outData 
 
-
-def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False, ymax=False, method='linear'):
-    """
-    Regrids the XYZ data to a regularly sampled grid.
-
-    :param x: vector with the x coordinates.
-    :param y: vector with the y coordinates.
-    :param z: vector with the z coordinates.
-    :param n: number of samples in the grid.
-    :param verbose: verbose output?
-    """
-    
-    # Set the grid limits.
-    if not xmin:
-        xmin = np.nanmin(x)
-    if not xmax:
-        xmax = np.nanmax(x)
-    if not ymin:
-        ymin = np.nanmin(y)
-    if not ymax:
-        ymax = np.nanmax(y)
-
-    if verbose:
-        print("Limits: ", xmin, xmax, ymin, ymax)
-
-    # Set the grid spacing.
-    dx = (xmax - xmin)/n
-    dy = (ymax - ymin)/n
-    
-    # Make the grid.
-    grid_xy = np.mgrid[xmin:xmax:dx,
-                       ymin:ymax:dy]
-    if verbose:
-        print("New grid shape: ", grid_xy[0].shape)
-
-    # Regrid the data.
-    reg_z = griddata(np.array([x[~np.isnan(z)].flatten(),y[~np.isnan(z)].flatten()]).T, 
-                     z[~np.isnan(z)].flatten(), 
-                     (grid_xy[0], grid_xy[1]), method=method, fill_value=np.nan)
-
-    # We need to flip the reggrided data in the abscisa axis 
-    # so that it has the same orientation as the input.
-    return grid_xy[0], grid_xy[1], reg_z.T
-
-
-def regridXYZMasked(x, y, z, n=512, verbose=False, xmin=False, xmax=False, ymin=False, ymax=False):
-    """
-    """
-
-    outMask = np.ma.masked_invalid(x).mask
-
-    xReg,yReg,zReg = regridXYZ(x[~outMask],
-                               y[~outMask],
-                               z[~outMask],
-                               n=n, verbose=verbose,
-                               xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
-
-    _,_,retroMask = regridXYZ(x[~outMask],
-                              y[~outMask],
-                              z.mask.astype(float)[~outMask],
-                              n=n, verbose=verbose,
-                              xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
-
-    zRegMasked = np.ma.masked_where(retroMask, zReg)
-
-    return xReg, yReg, zRegMasked
 
 def simulateSignal(sigFn,
                    refFn,

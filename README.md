@@ -31,9 +31,10 @@ This code base is the product of research, where adherence to software engineeri
 Also, a type of high-level integration test can be found in Scan9vs11-Z-UnitTest.ipynb.  Run this notebook and make sure the final results match the expected results.
 
 ## Structure
-
+  
+  |- analysis/     # Analysis scripts.
   |- data/         # Data products associated with lassi-analysis.
-  |- notebooks/    # Notebooks detailing different aspects of the telescope (e.g., active surface) and the development of the code (e.g. parabolas).
+  |- notebooks/    # Notebooks detailing different aspects of the telescope (e.g., active surface),the development of the code (e.g. parabolas) and analysis of LASSI scans.
   |- gbtdata/
   |- PDFs/         # Documentation describing different experiments.
   |- misc/    

@@ -1,21 +1,23 @@
-from copy import copy
-import random
+
 import os
-
+import random
 import numpy as np
-from scipy.optimize import least_squares
-from scipy.optimize import leastsq
-# Do this if you run into the dreaded Tkinter import error
-#import matplotlib
-#matplotlib.use('agg')
-import matplotlib.pylab as plt
-from mpl_toolkits.mplot3d import Axes3D
 
-from utils.utils import sph2cart, cart2sph
+from copy import copy
+from scipy.optimize import least_squares
 
 from rotate import *
-
 from SmoothedFITS import SmoothedFITS
+from utils.utils import sph2cart, cart2sph, sampleXYZData
+from plotting import scatter3dPlot, surface3dPlot, imagePlot
+
+"""
+TODO: 
+- move plotting methods to the plotting module.
+- clean up unused methods.
+- devise a method that can fit for the parabola focus
+  while producing accurate rotation parameters (robust).
+"""
 
 def parabola(xdata, ydata, focus, v1x=0, v1y=0, v2=0, heavy=False):
     if heavy:
@@ -177,7 +179,8 @@ def fitLeicaScan(fn,
                  xyz=None,
                  inSpherical=False,
                  weights=None,
-                 plot=True):
+                 plot=True,
+                 guess=None):
 
     # TBF: ignore weights for now!
 
@@ -225,11 +228,12 @@ def fitLeicaScan(fn,
             scatter3dPlot(x, y, z, "Leica Data Radial Filtered")
 
     # assemble initial guess
-    f = 60.
-    v1x = v1y = v2 = 0
-    xTheta = 0. #-np.pi / 2.
-    yTheta = 0.
-    guess = [f, v1x, v1y, v2, 0., 0.]
+    if guess is None:
+        f = 60.
+        v1x = v1y = v2 = 0
+        xTheta = 0. #-np.pi / 2.
+        yTheta = 0.
+        guess = [f, v1x, v1y, v2, 0., 0.]
 
     if weights is not None:
         print("Weights: ", weights.shape, weights)
@@ -276,15 +280,6 @@ def fitLeicaScan(fn,
     return diff, newX, newY
 
 
-def imagePlot(z, title):
-    fig = plt.figure()
-    ax = fig.gca()
-    #cax = ax.imshow(np.log(np.abs(np.diff(zrr - newZ))))
-    cax = ax.imshow(z)
-    fig.colorbar(cax)
-    plt.title(title)
-
-
 def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfev=10000, ftol=1e-12, xtol=1e-12, verbose=False):
 
     if verbose:
@@ -311,6 +306,7 @@ def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfe
         if weights is None:
             if verbose:
                 print ("Using method fitParabola")
+
             method = fitParabola
             args = (x.flatten(), y.flatten(), z.flatten())
         else:
@@ -353,12 +349,12 @@ def loadLeicaDataFromNumpy(fn):
     
     return (x, y, z), (xx, yy, zz)
 
+
 def loadSmoothedFits(fn):
     f = SmoothedFITS()
     f.read(fn)
     return f.x, f.y, f.z
 
-    #return xyzs['x'], xyzs['y'], xyzs['z']
 
 def loadLeicaDataFromGpus(fn):
     """
@@ -414,21 +410,6 @@ def loadLeicaData(fn, n=None, numpy=True):
     return (x, y, z), (xxn, yyn, zzn)
 
 
-def sampleXYZData(x, y, z, samplePercentage):
-    "Return a random percentage of the data"
-
-    assert len(x) == len(y)
-    assert len(y) == len(z)
-
-    lenx = len(x)
-
-    sampleSize = int((lenx * samplePercentage) / 100.)
-
-    idx = random.sample(range(lenx), sampleSize)
-
-    return copy(x[idx]), copy(y[idx]), copy(z[idx])
-
-
 def radialReplace(x, y, z, xOffset, yOffset, radius, replacement):
     "Replace z values outside of given radius with a new value"
 
@@ -442,45 +423,6 @@ def radialReplace(x, y, z, xOffset, yOffset, radius, replacement):
     print("radialReplace replaced %d points with %s" % (cnt, replacement))
     # only z gets changed
     return z
-
-
-def surface3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
-    fig = plt.figure()
-    ax = Axes3D(fig)
-
-    # plot all the data, or just some?
-    if sample is not None:
-        print("Plotting %5.2f percent of data" % sample)
-        x, y, z = sampleXYZData(x, y, z, sample)
-
-    ax.plot_surface(x, y, z)
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.title(title)
-    if xlim is not None:
-        plt.xlim(xlim)
-    if ylim is not None:
-        plt.ylim(ylim)
-
-
-def scatter3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
-
-    # plot all the data, or just some?
-    if sample is not None:
-        print("Plotting %5.2f percent of data" % sample)
-        x, y, z = sampleXYZData(x, y, z, sample)
-        print("Now length of data is %d" % len(x))
-
-    fig = plt.figure()
-    ax = Axes3D(fig)
-    ax.scatter(x, y, z)
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.title(title)
-    if xlim is not None:
-        plt.xlim(xlim)
-    if ylim is not None:
-        plt.ylim(ylim)
 
 
 def fitNoRot():

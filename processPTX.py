@@ -238,25 +238,26 @@ def getRawXYZ(ls, sampleSize=None):
 
     numLines = 0
 
-    # for i, l in enumerate(ls):
     for i in lsIdx:
         l = ls[i]
 
-        # print i, l
         if "Line" in l:
-            # print l
             numLines += 1
             continue
 
         ll = l.split(' ')
-        x = float(ll[0])
-        y = float(ll[1])
-        z = float(ll[2])
-        i = float(ll[3])
-        xs.append(x)
-        ys.append(y)
-        zs.append(z)
-        it.append(i)
+        try:
+            x = float(ll[0])
+            y = float(ll[1])
+            z = float(ll[2])
+            i = float(ll[3])
+            xs.append(x)
+            ys.append(y)
+            zs.append(z)
+            it.append(i)
+        except IndexError:
+            print("Line {0} is missing columns.".format(i))
+            continue
 
     print("Skipped %d non-data lines" % numLines)
 
@@ -342,7 +343,7 @@ def tryEllipticalOffsets(lines, ellipse):
     plt.ylabel("y")
     plt.title("X Y orientation of data")
 
-    xin, yin, zin, _ = ellipticalFilter(x, y, z, ellipse[0], ellipse[1], ellipse[2], ellipse[3], ellipse[4])
+    xin, yin, zin, _, _ = ellipticalFilter(x, y, z, ellipse[0], ellipse[1], ellipse[2], ellipse[3], ellipse[4])
 
     f = plt.figure()
     ax = f.gca()
@@ -366,7 +367,7 @@ def radialFilter(x, y, z, xOffset, yOffset, radius, dts=None):
 
     return x[mask], y[mask], z[mask], dts
 
-def ellipticalFilter(x, y, z, xOffset, yOffset, bMaj, bMin, angle, dts=None):
+def ellipticalFilter(x, y, z, xOffset, yOffset, bMaj, bMin, angle, dts=None, intensity=None):
     """
     Filter points that lie outside an ellipse with 
     a semi-major axis of bMaj, semi-minor axis bMin and rotated by angle.
@@ -388,7 +389,10 @@ def ellipticalFilter(x, y, z, xOffset, yOffset, bMaj, bMin, angle, dts=None):
     if dts is not None:
         dts = dts[mask]
 
-    return x[mask], y[mask], z[mask], dts
+    if intensity is not None:
+        intensity = intensity[mask]
+
+    return x[mask], y[mask], z[mask], dts, intensity
 
 def nearFilter(x, y, z, tol=10., dts=None):
     """
@@ -403,7 +407,7 @@ def nearFilter(x, y, z, tol=10., dts=None):
 
     return x[mask], y[mask], z[mask], dts
 
-def zLimitFilter(x, y, z, zLimit=-80, dts=None):
+def zLimitFilter(x, y, z, zLimit=-80, dts=None, intensity=None):
     """
     """
     # z - filter: at this point we should have the
@@ -417,7 +421,10 @@ def zLimitFilter(x, y, z, zLimit=-80, dts=None):
     if dts is not None:
         dts = dts[mask]
 
-    return x, y, z, dts
+    if intensity is not None:
+        intensity = intensity[mask]
+
+    return x, y, z, dts, intensity
 
 
 def processNewPTXData(lines,
@@ -449,20 +456,20 @@ def processNewPTXData(lines,
         tryEllipticalOffsets(lines, ellipse)
 
     if lines is not None:
-        # get the actual float values from the file contents
-        x, y, z, i = getRawXYZ(lines, sampleSize=sampleSize)
+        # Get the actual float values from the file contents.
+        x, y, z, intensity = getRawXYZ(lines, sampleSize=sampleSize)
     else:
-        x, y, z, i = xyzi
+        x, y, z, intensity = xyzi
 
     print("Starting with %d lines of data" % len(x))
 
-    # lets first just remove all the zero data
-    mask = i != 0.0
-    i = i[mask]
+    # First remove all the zero data.
+    mask = intensity != 0.0
+    intensity = intensity[mask]
     if dts is not None:
         dts = dts[mask]
 
-    numFilteredOut = len(x) - len(i)
+    numFilteredOut = len(x) - len(intensity)
     percent = (float(numFilteredOut) / float(len(x))) * 100.
     print("Filtered out %d points of %d (%5.2f%%) intensity equal to zero" % (numFilteredOut, len(x), percent))
 
@@ -472,20 +479,20 @@ def processNewPTXData(lines,
 
     print("Now we have %d lines of data" % len(x))
 
-    # remove aggregious jumps in data?
+    # Remove aggregious jumps in data?
     if nFilter:
         # TBF: document where our tolerance comes from
         x, y, z, mask = neighborFilter(x, y, z, 0.122)
-        i = i[mask]
+        intensity = intensity[mask]
         print("Now we have %d lines of data" % len(x))
         if dts is not None:
             dts = dts[mask]
 
-    # we only want the data that has a decent intesity
-    meanI = np.mean(i)
-    stdI = np.std(i)
-    print("Intensity: max=%5.2f, min=%5.2f, mean=%5.2f, std=%5.2f" % (np.max(i),
-                                                                      np.min(i),
+    # We only want the data that has a decent intesity.
+    meanI = np.mean(intensity)
+    stdI = np.std(intensity)
+    print("Intensity: max=%5.2f, min=%5.2f, mean=%5.2f, std=%5.2f" % (np.max(intensity),
+                                                                      np.min(intensity),
                                                                       meanI,
                                                                       stdI))
 
@@ -494,13 +501,11 @@ def processNewPTXData(lines,
         #mask = i > lowestI
         #highest = 0.8
         #mask = i < highest
-        mask = np.logical_and(i > 0.75, i < 0.85)
-        i = i[mask]
+        mask = np.logical_and(intensity > 0.75, intensity < 0.85)
+        intensity = intensity[mask]
 
-        numFilteredOut = len(x) - len(i)
+        numFilteredOut = len(x) - len(intensity)
         percent = (float(numFilteredOut) / float(len(x))) * 100.
-        #print "Filtered out %d points of %d (%5.2f%%) below intensity %5.2f" % (numFilteredOut, len(x), percent, lowestI)
-        #print "Filtered out %d points of %d (%5.2f%%) higher intensity %5.2f" % (numFilteredOut, len(x), percent, highest)
         print("Filtered out %d points of %d (%5.2f%%) via intensity" % (numFilteredOut, len(x), percent))
 
         x = x[mask]
@@ -514,7 +519,7 @@ def processNewPTXData(lines,
 
     assert len(x) == len(y)
     assert len(y) == len(z)
-    assert len(z) == len(i)
+    assert len(z) == len(intensity)
 
     # We want as much as possible of the dish.
     # Since the dish will be rotated, it will look like an ellipse to the TLS.
@@ -522,7 +527,10 @@ def processNewPTXData(lines,
         orgNum = len(x)
         print('Elliptical fitler parameters:')
         print(ellipse)
-        x, y, z, dts = ellipticalFilter(x, y, z, ellipse[0], ellipse[1], ellipse[2], ellipse[3], ellipse[4], dts=dts)
+        x, y, z, dts, intensity = ellipticalFilter(x, y, z, 
+                                                   ellipse[0], ellipse[1], ellipse[2], 
+                                                   ellipse[3], ellipse[4], 
+                                                   dts=dts, intensity=intensity)
         newNum = len(x)
         print("Filter removed {0} points outside the ellipse".format(orgNum - newNum))
         print("The ellipse has semi-major axis {0:.2f} m, semi-minor axis {1:.2f} m and angle {2:.2f} degrees".format(ellipse[2], ellipse[3], ellipse[4]))
@@ -530,21 +538,15 @@ def processNewPTXData(lines,
 
     # TBF: why must we do this?  No idea, but this,
     # along with a rotation of -90. gets our data to
-    # look just like the 2016 data at the same stage
+    # look just like the 2016 data at the same stage.
     z = -z
 
     # z - filter: at this point we should have the
     # dish, but with some things the radial filter didn't
-    # get rid of above or below the dish
-#    mask = np.logical_and(z > -80, z < -10)
-#    x = x[mask]
-#    y = y[mask]
-#    z = z[mask]
-#    if dts is not None:
-#        dts = dts[mask]
+    # get rid of above or below the dish.
     orgNum = len(z)
     zLimit = -80    
-    x, y, z, dts = zLimitFilter(x, y, z, zLimit=zLimit)
+    x, y, z, dts, intensity = zLimitFilter(x, y, z, zLimit=zLimit, dts=dts, intensity=intensity)
     newNum = len(z)
     print("z - limit filtered out %d points below %5.2f and above -10" % ((orgNum - newNum), zLimit))
 
@@ -569,6 +571,10 @@ def processNewPTXData(lines,
         r = np.sqrt(np.power(xyz[:,0], 2.) + np.power(xyz[:,1], 2.) + np.power(xyz[:,2], 2.))
         mask = r > tooClose
         xyz = xyz[mask]
+        if dts is not None:
+            dts = dts[mask]
+        if intensity is not None:
+            intensity = intensity[mask]
         newNum = xyz.shape[0]
         print("Removed {0:.0f} points closer than {1:.2f} m from the scanner.".format((orgNum - newNum), tooClose))
 
@@ -605,7 +611,10 @@ def processNewPTXData(lines,
         plt.ylabel("y")
         plt.title("X Y orientation of data")
 
-    return xyz, dts
+    print("XYZ output of ProcessNewPTXData has {0} lines of data.".format(len(xyz)))
+    print("Intensity output of ProcessNewPTXData has {0} lines of data.".format(len(intensity)))
+
+    return xyz, dts, intensity
 
 def getTimeStamps(fpath):
     "Read in file of form *_times.csv and return MJDs"
@@ -645,7 +654,7 @@ def processNewPTX(fpath,
                   simSignal=None,
                   ellipse=[-8., 50., 49., 49., 0.]):
 
-    # is there associated time data?
+    # Is there associated time data?
     if useTimestamps:
         dts = getTimeStamps(fpath)
     else:
@@ -654,33 +663,39 @@ def processNewPTX(fpath,
     with open(fpath, 'r') as f:
         ls = f.readlines()
     
-    xyz, dts = processNewPTXData(ls,
-                            dts=dts,
-                            rot=rot,
-                            sampleSize=sampleSize,
-                            simSignal=simSignal,
-                            iFilter=iFilter,
-                            rFilter=rFilter,
-                            addOffset=addOffset,
-                            filterClose=filterClose,
-                            ellipse=ellipse)
+    xyz, dts, intensity = processNewPTXData(ls,
+                                            dts=dts,
+                                            rot=rot,
+                                            sampleSize=sampleSize,
+                                            simSignal=simSignal,
+                                            iFilter=iFilter,
+                                            rFilter=rFilter,
+                                            addOffset=addOffset,
+                                            filterClose=filterClose,
+                                            ellipse=ellipse)
 
-    # write to CSV file
+    # Write to CSV file.
     outf = fpath + ".csv"
+    print("Writing out dish xyz coordinates to:", outf)
     np.savetxt(outf, xyz, delimiter=",")
 
     if dts is not None:
         outf = fpath + "_times.processed.csv"
-        print("writing out MJDs to:", outf)
+        print("Writing out associated MJDs to:", outf)
         np.savetxt(outf, dts, delimiter=",")
 
-    # converting to datetimes takes a LONG time.
+    # Converting to datetimes takes a LONG time.
     if dts is not None and convertToDatetimes:
         print("Converting timestamps (MJDs) to datetime ...")
         mjd2utcArray = np.frompyfunc(mjd2utc, 1, 1)
         dts = mjd2utcArray(dts)
 
-    return xyz, dts
+    if intensity is not None:
+        outf = fpath + "_int.processed.csv"
+        print("Writing out associated intensities to:", outf)
+        np.savetxt(outf, intensity, delimiter=",")
+
+    return xyz, dts, intensity
 
 def addCenterBump(x, y, z, rScale=10., zScale=0.05):
 

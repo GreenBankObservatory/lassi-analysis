@@ -1,9 +1,7 @@
 import unittest
-
 import numpy as np
-#import opticspy
 
-from zernikies import zernikePolar, getZernikeCoeffs
+from zernikies import zernikePolar #, getZernikeCoeffs
 
 class TestZernikes(unittest.TestCase):
     "Test methods in lassiAnalysis that don't call gpu smoothing"

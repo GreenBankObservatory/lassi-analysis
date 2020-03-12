@@ -1,10 +1,8 @@
 from copy import copy
 
 import numpy as np
-#import opticspy
 
-from plotting import barChartPlot, zernikeResiduals2DPlot
-from zernikeIndexing import noll2asAnsi, printZs
+#from plotting import barChartPlot, zernikeResiduals2DPlot
 
 nMax = 120
 zernikeNorm = { 1:  1.,
@@ -926,6 +924,7 @@ zernikes = [z0,
             z120,
 ]
 
+
 def _single_term_cos(power, rho, theta):
     """
     Utility function to compute Zernike polynomials.
@@ -934,6 +933,7 @@ def _single_term_cos(power, rho, theta):
 
     return np.power(rho, power) * np.cos(power * theta)
 
+
 def _single_term_sin(power, rho, theta):
     """
     Utility function to compute Zernike polynomials.
@@ -941,6 +941,7 @@ def _single_term_sin(power, rho, theta):
     """
 
     return np.power(rho, power) * np.sin(power * theta)
+
 
 def _multi_term_cos(coef, power, multiplier, rho, theta):
     """
@@ -951,6 +952,7 @@ def _multi_term_cos(coef, power, multiplier, rho, theta):
     power2 = (coef + 1.) * -1.
     return ((coef * np.power(rho, power2) + (power * np.power(rho, power))) * np.cos(multiplier * theta))
 
+
 def _multi_term_sin(coef, power, multiplier, rho, theta):
     """
     Utility function to compute Zernike polynomials.
@@ -959,6 +961,7 @@ def _multi_term_sin(coef, power, multiplier, rho, theta):
     
     power2 = (coef + 1.) * -1.
     return ((coef * np.power(rho, power2) + (power * np.power(rho, power))) * np.sin(multiplier * theta))
+
 
 def zernikePolar(coefficients, rho, theta):
     """
@@ -972,6 +975,7 @@ def zernikePolar(coefficients, rho, theta):
         zf += coefficients[i]*func(rho, theta)
 
     return zf
+
 
 def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=False, norm='sqrt'):
     """
@@ -1021,24 +1025,25 @@ def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=F
         a = np.sum(surface*zf)*2.*2./nx/ny/np.pi*zn
         coeffs.append(a)
 
-    # Plot bar chart of Zernike coefficients.
-    if barChart:
-        fitlist = coeffs[1:order+1]
-        index = np.arange(1,order+1)
-        barChartPlot(index, fitlist)
-
-    # Plot the residuals.
-    if plot2D:
-        # Compute the residuals.
-        z_new = surface - zernikePolar(coeffs, r, u)
-        z_new[mask] = 0
-        zernikeResiduals2DPlot(xx, yy, z_new)
+#    # Plot bar chart of Zernike coefficients.
+#    if barChart:
+#        fitlist = coeffs[1:order+1]
+#        index = np.arange(1,order+1)
+#        barChartPlot(index, fitlist)
+#
+#    # Plot the residuals.
+#    if plot2D:
+#        # Compute the residuals.
+#        z_new = surface - zernikePolar(coeffs, r, u)
+#        z_new[mask] = 0
+#        zernikeResiduals2DPlot(xx, yy, z_new)
 
     # Print a table with the coefficients.
     if printReport:
         zernikePrint(coeffs)
 
     return coeffs
+
 
 def zernikePrint(z):
     """
