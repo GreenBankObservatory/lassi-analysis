@@ -65,7 +65,8 @@ class TestMain(unittest.TestCase):
 
         fn = "Test1_STA14_Bump1_High-02_METERS.ptx.csv"
         # path = "/home/scratch/pmargani/LASSI/unitTestData"
-        path = lassiTestSettings.DATA_UNIT_TESTS
+        # path = lassiTestSettings.DATA_UNIT_TESTS
+        path = settings.UNIT_TEST_PATH
         fpath = os.path.join(path, '2016', fn)
 
         x, y, z = importCsv(fpath)

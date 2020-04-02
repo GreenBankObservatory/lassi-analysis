@@ -8,6 +8,7 @@ from plotting import scatter3dPlot
 from lassiAnalysis import maskLeicaData
 from lassiAnalysis import extractZernikesLeicaScanPair
 import lassiTestSettings
+import settings
 
 class TestLassiAnalysis(unittest.TestCase):
     "Test methods in lassiAnalysis that don't call gpu smoothing"
@@ -31,7 +32,8 @@ class TestLassiAnalysis(unittest.TestCase):
         # fn = "Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
         fn = lassiTestSettings.SCAN9 + ".csv"
         # path = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
-        path = lassiTestSettings.DATA_UNIT_TESTS
+        # path = lassiTestSettings.DATA_UNIT_TESTS
+        path = settings.UNIT_TEST_PATH
         fpath = os.path.join(path, '27mar2019/gpus', fn)
 
         maskGuess=[60., 0., 0., -50., 0., 0.]
@@ -95,7 +97,8 @@ class TestLassiAnalysis(unittest.TestCase):
         fn1 = lassiTestSettings.SCAN9 + ".csv"
         fn2 = lassiTestSettings.SCAN11 + ".csv"
         # path = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
-        path = lassiTestSettings.DATA_UNIT_TESTS
+        # path = lassiTestSettings.DATA_UNIT_TESTS
+        path = settings.UNIT_TEST_PATH
         fpath1 = os.path.join(path, '27mar2019/gpus', fn1)
         fpath2 = os.path.join(path, '27mar2019/gpus', fn2)
 

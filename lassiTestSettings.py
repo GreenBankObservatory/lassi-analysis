@@ -63,7 +63,7 @@ SETTINGS_19FEB2020 = {
     'dataPath': '/home/gbtdata/TLASSI_200219'
     }
 
-DATA_UNIT_TESTS = "/home/scratch/pmargani/LASSI/unitTestData/"
+# DATA_UNIT_TESTS = "/home/scratch/pmargani/LASSI/unitTestData/"
 
 def getData(settings):
 
