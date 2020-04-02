@@ -12,6 +12,16 @@ import numpy as np
 from .ProjectScanLog import ProjectScanLog
 from .AsZernikeFile import AsZernikeFile
 
+def getAsZernikeFile():
+    "Return object that parses config file"
+    try:
+        ygorTeleDir = os.environ["YGOR_TELESCOPE"]
+    except:
+        ygorTeleDir = "/home/gbt/"    
+    fn = os.path.join(ygorTeleDir, "etc/config", "AsZernike.conf")
+    print("Examining Active Surface conf file:", fn)
+    return AsZernikeFile(fn)
+
 def plotData(data,
              scanNumber,
              fieldName,
@@ -43,8 +53,14 @@ def plotData(data,
 
     if dividePhi:
         phis = []
-        fn = "/home/gbt/etc/config/AsZernike.conf"
-        asz = AsZernikeFile(fn)
+        # try:
+        #     ygorTeleDir = os.environ["YGOR_TELESCOPE"]
+        # except:
+        #     ygorTeleDir = "/home/gbt/"    
+        # fn = os.path.join(ygorTeleDir, "etc/config", "AsZernike.conf")
+        # print("Examining Active Surface conf file:", fn)
+        # asz = AsZernikeFile(fn)
+        asz = getAsZernikeFile()
         asz.parse()
         for i, h in enumerate(hoops):
             r = ribs[i]
@@ -61,8 +77,7 @@ def plotData(data,
         xlabel = 'x'
         ylabel = 'y'
         # TBF: make this a singleton
-        fn = "/home/gbt/etc/config/AsZernike.conf"
-        asz = AsZernikeFile(fn)
+        asz = getAsZernikeFile()
         asz.parse()
         x = []
         y = []
@@ -277,8 +292,7 @@ def extractSurface(filename, fieldName, dividePhi=True, xy=True, filterDisabled=
 
     if dividePhi:
         phis = []
-        fn = "/home/gbt/etc/config/AsZernike.conf"
-        asz = AsZernikeFile(fn)
+        asz = getAsZernikeFile()
         asz.parse()
         for i, h in enumerate(hoops):
             r = ribs[i]
@@ -290,8 +304,7 @@ def extractSurface(filename, fieldName, dividePhi=True, xy=True, filterDisabled=
         z = z / phis
 
     if xy:
-        fn = "/home/gbt/etc/config/AsZernike.conf"
-        asz = AsZernikeFile(fn)
+        asz = getAsZernikeFile()
         asz.parse()
         x = []
         y = []
