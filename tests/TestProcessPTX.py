@@ -12,7 +12,7 @@ import numpy as np
 from processPTX import * 
 
 from lassiTestSettings import DATA_27MARCH2019, SCAN9, SETTINGS_27MARCH2019
-
+import settings
 
 class TestProcessPTX(unittest.TestCase):
 
@@ -300,7 +300,8 @@ class TestProcessPTX(unittest.TestCase):
 
     def testProcessNewPTXDataScan9(self):
 
-        fpath = os.path.join(DATA_27MARCH2019, SCAN9)
+        # fpath = os.path.join(DATA_27MARCH2019, SCAN9)
+        fpath = os.path.join(settings.UNIT_TEST_PATH, '27mar2019', SCAN9)
 
         with open(fpath, 'r') as f:
             ls = f.readlines()

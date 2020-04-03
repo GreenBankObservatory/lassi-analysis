@@ -71,7 +71,7 @@ SETTINGS_15MAR2020 = {
     }
 
 
-DATA_UNIT_TESTS = "/home/scratch/pmargani/LASSI/unitTestData/"
+# DATA_UNIT_TESTS = "/home/scratch/pmargani/LASSI/unitTestData/"
 
 def getData(settings):
 

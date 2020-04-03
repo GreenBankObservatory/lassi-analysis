@@ -1,0 +1,2 @@
+#jupyter notebook --ip=galileo.gb.nrao.edu --port=9015 --NotebookApp.token='' --NotebookApp.password='' --no-browser
+jupyter notebook --port=9015 --NotebookApp.token='' --NotebookApp.password='' --no-browser

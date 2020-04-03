@@ -1,6 +1,8 @@
 # copy this to settings.py and edit for this sandbox
 import os
 
+UNIT_TEST_PATH="/home/scratch/pmargani/LASSI/unitTestData"
+
 GPU_PATH="/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/"
 GPU_OUTPUT_PATH="/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/"
 
@@ -15,6 +17,8 @@ GPU_HOST_2 = DEV2
 GPU_MULTI_HOSTS = [DEV1]
 
 
-gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions"
-gpuVersions = [DEV1]
-GPU_MULTI_PATHS = [os.path.join(gpuPath, f) for f in gpuVersions]
+# for supporting unit tests:
+#gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions"
+#gpuVersions = [DEV1]
+#GPU_MULTI_PATHS = [os.path.join(gpuPath, f) for f in gpuVersions]
+GPU_MULTI_PATHS=["./data/gpus"]
