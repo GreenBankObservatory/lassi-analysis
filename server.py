@@ -139,7 +139,9 @@ def processLeicaDataStream(x,
                            project,
                            dataDir,
                            filename,
-                           plot=True):
+                           plot=True,
+                           smoothOutputs=None,
+                           test=False):
     """
     x, y, z: data streamed from scanner
     i: intensity values
@@ -149,13 +151,19 @@ def processLeicaDataStream(x,
     dataDir: where data files get written to (eg, /home/gbtdata)
     project: same sense as GBT project (eg, TGBT19A_500_01)
     filename: basename of file products (eg, 2019_09_26_01:35:43)
+    smoothOutputs: optionally override where smoothing outputs go
+    test: dont smooth, it's a unit test!
     """
+
+    # TBF: make this an optional arg as well?
+    # We can lower this for testing purposes
+    N = 512
 
     # do basic processing first: remove bad data, etc.
     # TBF: backwards compatible (bad) interface
     lines = None
     xyzi = (x, y, z, i)
-    xyz, dts = processNewPTXData(lines,
+    xyz, dts, intensities = processNewPTXData(lines,
                                  xyzi=xyzi,
                                  rot=rot,
                                  ellipse=ellipse,
@@ -176,32 +184,40 @@ def processLeicaDataStream(x,
     # outPath = "/users/pmargani/tmp"
     # fn = os.path.join(outPath, outFile)
     # fn = "%s.x.csv" % fn
-    outputs = getGpuOutputPaths(GPU_MULTI_PATHS, "outfile")
-    xOutputs = ["%s.x.csv" % f for f in outputs]
-    print("xOutputs: ", xOutputs)
-    # make sure that output isn't there yet
-    for fn in xOutputs:
-        if os.path.isfile(fn):
-            print ("Removing previous results: ", fn)
-            os.remove(fn)
-    
-    # now publish the input to smoothing
-    print("splitting data")
-    x, y, z = splitXYZ(xyz)
-    publishData(x, y, z)
 
-    # We can lower this for testing purposes
-    N = 512
+    # optionally override settings 
+    if smoothOutputs is None:
+        outputs = getGpuOutputPaths(GPU_MULTI_PATHS, "outfile")
+    else:
+        outputs = smoothOutputs
 
-    #x, y, z = smoothGPUParallel(processedPath, N)
+    # when running unit tests, we may not
+    # have access to GPUs for smoothing
+    if not test:
+        xOutputs = ["%s.x.csv" % f for f in outputs]
+        print("xOutputs: ", xOutputs)
+        # make sure that output isn't there yet
+        for fn in xOutputs:
+            if os.path.isfile(fn):
+                print ("Removing previous results: ", fn)
+                os.remove(fn)
+        
+        # now publish the input to smoothing
+        print("splitting data")
+        x, y, z = splitXYZ(xyz)
+        publishData(x, y, z)
 
-    # and wait for it to show up.
-    # TBF: how to handle mutliple parallel GPUs???
-    missing = getMissingFiles(xOutputs)
-    while len(missing) > 0:
-        print("Waiting on smoothing file", missing[0])
-        time.sleep(5)
+
+
+        #x, y, z = smoothGPUParallel(processedPath, N)
+
+        # and wait for it to show up.
+        # TBF: how to handle mutliple parallel GPUs???
         missing = getMissingFiles(xOutputs)
+        while len(missing) > 0:
+            print("Waiting on smoothing file", missing[0])
+            time.sleep(5)
+            missing = getMissingFiles(xOutputs)
 
     # read in those files
     x, y, z = loadGPUFiles(outputs)
