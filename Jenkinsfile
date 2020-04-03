@@ -1,7 +1,9 @@
 pipeline {
   agent {label 'rhel7'}
 
-
+ environment {
+    YGOR_TELESCOPE = './data'
+  }
 
   stages {
     stage('Init') {
