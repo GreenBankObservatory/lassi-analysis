@@ -1,17 +1,32 @@
 import os
 import unittest
-
+from multiprocessing import Value
 
 from processPTX import getRawXYZ
 from server import getMissingFiles, getGpuOutputPaths
 from server import processLeicaDataStream, getRefScanFileName
+from server import processing
 import lassiTestSettings
 import settings
 
 class TestServer(unittest.TestCase):
 
     def setUp(self):
-        pass
+        print("setUp getting fake data ...")
+        x, y, z, i = self.getRawData()
+        self.x = x
+        self.y = y
+        self.z = z
+        self.i = i
+
+    def getRawData(self):    
+        path = settings.UNIT_TEST_PATH
+        scan9 = lassiTestSettings.SCAN9
+        fn = os.path.join(path, '27mar2019', scan9)
+        with open(fn, 'r') as f:
+            ls = f.readlines()
+        x, y, z, i = getRawXYZ(ls)
+        return x, y, z, i
 
     def testGetMissingFiles(self):
 
@@ -102,14 +117,6 @@ class TestServer(unittest.TestCase):
         for fn in expFiles:
             self.assertTrue(not os.path.isfile(fn))
 
-        # get raw data from file
-        path = settings.UNIT_TEST_PATH
-        scan9 = lassiTestSettings.SCAN9
-        fn = os.path.join(path, '27mar2019', scan9)
-        with open(fn, 'r') as f:
-            ls = f.readlines()
-        x, y, z, i = getRawXYZ(ls)
-
         # TBF: remove these if we arent using them
         hdr = {}
         dts = None
@@ -120,11 +127,13 @@ class TestServer(unittest.TestCase):
 
         # we can't smooth in tests cause we don't have GPUs,
         # so what canned smooth data to use?
+        scan9 = lassiTestSettings.SCAN9
         fn = scan9 + '.csv'
+        path = settings.UNIT_TEST_PATH
         smoothOutputs = [os.path.join(path, '27mar2019/gpus', fn)]
 
 
-        processLeicaDataStream(x, y, z, i, dts, hdr,
+        processLeicaDataStream(self.x, self.y, self.z, self.i, dts, hdr,
             ellipse, rot, project, dataDir, filename, 
             plot=True, test=True, smoothOutputs=smoothOutputs)
 
@@ -132,3 +141,41 @@ class TestServer(unittest.TestCase):
         # created these files
         for fn in expFiles:
             self.assertTrue(os.path.isfile(fn))
+
+    def testProcessing(self):
+
+        # write locally
+        dataDir = './data'
+        project = "UNIT_TEST_PROJ"
+        filename = "filename"
+
+        # before we prepare, clean up from last time?
+        exts = ['.processed.png', '.smoothed.fits']
+        expFiles = []
+        for ext in exts:
+            fn = filename + ext
+            path = os.path.join(dataDir, project, 'LASSI', fn)
+            expFiles.append(path)
+            if os.path.isfile(path):
+                # clean up!
+                print("Removing old file", path)
+                os.remove(path)
+        for fn in expFiles:
+            self.assertTrue(not os.path.isfile(fn))
+
+        # setup simple ref scan for processing
+        state = Value('i', 0)
+        refScanFile = None
+        scanNum = refScanNum = 1
+
+        # fake the data
+        results = {
+            'X_ARRAY': self.x,
+            'Y_ARRAY': self.y,
+            'Z_ARRAY': self.z,
+            'I_ARRAY': self.i,
+            'TIME_ARRAY': [],
+            'HEADER': {}
+        }
+
+        processing(state, results, project, scanNum, True, refScanNum, refScanFile, filename, test=True)    

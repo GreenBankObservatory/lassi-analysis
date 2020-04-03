@@ -172,22 +172,10 @@ def processLeicaDataStream(x,
 
     print("done pre-processing data, ready to smooth")
 
-    # fpathBase = os.path.join(dataDir, project, "LASSI", filename)
-    # processedPath = "%s.csv" % fpathBase
-    # print ("writing filtered data to CSV file: ", processedPath)
-    # np.savetxt(processedPath, xyz, delimiter=",")
-
-    # Next: smooth
-    # where will the smoothing output go?
-    # TBF: don't hard code the file output path!!!
-    # outFile = "outfile"
-    # outPath = "/users/pmargani/tmp"
-    # fn = os.path.join(outPath, outFile)
-    # fn = "%s.x.csv" % fn
-
     # optionally override settings 
     if smoothOutputs is None:
         outputs = getGpuOutputPaths(GPU_MULTI_PATHS, "outfile")
+        print("getGpuOutputPaths", GPU_MULTI_PATHS, outputs)
     else:
         outputs = smoothOutputs
 
@@ -207,12 +195,7 @@ def processLeicaDataStream(x,
         x, y, z = splitXYZ(xyz)
         publishData(x, y, z)
 
-
-
-        #x, y, z = smoothGPUParallel(processedPath, N)
-
         # and wait for it to show up.
-        # TBF: how to handle mutliple parallel GPUs???
         missing = getMissingFiles(xOutputs)
         while len(missing) > 0:
             print("Waiting on smoothing file", missing[0])
@@ -221,7 +204,6 @@ def processLeicaDataStream(x,
 
     # read in those files
     x, y, z = loadGPUFiles(outputs)
-    # x, y, z = loadParallelGPUFiles(outFile, [outPath])
 
     # save this off for later use
     fitsio = SmoothedFITS()
@@ -325,24 +307,14 @@ def waitForData(state, a):
     return a.get_results()
     # return None
 
-def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, filename):
+def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, filename, test=False):
+    
+    # make sure we've made it clear we've entered this state
     state.value = PROCESSING
     print(stateMap[PROCESSING])
 
     # here we can finally process the data
     time.sleep(3)
-
-    # test = True
-
-    # if test:
-    #     results = {
-    #         'X_ARRAY': None,
-    #         'Y_ARRAY': None,
-    #         'Z_ARRAY': None,
-    #         'TIME_ARRAY': None,
-    #         'I_ARRAY': None,
-    #         'HEADER': {},
-    #     }
 
     # get x, y, z and intesity from results
     if not SIM_INPUTS:
@@ -353,8 +325,8 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         dts = results['TIME_ARRAY']
         hdrObj = results['HEADER']
 
-        # hdr = hdrObj.asdict() if not test else {}
-        hdr = hdrObj.asdict()
+        hdr = hdrObj.asdict() if not test else {}
+        # hdr = hdrObj.asdict()
     else:
         simFile = SIM_REF_INPUT if bool(refScan) else SIM_SIG_INPUT
         print("Using simulated input: ", simFile)
@@ -379,42 +351,19 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     lines = None
     xyzi = (x, y, z, i)
 
-    # xyz, dts = processNewPTXData(lines,
-    #                   xyzi=xyzi,
-    #                   dts=dts,
-    #                   plotTest=False)
 
     # TBF: pass this in?  From settings file?
     s = settings.SETTINGS_27MARCH2019
     # s = settings.SETTINGS_19FEB2020
     # s = settings.SETTINGS_11OCTOBER2019
 
-    # if test:
-    #     # read data from previous scans
-    #     path = s['dataPath']
-
-    #     # determine which scan to read depending on
-    #     # whether this is a reference or signal scan
-    #     fn = settings.SCAN9 if refScan else settings.SCAN11
-
-    #     fpath = os.path.join(path, fn)
-    #     with open(fpath, 'r') as f:
-    #         ls = f.readlines()
-
-    #     # finally, substitue the data!
-    #     x, y, z, i = getRawXYZ(ls)
-
-    #     # fake the datetimes
-    #     dts = np.zeros(len(x))
-    
     # TBF: in production this might come from config file?        
     ellipse, rot = settings.getData(s)
 
-    # TBF: we'll get these from the manager
+    # TBF: we'll get these from the manager?
     # proj = "TEST"
     # dataDir = "/home/sandboxes/pmargani/LASSI/data"
     dataDir = DATADIR
-    # filename = "test"
 
     if not SIM_RESULTS:
         fitsFile = processLeicaDataStream(x,
@@ -427,7 +376,8 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
                            rot,
                            proj,
                            dataDir,
-                           filename)
+                           filename,
+                           test=test)
     else:
         # cp the smoothed file to the right locatoin
         dest = os.path.join(dataDir, proj, 'LASSI', filename)
@@ -450,6 +400,8 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     # find the previous refscan:
     # print("look for file for scan", refScanNum)
     sigScanFile = filename
+
+    # TBF: where to specify this?
     #N = 100
     N = 512
 
@@ -457,10 +409,6 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     print("files: ", refScanFile, sigScanFile, fitsFile)
 
     if not SIM_RESULTS:
-        #testSig = '/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1/1.csv'
-        #testRef = '/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1/2.csv'
-        # extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.)
-        # extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=N, nZern=36)
         xs, ys, zs, zernikes = extractZernikesLeicaScanPair(refScanFile,
                                                             fitsFile,
                                                             n=N,
@@ -494,15 +442,7 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         fn = fitsio.getFilePath()[:-4] + "png"
         print ("Plotting and writing Zernikes png to: ", fn)
         title = "%s:%s" % (proj, scanNum)
-        plotZernikes(xs, ys, zernikes, n=N, title=title, filename=fn)
-        
-        #p = plotZernikes(zDict, title=title)
-        #p = plotZernikes(zernikes, title=title)
-        
-        # change extension from .fits to .png
-        #fn = fitsio.getFilePath()[:-4] + "png"
-        #print ("Writing Zernikes png to: ", fn)
-        #p.savefig(fn)    
+        plotZernikes(xs, ys, zernikes, n=N, title=title, filename=fn)  
 
     else:
         # cp the files to the right locatoin
@@ -517,14 +457,23 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         print("simulating zernike PNG results from %s to %s" % (SIM_ZERNIKE_PNG, dest))
         shutil.copy(SIM_ZERNIKE_PNG, dest)
 
-def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
+def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename, test=False):
+    """
+    This is the processing spawned off by the main server thread.
+    state: server state
+    proj: as in /home/gbtdata/<proj>
+    refScan: boolean
+    refScanNum: the scan number of the desired ref scan
+    refScanFilename: the path to the desired ref scan.  Needed if this is
+    not a ref scan and we want to process a ref/sig pair of scan.
+    filename: path to this scans eventual data file
+    test: for testing, avoid interacting with lassi_daq
+    """
     print("starting process, with state: ", state.value)
 
-    # test = True
-    test = False
     if test:
         # skip all interactions with scanner
-        processing(state, {}, proj, scanNum, refScan, refScanNum, refScanFile, filename)
+        processing(state, {}, proj, scanNum, refScan, refScanNum, refScanFile, filename, test=test)
         state.value = READY
         print ("done, setting state: ", state.value)
         return
@@ -544,9 +493,15 @@ def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename):
 
 
 def serve():
+    """
+    This is the server entry point, where a while loop
+    receives messages, parses them, and acts accordingly.
+    Actually data processing may be spawned from here as
+    a separate Process.
+    """
 
+    # initiallize our bookkeeping
     state = Value('i', READY)
-
     proj = None
     scanNum = None
     refScan = True
@@ -566,11 +521,10 @@ def serve():
     # have processed
     scans = {}
 
-    # before we go further, spawn the processes that
-    # will smooth via GPUs
-    gpus = spawnGpus()
-
+    # TBF: terminate with a server command as well?
+    # run till a keyboard interrupt
     run = True
+
     while run:
         try:
             #print ("waiting for message")
@@ -678,128 +632,28 @@ def serve():
                 print(msg)
                 socket.send_string("Dont' understand message")
 
+            # no need for the server to spin too fast
             time.sleep(1)
+
         except KeyboardInterrupt:
+
+            # exit gracefully
             print("KeyboardInterrupt")
-            for p in gpus:
-                print("terminating GPU smoothing process", p.pid)
+            if p is not None:
                 p.terminate()
-            ps = []
+            socket.send_string("server exiting")
             run = False
-
         
-    for p in gpus:
-        p.terminate()    
-
-def tryPublishFromThread():
-
-    p = Process(target=tryPublishPreSmoothedData)
-
-    p.start()
-
-    while True:
-        time.sleep(1)
-
-def tryPublishPreSmoothedData():
-
-    # # pubHost = "galileo.gb.nrao.edu"
-    # # pubPort = 35564
-    # pubPort = 9001
-    # # pubUrl = "tcp://%s:%d" % (pubHost, pubPort)
-    # pubUrl = "tcp://*:%d" % (pubPort)
-    # print("Publishing from: ", pubUrl)
-
-    # ctx = zmq.Context()
-    # # pubck = zmq.Socket(ctx, zmq.PUB)
-    # pubck = ctx.socket(zmq.PUB)
-    # # pubck.connect(pubUrl) 
-    # pubck.bind(pubUrl)
-    
-    # while True:
-    #     print("publish!")
-    #     # pubck.send_string("topic data")
-    #     pubck.send_multipart([b"HEADER", b"DATA"])
-    #     time.sleep(10)  
-
-
-    x = np.array([float(0.) for i in range(4019821)])
-    y = np.array([float(0.) for i in range(4019821)])
-    z = np.array([float(0.) for i in range(4019821)])
-
-    print("len of x data", len(x))
-    
-    # # x = msgpack.packb(data)
-    # x = msgpack.packb(xdata, default=msgpack_numpy.encode)
-    # y = msgpack.packb(ydata, default=msgpack_numpy.encode)
-    # z = msgpack.packb(zdata, default=msgpack_numpy.encode)
-
-    publishData(x, y, z)
+    print("Exiting server")   
 
 def getGpuOutputPaths(paths, outfile):
     "Where will the output go?"
     # Ex: [/home/sandboxes/pmargani/gpus/gpu1/outfile.1]
     return ["%s.%d" % (os.path.join(path,outfile), i+1) for i, path in enumerate(paths)]
 
-def spawnGpus():
-
-    outfile = "outfile"
-
-    print (GPU_MULTI_PATHS)
-    print (GPU_MULTI_HOSTS)
-
-    hosts = GPU_MULTI_HOSTS
-    paths = GPU_MULTI_PATHS
-    user = os.getlogin()
-
-    thisHost = os.uname()[1]
-
-    scriptDir = os.path.dirname(os.path.realpath(__file__))
-    gpuStreamScript = "{0}/runGpuStream".format(scriptDir)
-
-    # ./runGpuStream /home/sandboxes/pmargani/LASSI/gpus/versions/gpuStreams 
-    # pmargani devenv-hpc1 1 8 devenv-hpc1.gb.nrao.edu 35564 outfile
-
-    # keep track of the processes we'll be spawning
-    ps = []
-
-    # where will the output go?
-    # Ex: /home/sandboxes/pmargani/gpus/gpu1/outfile.1
-    # outputs = ["%s.%d" % (os.path.join(path,outfile), i+1) for i, path in enumerate(paths)]
-    # outputs = getGpuOutputPaths(paths, outfile)
-    outputs = [os.path.join(path, outfile) for path in paths]
-
-    part = 0
-    parts = len(hosts)
-
-    # for host, path in zip(hosts, paths):
-    for i in range(len(hosts)):
-        host = hosts[i]
-        path = paths[i]
-        part = i + 1
-        # thisOutfile = "%s.%d" % (outfile, part)
-        cmd = [
-            gpuStreamScript,
-            path,
-            user,
-            host,
-            str(part),
-            str(parts),
-            thisHost,
-            str(PUB_PORT),
-            os.path.basename(outputs[i])
-        ]
-
-        print ("cmd: ", " ".join(cmd))
-
-        p = subprocess.Popen(cmd)
-        ps.append(p)
-
-    return ps
 
 def main():
     serve()
-    # tryPublishFromThread()
-    # tryPublishPreSmoothedData()
 
 if __name__ == '__main__':
     main()
