@@ -2,8 +2,8 @@
 
 import os
 
-# RUNTLS_LOG_DIR = os.getenv('TELESPY_LOG_DIR', '.')
-RUNTLS_LOG_DIR = "/home/scratch/pmargani/LASSI/runTLSlogs" #os.getenv('TELESPY_LOG_DIR', '.')
+RUNTLS_LOG_DIR = os.getenv('LASSI_ANALYSIS_LOG_DIR', './data')
+# RUNTLS_LOG_DIR = "/home/scratch/pmargani/LASSI/runTLSlogs" #os.getenv('TELESPY_LOG_DIR', '.')
 
 config = {
     'version': 1,
@@ -35,7 +35,7 @@ config = {
         'teleSpyFile': {
             'level': 'DEBUG',
             'formatter': 'verbose',
-            'class': 'handlers.DatestampFileHandler',
+            'class': 'ops.handlers.DatestampFileHandler',
             # Pull the log path from the environment. If this isn't set, an error
             # will be thrown. To log to the current directory, set this to .
             # 'filename': os.path.join(SPARROW_LOG_DIR, 'gfm_logs', 'gfm.log'),

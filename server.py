@@ -7,6 +7,7 @@ import time
 from datetime import datetime
 from multiprocessing import Process, Value
 import subprocess
+import logging, logging.config
 
 import numpy  as np
 import msgpack
@@ -15,7 +16,6 @@ import msgpack_numpy
 import lassiTestSettings as settings
 from ops.pyTLS import TLSaccess
 from processPTX import getRawXYZ, processNewPTXData
-# from lassiAnalysis import processLeicaDataStream
 from lassiAnalysis import extractZernikesLeicaScanPair
 from ZernikeFITS import ZernikeFITS
 from ops.getConfigValue import getConfigValue
@@ -27,11 +27,17 @@ from lassiAnalysis import imageSmoothedData
 
 from settings import GPU_MULTI_HOSTS, GPU_MULTI_PATHS
 
+import ops.runTLSLogging as runTLSLogging
+
+# Init the logging configuration
+logging.config.dictConfig(runTLSLogging.config)
+logger = logging.getLogger(__name__)
+
 # Get a number of settings from the config files:
 # DATADIR = "/home/sandboxes/pmargani/LASSI/data"
 # from system.conf:
 DATADIR = getConfigValue(".", "YGOR_DATA")
-print("Writing FITS files to YGOR_DATA: ", DATADIR)
+logger.debug("Writing FITS files to YGOR_DATA: %s" % DATADIR)
 
 # from LASSI.conf:
 # TLS_HOST = "galileo.gb.nrao.edu"
@@ -47,10 +53,12 @@ SIM_ZERNIKE_RESULT = getConfigValue(".", "analysisZernikeResult", configFile=lc)
 SIM_ZERNIKE_PNG = getConfigValue(".", "analysisZernikePng", configFile=lc)
 PORT = int(getConfigValue(".", "analysisServerPort", configFile=lc))
 PUB_PORT = int(getConfigValue(".", "analysisPublishPort", configFile=lc))
-print("Starting analysis server using sim results: ", SIM_RESULTS)
-print("Starting analysis server using sim  inputs: ", SIM_INPUTS)
-print("For smoothing using these hosts: ", GPU_MULTI_HOSTS)
-print("from these installations: ", GPU_MULTI_PATHS)
+
+# let user know how we're setup
+logger.debug("Starting analysis server using sim results: %s" % SIM_RESULTS)
+logger.debug("Starting analysis server using sim  inputs: %s" % SIM_INPUTS)
+logger.debug("For smoothing using these hosts: %s" % GPU_MULTI_HOSTS)
+logger.debug("from these installations: %s" % GPU_MULTI_PATHS)
 
 # states
 READY = 0 #"READY"
@@ -73,7 +81,7 @@ def setupServerSocket(port):
     # pubPort = 9001
     # pubUrl = "tcp://%s:%d" % (pubHost, pubPort)
     pubUrl = "tcp://*:%d" % (port)
-    print("Publishing from: ", pubUrl)
+    logger.debug("Publishing from: %s" % pubUrl)
 
     ctx = zmq.Context()
     pubck = ctx.socket(zmq.PUB)
@@ -96,11 +104,11 @@ def publishData(x, y, z):
 
     # TBF: this is a kluge to 'wake up' the client subscriber,
     # which often doesn't receive the first thing published
-    print("publishing primer")
+    logger.debug("publishing primer")
     pubSocket.send_multipart([b"PRIMER"])
     time.sleep(3)
 
-    print ("publishing data")
+    logger.debug("publishing data")
     data = [b"HEADER",
       # TBF: replace with actual header info
       b"HEADER_DATA",
@@ -118,7 +126,7 @@ def publishData(x, y, z):
       x]
                           
     pubSocket.send_multipart(data)
-    print("published!")
+    logger.debug("published!")
 
 def getMissingFiles(files):
     "Which of the given files does not exist?"
@@ -170,12 +178,12 @@ def processLeicaDataStream(x,
                                  rFilter=True,
                                  iFilter=False)
 
-    print("done pre-processing data, ready to smooth")
+    logger.debug("done pre-processing data, ready to smooth")
 
     # optionally override settings 
     if smoothOutputs is None:
         outputs = getGpuOutputPaths(GPU_MULTI_PATHS, "outfile")
-        print("getGpuOutputPaths", GPU_MULTI_PATHS, outputs)
+        logger.debug("getGpuOutputPaths %s %s" % (GPU_MULTI_PATHS, outputs))
     else:
         outputs = smoothOutputs
 
@@ -183,22 +191,22 @@ def processLeicaDataStream(x,
     # have access to GPUs for smoothing
     if not test:
         xOutputs = ["%s.x.csv" % f for f in outputs]
-        print("xOutputs: ", xOutputs)
+        logger.debug("xOutputs: %s" % xOutputs)
         # make sure that output isn't there yet
         for fn in xOutputs:
             if os.path.isfile(fn):
-                print ("Removing previous results: ", fn)
+                logger.debug("Removing previous results: %s" % fn)
                 os.remove(fn)
         
         # now publish the input to smoothing
-        print("splitting data")
+        logger.debug("splitting data")
         x, y, z = splitXYZ(xyz)
         publishData(x, y, z)
 
         # and wait for it to show up.
         missing = getMissingFiles(xOutputs)
         while len(missing) > 0:
-            print("Waiting on smoothing file", missing[0])
+            logger.debug("Waiting on smoothing file %s" % missing[0])
             time.sleep(5)
             missing = getMissingFiles(xOutputs)
 
@@ -216,7 +224,7 @@ def processLeicaDataStream(x,
         # how should we save the image of our processed data?
         ext = "smoothed.fits"
         fn = smoothedFitsFilename[:-len(ext)] + "processed.png"
-        print("Processing smoothed data, imaging to:", fn)
+        logger.debug("Processing smoothed data, imaging to: %s" % fn)
         # process a little more and create a surface plot for diagnosis
         imageSmoothedData(x, y, z, N, filename=fn)
 
@@ -237,7 +245,7 @@ def getRefScanFileName(scans, proj, refScanNum):
     """
 
     if proj not in scans:
-        print ("Proj not in scans: ", proj, scans.keys())
+        logger.error("Proj not in scans: %s %s" % (proj, scans.keys()))
         return None
 
     # if the ref scan number HAS NOT BEEN specified
@@ -255,30 +263,33 @@ def getRefScanFileName(scans, proj, refScanNum):
                     newestRefScan = scanInfo
         if newestRefScan is None:
             # TBF: go to the file system to look for it?
-            print("ERROR: cannot find refScan from", proj, refScanNum, scans)
+            logger.error("Cannot find refScan from %s %s %s" % (proj, refScanNum, scans))
             return None
         else:
-            print("getRefScanFileName: ", newestRefScan)
+            logger.debug("getRefScanFileName: %s" % newestRefScan)
             return newestRefScan['filepathSmoothed']
 
     # if it has, can we use it?
     if refScanNum not in scans[proj]:
-        print ("Scan not in proj: ", refScanNum, scans[proj].keys())
+        logger.error("Scan not in proj: %s %s" % (refScanNum, scans[proj].keys()))
         return None            
 
     scan = scans[proj][refScanNum]
-    print(scan)
+    logger.debug(scan)
 
     return scan['filepathSmoothed']
 
 def waitForScanEnd(state, a):
-    print ("in WaitForScanEnd")
-    state.value = WAITING_FOR_SCAN_END
-    print(stateMap[WAITING_FOR_SCAN_END])
+    "The TLS is scanning, we need to wait for that to end"
 
-    print ("can we get the scanner state?")
-    print (a.get_status())
-    print ("yes we can")
+    # set the new state
+    logger.debug ("in WaitForScanEnd")
+    state.value = WAITING_FOR_SCAN_END
+    logger.debug(stateMap[WAITING_FOR_SCAN_END])
+
+    logger.debug ("can we get the scanner state?")
+    logger.debug (a.get_status())
+    logger.debug ("yes we can")
 
     # here we wait until the scanner's state has gotten to Ready
     # time.sleep(3)
@@ -286,32 +297,31 @@ def waitForScanEnd(state, a):
     while state != "Ready":
         status = a.get_status()
         state = status.state
-        print("State: ", state)
+        logger.debug("State: %s" % state)
         time.sleep(1)
-    print ("done waiting for scan end")
+    logger.debug ("done waiting for scan end")
     
 
 def waitForData(state, a):
-    state.value = WAITING_FOR_DATA
-    print(stateMap[WAITING_FOR_DATA])
+    "The scan is over, but we now need to get the data"
 
-    # here we call export to data, then wait until we actually see all of it
-    # time.sleep(3)
-    #a.export_data()
+    # set the new state
+    state.value = WAITING_FOR_DATA
+    logger.debug(stateMap[WAITING_FOR_DATA])
+
     keys = a.get_results().keys()
     while len(keys) < 5:
-        print("not enough keys: ", keys)
+        logger.debug("not enough keys: %s" % keys)
         time.sleep(1)
         keys = a.get_results().keys()
-    print ("We have all our keys now: ", keys)
+    logger.debug ("We have all our keys now: %s" % keys)
     return a.get_results()
-    # return None
 
 def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, filename, test=False):
     
     # make sure we've made it clear we've entered this state
     state.value = PROCESSING
-    print(stateMap[PROCESSING])
+    logger.debug(stateMap[PROCESSING])
 
     # here we can finally process the data
     time.sleep(3)
@@ -329,7 +339,7 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         # hdr = hdrObj.asdict()
     else:
         simFile = SIM_REF_INPUT if bool(refScan) else SIM_SIG_INPUT
-        print("Using simulated input: ", simFile)
+        logger.debug("Using simulated input: %s" % simFile)
         # this is not smoothed data, but it still can be read
         f = SmoothedFITS()
         f.read(simFile)
@@ -384,21 +394,21 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         dest = dest + ".smoothed.fits"
         # which file?
         simFile = SIM_REF_SMOOTH_RESULT if refScan else SIM_SIG_SMOOTH_RESULT
-        print("simulating smoothed results from %s to %s" % (simFile, dest))
+        logger.debug("simulating smoothed results from %s to %s" % (simFile, dest))
         shutil.copy(simFile, dest)
         fitsFile = dest
 
     # any more processing?
     if refScan:
         # if this is a ref scan we are done
-        print("This is a ref scan, we are done")
+        logger.debug("This is a ref scan, we are done")
         return
 
 
     # if it is a signal scan, we
     # need to compute Zernike's
     # find the previous refscan:
-    # print("look for file for scan", refScanNum)
+    # logger.debug("look for file for scan", refScanNum)
     sigScanFile = filename
 
     # TBF: where to specify this?
@@ -406,7 +416,7 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
     N = 512
 
 
-    print("files: ", refScanFile, sigScanFile, fitsFile)
+    logger.debug("files: %s %s %s" % (refScanFile, sigScanFile, fitsFile))
 
     if not SIM_RESULTS:
         xs, ys, zs, zernikes = extractZernikesLeicaScanPair(refScanFile,
@@ -420,13 +430,13 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         hdr['REFSCNFN'] = os.path.basename(refScanFile)
         # make sure the zernikes are in microns, not meters
         hdr['ZUNITS'] = 'microns'
-        print(zernikes)
-        print(type(zernikes))
+        logger.debug(zernikes)
+        logger.debug(type(zernikes))
         # zernikes = zernikes * 1e6
         zernikes = [z * 1e6 for z in zernikes]
         fitsio.setData(xs, ys, zs, N, hdr, dataDir, proj, filename)
         fitsio.setZernikes(zernikes)
-        print ("Writing Zernikes to: ", fitsio.getFilePath())
+        logger.debug ("Writing Zernikes to: %s" % fitsio.getFilePath())
         fitsio.write()
 
         """
@@ -440,7 +450,7 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
 
         # Ask for Paul's approval.
         fn = fitsio.getFilePath()[:-4] + "png"
-        print ("Plotting and writing Zernikes png to: ", fn)
+        logger.debug ("Plotting and writing Zernikes png to: %s" % fn)
         title = "%s:%s" % (proj, scanNum)
         plotZernikes(xs, ys, zernikes, n=N, title=title, filename=fn)  
 
@@ -449,12 +459,12 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         # first the zernike FITS file
         dest = os.path.join(dataDir, proj, 'LASSI', filename)
         dest = dest + ".zernike.fits"
-        print("simulating zernike FITS results from %s to %s" % (SIM_ZERNIKE_RESULT, dest))
+        logger.debug("simulating zernike FITS results from %s to %s" % (SIM_ZERNIKE_RESULT, dest))
         shutil.copy(SIM_ZERNIKE_RESULT, dest)
 
         # then copy over the image file
         dest = dest[:-4] + "png"
-        print("simulating zernike PNG results from %s to %s" % (SIM_ZERNIKE_PNG, dest))
+        logger.debug("simulating zernike PNG results from %s to %s" % (SIM_ZERNIKE_PNG, dest))
         shutil.copy(SIM_ZERNIKE_PNG, dest)
 
 def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename, test=False):
@@ -469,13 +479,13 @@ def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename, te
     filename: path to this scans eventual data file
     test: for testing, avoid interacting with lassi_daq
     """
-    print("starting process, with state: ", state.value)
+    logger.debug("starting process, with state: %s" % state.value)
 
     if test:
         # skip all interactions with scanner
         processing(state, {}, proj, scanNum, refScan, refScanNum, refScanFile, filename, test=test)
         state.value = READY
-        print ("done, setting state: ", state.value)
+        logger.debug ("done, setting state: %s" % state.value)
         return
 
     # a = TLSaccess("lassi.ad.nrao.edu")
@@ -489,7 +499,7 @@ def process(state, proj, scanNum, refScan, refScanNum, refScanFile, filename, te
 
     # done!
     state.value = READY
-    print ("done, setting state: ", state.value)
+    logger.debug ("done, setting state: %s" % state.value)
 
 
 def serve():
@@ -527,10 +537,10 @@ def serve():
 
     while run:
         try:
-            #print ("waiting for message")
+            #logger.debug ("waiting for message")
             msg = socket.recv()
-            #print ("got msg")
-            #print (msg)
+            #logger.debug ("got msg")
+            #logger.debug (msg)
             msgStr = "".join( chr(x) for x in msg)
 
             # ************ Process Data
@@ -551,7 +561,7 @@ def serve():
                         "filepathSmoothed": filepath.replace(".fits", ".smoothed.fits")
                     }
 
-                    print("scans list:", scans)
+                    logger.debug("scans list: %s" % scans)
                     if not refScan:
                         # this is a signal scan, so get the filename of our 
                         # reference scan
@@ -559,7 +569,7 @@ def serve():
                     else:
                         refScanFile = None
                         
-                    print("processing!")
+                    logger.debug("processing!")
                     p = Process(target=process, 
                                 args=(state,
                                       proj, 
@@ -571,10 +581,10 @@ def serve():
                     p.start()
                     #state.value = PROCESSING
                     # socket.send_string("Started Processing")
-                    print("Started Processing")
+                    logger.debug("Started Processing")
                     socket.send_string("OK")
                 else:
-                    print("processing already!")
+                    logger.debug("processing already!")
                     socket.send_string("Already processing")
 
             # ******** STOP processing data        
@@ -583,14 +593,14 @@ def serve():
                     socket.send_string("Nothing to stop")
                 else:
                     if p is not None:
-                        print ("terminating process")
-                        print (stateMap[state.value])
+                        logger.debug ("terminating process")
+                        logger.debug (stateMap[state.value])
                         p.terminate()
                         state.value = READY
-                        print ("process terminated")
+                        logger.debug ("process terminated")
                         socket.send_string("OK")
                     else:
-                        print ("can't terminate, p is none")
+                        logger.debug ("can't terminate, p is none")
                         socket.send_string("can't terminate, p is none")
 
             # ************ return our current STATE            
@@ -621,15 +631,15 @@ def serve():
                     elif key == 'filename':
                         filename = value
                     else:
-                        print("unknonw key", key)                    
+                        logger.debug("unknonw key: %s" % key)                    
                     # socket.send_string("setting %s to %s" % (key, value))    
-                    print("setting %s to %s" % (key, value))
+                    logger.debug("setting %s to %s" % (key, value))
                     socket.send_string("OK")
 
             # ********* RAISE an ERROR!            
             else:
-                print("what?")
-                print(msg)
+                logger.debug("what?")
+                logger.debug(msg)
                 socket.send_string("Dont' understand message")
 
             # no need for the server to spin too fast
@@ -638,13 +648,13 @@ def serve():
         except KeyboardInterrupt:
 
             # exit gracefully
-            print("KeyboardInterrupt")
+            logger.debug("KeyboardInterrupt")
             if p is not None:
                 p.terminate()
-            socket.send_string("server exiting")
+            # socket.send_string("server exiting")
             run = False
         
-    print("Exiting server")   
+    logger.debug("Exiting server")   
 
 def getGpuOutputPaths(paths, outfile):
     "Where will the output go?"
