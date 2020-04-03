@@ -4,7 +4,7 @@ import unittest
 
 from processPTX import getRawXYZ
 from server import getMissingFiles, getGpuOutputPaths
-from server import processLeicaDataStream
+from server import processLeicaDataStream, getRefScanFileName
 import lassiTestSettings
 import settings
 
@@ -34,6 +34,52 @@ class TestServer(unittest.TestCase):
         exp = ["/path/one/outfile.1", "/path/two/outfile.2"]
         opaths = getGpuOutputPaths(paths, outfile)
         self.assertEquals(exp, opaths)
+
+    def testGetRefScanFileName(self):
+        "test getRefScanFileName"
+
+        # first test a bunch of the error checking:
+
+        # Project not in scan:
+        scans = {}
+        proj = 'projA'
+        refScanNum = None
+        fn = getRefScanFileName(scans, proj, refScanNum)
+        self.assertEquals(fn, None)
+
+        # Cant find any refscan for this project
+        scans = {proj: {}}
+        fn = getRefScanFileName(scans, proj, refScanNum)
+        self.assertEquals(fn, None)
+
+        # Cant find a ref by this scan in this proj
+        refScanNum = 1
+        fn = getRefScanFileName(scans, proj, refScanNum)
+        self.assertEquals(fn, None)
+
+        # Finally: happy path - find given scan number,
+        # return what we came for
+        exp = 'filepathSmoothed'
+        scanInfo = {exp: exp, 'refScan': True, 'timestamp': 0}
+        scans = {proj: {refScanNum: scanInfo}}
+        fn = getRefScanFileName(scans, proj, refScanNum)
+        self.assertEquals(fn, exp)
+
+        # Another happy path - just give us the most
+        # recent ref scan filename
+        fn = getRefScanFileName(scans, proj, None)
+        self.assertEquals(fn, exp)
+     
+        # But that was too easy, let's add more scans
+        # so we know it gets' the most recent one.
+        # the most recent has a larger timestamp then the last one
+        exp2 = exp + "2"
+        scanInfo2 = {exp: exp2, 'refScan': True, 'timestamp': 1}
+        scans = {proj: {refScanNum: scanInfo, 2: scanInfo2}}
+        fn = getRefScanFileName(scans, proj, None)
+        self.assertEquals(fn, exp2)
+
+
 
     def testProcessLeicaDataStream(self):
 

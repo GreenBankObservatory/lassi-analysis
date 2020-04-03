@@ -244,6 +244,15 @@ def getFITSFilePath(proj, filename):
     return os.path.join(DATADIR, proj, "LASSI", filename + ".fits")
 
 def getRefScanFileName(scans, proj, refScanNum):
+    """
+    Retrieves the full path to the smoothed FITS file
+    for the given reference scan number.
+    proj: given project, as in /home/gbtdata/<proj>
+    refScanNum: reference scan number.  Can be None.
+    scans: a dictionary of scan information that we will
+    mine to get the desired file name. Looks like:
+       {project: { scanNumber: {refScan: true, ...}}}
+    """
 
     if proj not in scans:
         print ("Proj not in scans: ", proj, scans.keys())
@@ -276,8 +285,6 @@ def getRefScanFileName(scans, proj, refScanNum):
         return None            
 
     scan = scans[proj][refScanNum]
-    # assert scans[proj][scan]["refScan"]
-    # print(scans[proj][scan]["refScan"])
     print(scan)
 
     return scan['filepathSmoothed']
