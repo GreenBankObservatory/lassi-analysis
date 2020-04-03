@@ -17,6 +17,8 @@ GPU_HOST_2 = DEV2
 GPU_MULTI_HOSTS = [DEV1]
 
 
-gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions"
-gpuVersions = [DEV1]
-GPU_MULTI_PATHS = [os.path.join(gpuPath, f) for f in gpuVersions]
+# for supporting unit tests:
+#gpuPath = "/home/sandboxes/pmargani/LASSI/gpus/versions"
+#gpuVersions = [DEV1]
+#GPU_MULTI_PATHS = [os.path.join(gpuPath, f) for f in gpuVersions]
+GPU_MULTI_PATHS=["./data/gpus"]
