@@ -11,15 +11,9 @@ import settings
 
 class TestServer(unittest.TestCase):
 
-    def setUp(self):
-        print("setUp getting fake data ...")
-        x, y, z, i = self.getRawData()
-        self.x = x
-        self.y = y
-        self.z = z
-        self.i = i
+    def getRawData(self): 
+        "Read raw data from old scan for tests."
 
-    def getRawData(self):    
         path = settings.UNIT_TEST_PATH
         scan9 = lassiTestSettings.SCAN9
         fn = os.path.join(path, '27mar2019', scan9)
@@ -44,10 +38,14 @@ class TestServer(unittest.TestCase):
 
     def testGetGpuOutputPaths(self):
 
-        paths = ["/path/one/", "/path/two"]
         outfile = "outfile"
-        exp = ["/path/one/outfile.1", "/path/two/outfile.2"]
-        opaths = getGpuOutputPaths(paths, outfile)
+        dataDir = "/home/gbt"
+        proj = "TINT"
+        opaths = getGpuOutputPaths(dataDir, proj, outfile, 2)
+        exp = [
+            "/home/gbt/TINT/LASSI/outfile.1",
+            "/home/gbt/TINT/LASSI/outfile.2",
+        ]
         self.assertEquals(exp, opaths)
 
     def testGetRefScanFileName(self):
@@ -94,9 +92,9 @@ class TestServer(unittest.TestCase):
         fn = getRefScanFileName(scans, proj, None)
         self.assertEquals(fn, exp2)
 
-
-
     def testProcessLeicaDataStream(self):
+        
+        x, y, z, i = self.getRawData()
 
         # write locally
         dataDir = './data'
@@ -133,7 +131,7 @@ class TestServer(unittest.TestCase):
         smoothOutputs = [os.path.join(path, '27mar2019/gpus', fn)]
 
 
-        processLeicaDataStream(self.x, self.y, self.z, self.i, dts, hdr,
+        processLeicaDataStream(x, y, z, i, dts, hdr,
             ellipse, rot, project, dataDir, filename, 
             plot=True, test=True, smoothOutputs=smoothOutputs)
 
@@ -143,6 +141,7 @@ class TestServer(unittest.TestCase):
             self.assertTrue(os.path.isfile(fn))
 
     def testProcessing(self):
+        x, y, z, i = self.getRawData()
 
         # write locally
         dataDir = './data'
@@ -170,10 +169,10 @@ class TestServer(unittest.TestCase):
 
         # fake the data
         results = {
-            'X_ARRAY': self.x,
-            'Y_ARRAY': self.y,
-            'Z_ARRAY': self.z,
-            'I_ARRAY': self.i,
+            'X_ARRAY': x,
+            'Y_ARRAY': y,
+            'Z_ARRAY': z,
+            'I_ARRAY': i,
             'TIME_ARRAY': [],
             'HEADER': {}
         }

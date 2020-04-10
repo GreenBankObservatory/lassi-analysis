@@ -3,6 +3,8 @@ import os
 
 UNIT_TEST_PATH="/home/scratch/pmargani/LASSI/unitTestData"
 
+NUM_GPUS=1
+
 GPU_PATH="/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/"
 GPU_OUTPUT_PATH="/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/"
 
