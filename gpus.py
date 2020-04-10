@@ -162,7 +162,7 @@ def loadGPUFiles(outfiles):
             # dimPath = os.path.join(gpuPath, dimFile)
             # outfiles.append(dimPath)
             dimFiles.append(dimFile)
-            print(dimFile)
+            print("checking for gpu file: ", dimFile)
             assert os.path.isfile(dimFile)
             print("GPUs created file: ", dimFile)
         # now load the data using the base name shared by all dimensions

@@ -22,10 +22,9 @@ from ops.getConfigValue import getConfigValue
 from plotting import plotZernikes
 from SmoothedFITS import SmoothedFITS
 from utils.utils import splitXYZ
-from gpus import loadParallelGPUFiles, loadGPUFiles
+from gpus import loadGPUFiles
 from lassiAnalysis import imageSmoothedData
-
-from settings import GPU_MULTI_HOSTS, GPU_MULTI_PATHS
+from settings import NUM_GPUS
 
 import ops.runTLSLogging as runTLSLogging
 
@@ -57,8 +56,7 @@ PUB_PORT = int(getConfigValue(".", "analysisPublishPort", configFile=lc))
 # let user know how we're setup
 logger.debug("Starting analysis server using sim results: %s" % SIM_RESULTS)
 logger.debug("Starting analysis server using sim  inputs: %s" % SIM_INPUTS)
-logger.debug("For smoothing using these hosts: %s" % GPU_MULTI_HOSTS)
-logger.debug("from these installations: %s" % GPU_MULTI_PATHS)
+logger.debug("Smoothing using %s GPUs" % NUM_GPUS)
 
 # states
 READY = 0 #"READY"
@@ -89,7 +87,7 @@ def setupServerSocket(port):
 
     return pubck
 
-def publishData(x, y, z):
+def publishData(x, y, z, outpath):
     "Publishes the given data over a ZMQ socket"
 
     # we must create our server socket here because
@@ -110,8 +108,8 @@ def publishData(x, y, z):
 
     logger.debug("publishing data")
     data = [b"HEADER",
-      # TBF: replace with actual header info
-      b"HEADER_DATA",
+      # for now, this is just this path
+      outpath.encode(),
       # the time info is not used, but must be here
       b"TIME_ARRAY",
       b"TIME_ARRAY_DATA",
@@ -129,6 +127,7 @@ def publishData(x, y, z):
     logger.debug("published!")
 
 def getMissingFiles(files):
+
     "Which of the given files does not exist?"
     missing = []
     for f in files:
@@ -182,8 +181,11 @@ def processLeicaDataStream(x,
 
     # optionally override settings 
     if smoothOutputs is None:
-        outputs = getGpuOutputPaths(GPU_MULTI_PATHS, "outfile")
-        logger.debug("getGpuOutputPaths %s %s" % (GPU_MULTI_PATHS, outputs))
+        outputs = getGpuOutputPaths(dataDir,
+                                    project,
+                                    filename,
+                                    NUM_GPUS)
+        logger.debug("getGpuOutputPaths %s" % (outputs))
     else:
         outputs = smoothOutputs
 
@@ -201,7 +203,8 @@ def processLeicaDataStream(x,
         # now publish the input to smoothing
         logger.debug("splitting data")
         x, y, z = splitXYZ(xyz)
-        publishData(x, y, z)
+        outpath = os.path.join(dataDir, project, 'LASSI', filename)
+        publishData(x, y, z, outpath)
 
         # and wait for it to show up.
         missing = getMissingFiles(xOutputs)
@@ -656,10 +659,13 @@ def serve():
         
     logger.debug("Exiting server")   
 
-def getGpuOutputPaths(paths, outfile):
+# def getGpuOutputPaths(paths, outfile):
+def getGpuOutputPaths(dataDir, project, outfile, numParts):
     "Where will the output go?"
     # Ex: [/home/sandboxes/pmargani/gpus/gpu1/outfile.1]
-    return ["%s.%d" % (os.path.join(path,outfile), i+1) for i, path in enumerate(paths)]
+    # return ["%s.%d" % (os.path.join(path,outfile), i+1) for i, path in enumerate(paths)]
+    path = os.path.join(dataDir, project, "LASSI", outfile)
+    return ["%s.%d" % (path, i+1) for i in range(numParts)]
 
 
 def main():
