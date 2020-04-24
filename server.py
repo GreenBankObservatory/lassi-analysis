@@ -146,6 +146,7 @@ def processLeicaDataStream(x,
                            project,
                            dataDir,
                            filename,
+                           scanNum,
                            plot=True,
                            smoothOutputs=None,
                            test=False):
@@ -218,7 +219,7 @@ def processLeicaDataStream(x,
 
     # save this off for later use
     fitsio = SmoothedFITS()
-    fitsio.setData(x, y, z, N, hdr, dataDir, project, filename)
+    fitsio.setData(x, y, z, N, hdr, dataDir, project, filename, scanNum)
     fitsio.write()
 
     smoothedFitsFilename = fitsio.getFilePath()
@@ -338,8 +339,10 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         dts = results['TIME_ARRAY']
         hdrObj = results['HEADER']
 
-        hdr = hdrObj.asdict() if not test else {}
-        # hdr = hdrObj.asdict()
+        # convert the this python object to a dict that
+        # astropy.io.fits can convert to a PHDU a lot like
+        # the raw FITS PHDU
+        hdr = hdrObj.asFitsHeaderDict() if not test else {}
     else:
         simFile = SIM_REF_INPUT if bool(refScan) else SIM_SIG_INPUT
         logger.debug("Using simulated input: %s" % simFile)
@@ -355,10 +358,12 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
         hdr = dict(f.hdr)      
 
     # update the header with more metadata
-    hdr['mc_project'] = proj
-    hdr['mc_scan'] = scanNum
-    hdr['REF'] = refScan
-    hdr['REFSCAN'] = refScanNum
+    # This needs to match what's expected in SmoothedFITS
+    # TBF: use SmoothedFITS?
+    hdr['PROJID'] = (proj, "Manager parameter projId")
+    hdr['SCAN'] = (scanNum, "Manager parameter scanNumber")
+    hdr['REFSCAN'] = (refScan, "Is this a reference scan?")
+    hdr['RSCANNUM'] = (refScanNum, "Scan number of reference scan")
 
     # then being processing
     lines = None
@@ -390,6 +395,7 @@ def processing(state, results, proj, scanNum, refScan, refScanNum, refScanFile, 
                            proj,
                            dataDir,
                            filename,
+                           scanNum,
                            test=test)
     else:
         # cp the smoothed file to the right locatoin

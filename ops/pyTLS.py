@@ -99,6 +99,24 @@ class ScanHeaderInfo:
         }
         return d
 
+    def asFitsHeaderDict(self):
+        "Returns a dict w/ keys equal to the raw FITS PHDU"
+        d = {
+            "TLSAZCTR" : (self.center_az, "instrument scan center azimuth in degrees"),
+            "TLSELCTR" : (self.center_el, "instrument scan center elevation in degrees"),
+            "TLSAZFOV" : (self.fov_az, "scan width in radians"),
+            "TLSELFOV" : (self.fov_el, "scan height in radians"),
+            "TLSSCAN"  : (self.scan_number, "TL Scanner project scan number"),
+            "TLSPROJE" : (self.tls_project, "TL Scanner project name"),
+            "TLSRESOL" : (self.tls_resolution, "TL Scanner resolution"),
+            "TLSSMODE" : (self.tls_scan_mode, "TL scanner (EDM) mode setting"),
+            "TLSSENSI" : (self.tls_sensitivity, "TL Scanner sensitivity setting"),
+            "TLSSERIA" : (self.tls_serial_number, "TL Scanner serial number"),
+            "TLSQUALI" : (self.tls_tilt_compensator, "TL Scanner tile compensator"),
+            # this is not in the raw FITS file?
+            "scan_time": (self.scan_time, "TBF")
+        }
+        return d
 
     def __str__(self):
         """
@@ -561,6 +579,7 @@ class TLSaccess(object):
         :return: True if callback was removed, False otherwise
         """
         if not self._sub_task:
+         
             return (False, "subtask not running - error or no callbacks previously defined")
 
         if callback_name in self._sub_task._callbacks.keys():

@@ -132,7 +132,7 @@ class TestServer(unittest.TestCase):
 
 
         processLeicaDataStream(x, y, z, i, dts, hdr,
-            ellipse, rot, project, dataDir, filename, 
+            ellipse, rot, project, dataDir, filename, 1,
             plot=True, test=True, smoothOutputs=smoothOutputs)
 
         # finally, if this function completed, it should have
