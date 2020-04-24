@@ -671,7 +671,10 @@ def getGpuOutputPaths(dataDir, project, outfile, numParts):
     # Ex: [/home/sandboxes/pmargani/gpus/gpu1/outfile.1]
     # return ["%s.%d" % (os.path.join(path,outfile), i+1) for i, path in enumerate(paths)]
     path = os.path.join(dataDir, project, "LASSI", outfile)
-    return ["%s.%d" % (path, i+1) for i in range(numParts)]
+    if numParts == 1:
+        return [path]
+    else:    
+        return ["%s.%d" % (path, i+1) for i in range(numParts)]
 
 
 def main():
