@@ -32,29 +32,41 @@ class MidpointNormalize(matplotlib.colors.Normalize):
         self.midpoint = midpoint
         matplotlib.colors.Normalize.__init__(self, vmin, vmax, clip)
 
+
     def __call__(self, value, clip=None):
-        # This ignores masked values and edge cases.
+
+        if clip is None:
+            clip = self.clip
+
         x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
-        return np.ma.masked_array(np.interp(value, x, y), np.isnan(value))
+
+        result, is_scalar = self.process_value(value)
+
+        result = np.ma.array(np.interp(value, x, y), mask=result.mask, fill_value=np.nan, copy=False)
+
+        if is_scalar:
+            result = result[0]
+
+        return result 
 
 
-def surfacePlot(x, y, z, title=False, vMin=-5e-3, vMax=5e-3, colorbarLabel=False, filename=None):
+def surfacePlot(x, y, z, title=None, midPoint=0, vMin=-5e-3, vMax=5e-3, colorbarLabel=None, filename=None):
     """
     """
 
     cmap = plt.matplotlib.cm.coolwarm
     cmap.set_bad(color='white')
 
-    extent = [plt.np.nanmin(x), plt.np.nanmax(x), plt.np.nanmin(y), plt.np.nanmax(y)]
+    extent = [np.nanmin(x), np.nanmax(x), np.nanmin(y), np.nanmax(y)]
 
     fig = plt.figure(figsize=(6, 5), dpi=150, frameon=False)
     ax = fig.add_subplot(111)
 
-    norm = MidpointNormalize(midpoint=0., vmin=vMin, vmax=vMax)
-    im = ax.imshow(z, extent=extent, vmin=vMin, vmax=vMax, norm=norm, cmap=cmap)
+    norm = MidpointNormalize(midpoint=midPoint, vmin=vMin, vmax=vMax)
+    im = ax.imshow(z, extent=extent, vmin=vMin, vmax=vMax, norm=norm, cmap=cmap, origin='lower')
 
     cb = plt.colorbar(im, fraction=0.046, pad=0.04)
-    if colorbarLabel:
+    if colorbarLabel is not None:
         cb.ax.set_ylabel(colorbarLabel)
 
     ax.minorticks_on()
@@ -62,11 +74,11 @@ def surfacePlot(x, y, z, title=False, vMin=-5e-3, vMax=5e-3, colorbarLabel=False
 
     ax.set_xlabel('x axis (m)')
     ax.set_ylabel('y axis (m)')
-    if title:
+    if title is not None:
         plt.title(title)
 
     if filename is not None:
-        plt.savefig(filename)
+        plt.savefig(filename, bbox_inches='tight', pad_inches=0.06)
         
 
 def barChartPlot(index, fitlist, expected=[]):
@@ -85,7 +97,7 @@ def barChartPlot(index, fitlist, expected=[]):
         xticklist.append('Z'+str(i))
     barfigure = plt.bar(index, fitlist, width, color='#2E9AFE', edgecolor='#2E9AFE', label='Measured')
     if len(expected) > 0:
-        plt.bar(index-width/3, expected, width, color='#882255', edgecolor='#882255', label='Input')
+        plt.bar(index-width/3, expected, width, color='#882255', edgecolor='#882255', label='Input', alpha=0.5)
 
     plt.legend(loc=0, fancybox=True)
 
@@ -132,7 +144,7 @@ def imagePlot(z, title):
     plt.title(title)
 
 
-def surface3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
+def surface3dPlot(x, y, z, title=None, xlim=None, ylim=None, sample=None):
     """
     """
 
@@ -147,14 +159,18 @@ def surface3dPlot(x, y, z, title, xlim=None, ylim=None, sample=None):
     ax.plot_surface(x, y, z)
     plt.xlabel("x")
     plt.ylabel("y")
-    plt.title(title)
+    
+    if title is not None:
+        plt.title(title)
+
     if xlim is not None:
         plt.xlim(xlim)
+    
     if ylim is not None:
         plt.ylim(ylim)
 
 
-def scatter3dPlot(x, y, z, title=None, xlim=None, ylim=None, sample=None, fig=None, axes=None):
+def scatter3dPlot(x, y, z, title=None, xlim=None, ylim=None, sample=None, fig=None, axes=None, color=None):
     """
     """
 
@@ -169,7 +185,10 @@ def scatter3dPlot(x, y, z, title=None, xlim=None, ylim=None, sample=None, fig=No
     
     if axes is None:
         axes = Axes3D(fig)
-    axes.scatter(x, y, z)
+    if color is None:
+        color = 'b'
+
+    axes.scatter(x, y, z, c=color)
     
     axes.set_xlabel("x")
     axes.set_ylabel("y")
@@ -182,13 +201,16 @@ def scatter3dPlot(x, y, z, title=None, xlim=None, ylim=None, sample=None, fig=No
     
     if ylim is not None:
         axes.set_ylim(ylim)    
+    
+    return fig, axes
 
+def scatterPlot(x, y, z=None, title=None, xlim=None, ylim=None, sample=None):
 
-def scatterPlot(x, y, title=None, xlim=None, ylim=None, sample=None):
+    if z is None:
+        z = np.ones(x.shape, dtype=np.int)
 
     # plot all the data, or just some?
     if sample is not None:
-        z = copy(y)
         print("Plotting %5.2f percent of data" % sample)
         x, y, z = sampleXYZData(x, y, z, sample)
         print("Now length of data is %d" % len(x))
@@ -197,7 +219,8 @@ def scatterPlot(x, y, title=None, xlim=None, ylim=None, sample=None):
     
     ax = fig.gca()
     
-    ax.scatter(x, y)
+    sc = ax.scatter(x, y, c=z)
+    plt.colorbar(sc)
     
     plt.xlabel("x")
     plt.ylabel("y")
@@ -267,3 +290,41 @@ def plotZernikes(x, y, zernCoeffs, n=512, title=None, filename=None):
     # Save the figure to disk.
     if filename is not None:
         plt.savefig(filename)
+
+
+def nicePlotDates(labels, i0=0):
+    """
+    Given a list of text labels representing dates with the format %m/%d %H:%M
+    it will update the list to keep only the month and day portion when it
+    changes.
+
+    :param labels: List with the text labels formatted as %m/%d %H:%M.
+
+    Example:
+    >>> labels = ['06/11 15:00', '06/11 18:00']
+    >>> new_labels = nicePlotDates(labels)
+    >>> new_labels
+    ['06/11 15:00', '18:00']
+    """
+
+    new_labels = []
+    month_ = None
+    day_ = None
+    for i,label in enumerate(labels):
+        date, time = label.split(' ')
+        month, day = date.split('/')
+        if i == i0:
+            month_ = month
+            day_ = day
+            new_labels.append(label)
+        if i != i0:
+            if month != month_:
+                month_ = month
+                new_labels.append(label)
+            elif day != day_:
+                day_ = day
+                new_labels.append(label)
+            else:
+                new_labels.append(time)
+
+    return new_labels
