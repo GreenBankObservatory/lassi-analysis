@@ -18,7 +18,14 @@ from parabolas import parabola
 from plotting import scatter3dPlot
 from utils.utils import mjd2utc, splitXYZ, aggregateXYZ
 
+
 def previewData(ptxFile, sample=None):
+    """
+    Loads a PTX file and displays its contents as a 3D scatter plot.
+
+    :param ptxFile: PTX file to display.
+    :param sample: Percentage of the data to display.
+    """
 
     print("opening file", ptxFile)
     with open(ptxFile, 'r') as f:
@@ -32,6 +39,7 @@ def previewData(ptxFile, sample=None):
         sample = 1.0
     scatter3dPlot(x, y, z, "preview", sample=sample)
 
+
 def previewEllipticalFilter(PTXFile, ellipse):
     """
     Loads the PTX data and shows it along with the data 
@@ -43,6 +51,7 @@ def previewEllipticalFilter(PTXFile, ellipse):
         ls = f.readlines()
 
     tryEllipticalOffsets(ls, ellipse)
+
 
 def rotateXYaboutZ(xyz, rotDegrees):
 
@@ -80,6 +89,7 @@ def processPTX(fpath, rotationAboutZdegrees=None, searchRadius=None, rFilter=Tru
     # write to CSV file
     outf = fpath + ".csv"
     np.savetxt(outf, xyz, delimiter=",")
+
 
 def processPTXdata(lines, rotationAboutZdegrees, searchRadius, quiet=True, sampleSize=None, preview=True):
 
@@ -162,6 +172,7 @@ def processPTXdata(lines, rotationAboutZdegrees, searchRadius, quiet=True, sampl
         plt.title("X Y orientation of data")
 
     return filterOutRadius(xyz, searchRadius=searchRadius)
+
     
 def filterOutRadius(xyz, searchRadius=None, mysteryX=None):
     "return only those xyz points where sqrt(x**2 + y**2) is within a limit"
@@ -182,6 +193,7 @@ def filterOutRadius(xyz, searchRadius=None, mysteryX=None):
     xyzInside = np.array(xyzInside)
 
     return xyzInside
+
 
 def getRawXYZsample(fn, sampleRate):
     with open(fn, 'r') as f:
@@ -216,11 +228,17 @@ def getRawXYZsample(fn, sampleRate):
 
     return xs, ys, zs
 
-def getRawXYZ(ls, sampleSize=None):
-    # with open(fn, 'r') as f:
-        # ls = f.readlines()
 
-    # skip the header
+def getRawXYZ(ls, sampleSize=None):
+    """
+    Given the lines of a PTX file it extracts x, y, z and intensity values.
+    
+    :param ls: Lines of the PTX file.
+    :param sampleSize: Use a random sample of the lines of this length.
+    :returns: x, y, z and intensity values read from the lines of the PTX file.
+    """
+
+    # Skip the header.
     ls = ls[10:]
 
     numLines = len(ls)
@@ -267,6 +285,7 @@ def getRawXYZ(ls, sampleSize=None):
     it = np.array(it)
 
     return xs, ys, zs, it
+
 
 def tryOffsets(lines, xOffset, yOffset, radius):
     "creates plots to make sure we are centered"
@@ -354,10 +373,19 @@ def tryEllipticalOffsets(lines, ellipse):
     plt.ylabel("y")
     plt.title("XY inside ellipse")
 
+
 def radialFilter(x, y, z, xOffset, yOffset, radius, dts=None):
     """
     Removes points outside a circle centered at (xOffset, yOffset).
 
+    :param x: x coordinates.
+    :param y: y coordinates.
+    :param z: z coordinates.
+    :param xOffset: Center of the circle in the x coordinate.
+    :param yOffset: Center of the circle in the y coordinate.
+    :param radius: Radius of the circle.
+    :param dts: Date time stamps.
+    :returns: Filtered x, y, z and dts.
     """
     
     mask = np.power(x - xOffset, 2.) + np.power(y - yOffset, 2.) < radius**2.
@@ -367,10 +395,23 @@ def radialFilter(x, y, z, xOffset, yOffset, radius, dts=None):
 
     return x[mask], y[mask], z[mask], dts
 
+
 def ellipticalFilter(x, y, z, xOffset, yOffset, bMaj, bMin, angle, dts=None, intensity=None):
     """
     Filter points that lie outside an ellipse with 
     a semi-major axis of bMaj, semi-minor axis bMin and rotated by angle.
+
+    :param x: x coordinates.
+    :param y: y coordinates.
+    :param z: z coordinates.
+    :param xOffset: Center of the ellipse in the x coordinate.
+    :param yOffset: Center of the ellipse in the y coordinate.
+    :param bMaj: Ellipse major axis.
+    :param bMin: Ellipse minor axis.
+    :param angle: Rotation of the ellipse with respect to the y axis.
+    :param dts: Date time stamps.
+    :param intensity: Intensity values.
+    :returns: Filtered x, y, z, dts and intensity values.
     """
 
     cos_angle = np.cos(np.radians(180. - angle))
@@ -394,9 +435,17 @@ def ellipticalFilter(x, y, z, xOffset, yOffset, bMaj, bMin, angle, dts=None, int
 
     return x[mask], y[mask], z[mask], dts, intensity
 
+
 def nearFilter(x, y, z, tol=10., dts=None):
     """
     Filter points that are closer than tol from the TLS.
+
+    :param x: x coordinates.
+    :param y: y coordinates.
+    :param z: z coordinates.
+    :param tol: Distance threshold for filtering.
+    :param dts: Date time stamps.
+    :returns: Filtered x, y, z and dts.
     """
 
     r = np.sqrt(np.power(x, 2.) + np.power(y, 2.) + np.power(z, 2.))
@@ -407,9 +456,20 @@ def nearFilter(x, y, z, tol=10., dts=None):
 
     return x[mask], y[mask], z[mask], dts
 
+
 def zLimitFilter(x, y, z, zLimit=-80, dts=None, intensity=None):
     """
+    Filter points whose z coordinate is larger than zLimit.
+
+    :param x: x coordinates.
+    :param y: y coordinates.
+    :param z: z coordinates.
+    :param zLimit: Filter values larger than this.
+    :param dts: Date time stamps.
+    :param intensity: Intensity values.
+    :returns: The filtered x, y, z, dts and intensity.
     """
+
     # z - filter: at this point we should have the
     # dish, but with some things the radial filter didn't
     # get rid of above or below the dish
