@@ -11,11 +11,15 @@ def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False
     """
     Regrids the XYZ data to a regularly sampled cartesian grid.
 
-    :param x: vector with the x coordinates.
-    :param y: vector with the y coordinates.
-    :param z: vector with the z coordinates.
-    :param n: number of samples in the grid.
-    :param verbose: verbose output?
+    :param x: Vector with the x coordinates.
+    :param y: Vector with the y coordinates.
+    :param z: Vector with the z coordinates.
+    :param n: Number of samples in the grid.
+    :param verbose: Verbose output?
+    :param xmin: Minimum x value of the grid.
+    :param xmax: Maximum x value of the grid.
+    :param ymin: Minimum y value of the grid.
+    :param ymax: Maximum y value of the grid.
     """
 
     # Set the grid limits.
@@ -53,6 +57,17 @@ def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False
 
 def regridXYZMasked(x, y, z, n=512, verbose=False, xmin=False, xmax=False, ymin=False, ymax=False):
     """
+    Regrids masked XYZ data to a regularly sampled cartesian grid.
+
+    :param x: Vector with the x coordinates.
+    :param y: Vector with the y coordinates.
+    :param z: Vector with the z coordinates.
+    :param n: Number of samples in the grid.
+    :param verbose: Verbose output?
+    :param xmin: Minimum x value of the grid.
+    :param xmax: Maximum x value of the grid.
+    :param ymin: Minimum y value of the grid.
+    :param ymax: Maximum y value of the grid.
     """
 
     outMask = np.ma.masked_invalid(x).mask
