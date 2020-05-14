@@ -2,7 +2,10 @@ from copy import copy
 
 import numpy as np
 
-#from plotting import barChartPlot, zernikeResiduals2DPlot
+from scipy.sparse import diags
+from scipy.optimize import least_squares
+
+from utils.utils import midPoint, getRollingStat, radialMask
 
 nMax = 120
 zernikeNorm = { 1:  1.,
@@ -207,7 +210,7 @@ def z13(rho, theta):
     """
     Primary spherical.
     """
-    return (1. - (6.*np.power(rho, 2.))  + (6.*np.power(rho, 4.)))
+    return (1. - (6.*np.power(rho, 2.)) + (6.*np.power(rho, 4.)))
 
 def z14(rho, theta):
     """
@@ -977,7 +980,7 @@ def zernikePolar(coefficients, rho, theta):
     return zf
 
 
-def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=False, norm='sqrt'):
+def getZernikeCoeffs(surface, order, printReport=False, norm='sqrt', radius=1):
     """
 
     Determines the coefficients of Zernike polynomials that best describe a surface.
@@ -985,17 +988,13 @@ def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=F
     :param surface: The surface where Zernike coefficients will be determined.
     :param order: How many order of Zernike polynomials you want to incorporate. Less than 37.
     :param printReport: Print the determined Zernike coefficients?
-    :param barChart: Plot a bar chart with the Zernike coefficients?
-    :param plot2D: Plot the residuals of the surface and the best fit Zernike polynomials?
     :return: n-th Zernike coefficients describing a surface.
     """
 
     if order > nMax:
         raise ValueError('order must be less than {}.'.format(nMax+1))
 
-    coeffs = []
-    # The active surface starts counting from Z1.
-    coeffs.append(0)
+    coeffs = np.zeros(order+1, dtype=np.float)
 
     # Make the support to evaluate the Zernike polynomials.
     ny = surface.shape[0]
@@ -1007,10 +1006,11 @@ def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=F
     u = np.arctan2(yy, xx)
 
     # Loop over Zernike polynomials and use their orthogonality to determine their coefficients.
+    # The active surface starts counting from Z1.
     for i in range(1,order+1):
         func = zernikes[i]
         zf = func(r, u)
-        mask = (r > 1)
+        mask = (r > radius)
         zf[mask] = 0
 
         # Define the normalization factor.
@@ -1023,26 +1023,187 @@ def getZernikeCoeffs(surface, order, plot2D=False, barChart=False, printReport=F
 
         # Get the coefficients like in a Fourier series.
         a = np.sum(surface*zf)*2.*2./nx/ny/np.pi*zn
-        coeffs.append(a)
-
-#    # Plot bar chart of Zernike coefficients.
-#    if barChart:
-#        fitlist = coeffs[1:order+1]
-#        index = np.arange(1,order+1)
-#        barChartPlot(index, fitlist)
-#
-#    # Plot the residuals.
-#    if plot2D:
-#        # Compute the residuals.
-#        z_new = surface - zernikePolar(coeffs, r, u)
-#        z_new[mask] = 0
-#        zernikeResiduals2DPlot(xx, yy, z_new)
+        coeffs[i] = a
 
     # Print a table with the coefficients.
     if printReport:
         zernikePrint(coeffs)
 
     return coeffs
+
+
+def getZernikeCoeffsOLS(x, y, z, nZern, xOffset=0, yOffset=0, xMax=None, yMax=None, weights=None):
+    """
+    Determines the coefficients of the Zernike polynomials in z using weighted least squares.
+    """
+    
+    if xMax is None:
+        xMax = np.nanmax(x)
+    if yMax is None:
+        yMax = np.nanmax(y)
+    if weights is None:
+        w = np.ma.ones(x.shape, dtype=np.int)
+    else:
+        w = weights
+    
+    # Remove NaN values.
+    z = np.ma.masked_where(x.mask | y.mask | z.mask | w.mask, z)
+    x = np.ma.masked_where(x.mask | y.mask | z.mask | w.mask, x)
+    y = np.ma.masked_where(x.mask | y.mask | z.mask | w.mask, y)
+    w = np.ma.masked_where(x.mask | y.mask | z.mask | w.mask, w)
+    x = x.compressed()
+    y = y.compressed()
+    w = w.compressed()
+    z = z.compressed()
+    
+    # Transform the coordinates to the unit circle.
+    xcn = (x - xOffset)/xMax
+    ycn = (y - yOffset)/yMax
+
+    # We defined the Zernike polynomials in polar coordinates.
+    rcn = np.sqrt(xcn**2. + ycn**2.)
+    ucn = np.arctan2(ycn, xcn)
+    
+    # Build the matrix with the Zernike polynomials.
+    zMat = np.zeros((np.prod(rcn.shape), nZern), dtype=np.float)
+    for i in range(0,nZern):
+        zMat[:,i] = zernikes[i+1](rcn.flatten(), ucn.flatten())
+
+    zMat = np.matrix(zMat)
+    sMat = np.matrix(z)
+    wMat = diags(w)
+    coefs = np.linalg.lstsq(wMat*zMat, wMat*sMat.T, rcond=None)
+    
+    return np.hstack((0, np.asarray(coefs[0])[:,0]))
+
+
+def zernikeWLS(x, y, z, nZern, weights=None):
+    """
+    """
+
+    # Use WLS to determine the Zernike coefficients.
+    if weights is None:
+        weights = np.ones(z.shape)
+
+    weights = np.ma.masked_invalid(weights)
+    
+    x_ = np.ma.masked_invalid(x)
+    x_ -= midPoint(x)
+    y_ = np.ma.masked_invalid(y)
+    y_ -= midPoint(y)
+    
+    fl_wls = getZernikeCoeffsOLS(x_, y_, z, nZern, weights=weights)
+    
+    return fl_wls
+
+
+def zernikeCost(coeffs, x, y, z, w):
+    """
+    """
+
+    zpoly = zernikePoly(x, y, midPoint(x), midPoint(y), coeffs)
+
+    return w*(z.flatten() - zpoly.flatten())
+
+
+def zernikeJac(coeffs, x, y, z):
+    """
+    """
+
+    coeffs = np.ones_like(coeffs)
+    coeffs[:2] = 0
+
+    jac = np.zeros((len(z),len(coeffs)))
+
+    for i in range(2,len(coeffs)):
+        cis = np.zeros(36)
+        cis[i] = 1.
+        jac[i] = zernikePoly(x, y, midPoint(x), midPoint(y), cis)
+
+    return jac
+
+
+def zernikeFitLS(x, y, z, guess, weights=None, max_nfev=10000, loss="soft_l1", f_scale=1e-3, ftol=1e-10, xtol=1e-10):
+    """
+    """
+
+    if weights is None:
+        weights = np.ones_like(z)
+
+    x_scale = np.ones_like(guess)*1e-5
+
+    args = (x, y, z, weights)
+    r = least_squares(zernikeCost,
+                      guess,
+                      args=args,
+                      max_nfev=10000,
+                      loss=loss,
+                      f_scale=f_scale,
+                      ftol=ftol,
+                      xtol=xtol,
+                      x_scale=x_scale)
+
+    return r
+
+
+def zernikeResidualSurfaceError(x, y, z_coef, r=50, eps=230e-6, lmbd=2.6e-3, verbose=False):
+    """
+    Computes the effect of the residual Zernike on the surface error.
+
+
+    """
+
+    # Simulate thermal deformation.
+    # The Zernike polynomials is at the center of the map.
+    x_mid = midPoint(x)
+    y_mid = midPoint(y)
+    z_sim = zernikePoly(x, y, x_mid, y_mid, coefficients=z_coef)
+    z_sim[~radialMask(x,y,r)] = np.nan
+    eps_z = np.nanstd(z_sim)
+    if verbose:
+        print("Residual surface error: {} microns".format(eps_z*1e6))
+
+    # Compute surface error.
+    eps_tot = np.sqrt(eps_z**2. + eps**2.)
+    if verbose:
+        print("Total surface error: {} microns".format(eps_tot*1e6))
+
+    # Compute aperture efficiency.
+    eta = lambda lmbd, eps: 0.71*np.exp(-np.power(4.*np.pi*eps/lmbd, 2.))
+    eta_tot = eta(lmbd, eps_tot)
+    if verbose:
+        print("Aperture efficiency: {}".format(eta_tot))
+        print("Change in aperture efficiency: {} %".format((eta(lmbd, eps) - eta_tot)/eta(lmbd, eps)*100.))
+
+    return eps_tot, eta_tot, eta
+
+
+def zernikePoly(x, y, xOffset, yOffset, coefficients, xMax=-1e22, yMax=-1e22, verbose=False):
+    """
+    Returns a Zernike polynomial.
+    """
+
+    if len(coefficients) > nMax + 1:
+        raise ValueError('coefficients must have less than {} items.'.format(zernikies.nMax+1))
+
+    if xMax == -1e22:
+        xMax = np.nanmax(x - xOffset)
+    if yMax == -1e22:
+        yMax = np.nanmax(y - yOffset)
+
+    xcn = (x - xOffset)/xMax
+    ycn = (y - yOffset)/yMax
+
+    rcn = np.sqrt(xcn**2. + ycn**2.)
+    ucn = np.arctan2(ycn, xcn)
+
+    z = zernikePolar(coefficients, rcn, ucn)
+
+    if verbose:
+        print("Zernike polynomials with coefficients", coefficients)
+        print("Their linear combination has mean: {0:.2e}, min: {1:.2e}, max: {2:.2e}".format(np.mean(z), np.nanmin(z), np.nanmax(z)))
+
+    return z
 
 
 def zernikePrint(z):
