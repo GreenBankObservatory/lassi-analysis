@@ -96,6 +96,32 @@ def rotateXYZ(x, y, z, coeffs):
     
     return xr, yr, zr
 
+
+def shiftRotateXYZ(x, y, z, coeffs):
+    """
+    Shifts and rotates a vector with (x,y,z) coordinates.
+    The first three coeffs represents shifts along (x,y,z).
+    The last three coeffs represent angles of rotation around 
+    (x,y,z) in radians.
+    """
+
+    L = np.ma.array([x.flatten(),
+                     y.flatten(),
+                     z.flatten()])
+
+    xr, yr, zr = np.dot(Rz(coeffs[5]),
+                        np.dot(Ry(coeffs[4]),
+                               np.dot(Rx(coeffs[3]), L)))
+
+    xr += coeffs[0]
+    yr += coeffs[1]
+    zr += coeffs[2]
+
+    xr.shape = yr.shape = zr.shape = z.shape
+
+    return xr, yr, zr
+
+
 def fitXYZ(coeffs, x_obs, y_obs, z_obs, x_ref, y_ref, z_ref):
     """
     Cost function to determine the rotattion and shift that aligns
