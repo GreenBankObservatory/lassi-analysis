@@ -324,7 +324,8 @@ class TestProcessPTX(unittest.TestCase):
                                       nFilter=False,
                                       iFilter=False,
                                       rFilter=False,
-                                      filterClose=False)
+                                      filterClose=False,
+                                      parabolaFilter=False)
 
         # check 
         self.assertEqual(len(xyz), 10032308)
@@ -337,6 +338,10 @@ class TestProcessPTX(unittest.TestCase):
                                       nFilter=True,
                                       iFilter=True,
                                       rFilter=True,
-                                      filterClose=False)        
+                                      filterClose=True,
+                                      parabolaFilter=True)
 
-        self.assertEqual(len(xyz), 6928318)
+        #self.assertEqual(len(xyz), 9027020)
+        # Since we are using a random sample to fit a parabola, 
+        # the results can change slightly.
+        self.assertAlmostEqual(len(xyz), 9028093, delta=2000)
