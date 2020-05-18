@@ -19,6 +19,7 @@ TODO:
   while producing accurate rotation parameters (robust).
 """
 
+
 def parabola(xdata, ydata, focus, v1x=0, v1y=0, v2=0, heavy=False):
     if heavy:
         return parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2)
@@ -31,7 +32,6 @@ def parabolaSimple(xdata, ydata, focus, v1x, v1y, v2):
     Simply the equation for a 2-D parabola.
     """
 
-    focus = 60.
     return (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 + v2
 
 
@@ -60,6 +60,7 @@ def parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2): #, hr=104.):
     # z[mask] = 0.0
     return z
     
+
 def heavySide(x, y, v1x, v1y, xoffset, yoffset, radius):
     return ((x - v1x - xoffset)**2 + (y - v1y - yoffset)**2) > radius**2    
 
@@ -82,15 +83,6 @@ def parabolaRot(xdata, ydata, focus, v1x, v1y, v2, rotX, rotY):
     #zdata = np.zeros(xdata.shape)
     #_, _, zdataRot = rotate(xdata, ydata, zdata, rotX, rotY)
 
-    L = np.array([xdata.flatten(), ydata.flatten(), zdata.flatten()])
-    pry = (rotX, rotY, 0.)
-    xr = PrimeX(pry, L)
-    yr = PrimeY(pry, L)
-    zr = PrimeZ(pry, L)
-    return xr, yr, zr
-
-
-def rotateData(xdata, ydata, zdata, rotX, rotY):
     L = np.array([xdata.flatten(), ydata.flatten(), zdata.flatten()])
     pry = (rotX, rotY, 0.)
     xr = PrimeX(pry, L)
@@ -259,10 +251,11 @@ def fitLeicaScan(fn,
     if plot:
         surface3dPlot(newX, newY, newZ, "Fitted Data")
 
-    # rotate original data using fitted coefficients
+    # Rotate original data using fitted coefficients.
     xThetaFit = r.x[4]
     yThetaFit = r.x[5]
-    xrr, yrr, zrr = rotateData(x0, y0, z0, xThetaFit, yThetaFit)
+    xrr, yrr, zrr = shiftRotateXYZ(x0, y0, z0, [0, 0, 0, xThetaFit, yThetaFit, 0]) # Slightly faster.
+    #xrr, yrr, zrr = rotateData(x0, y0, z0, xThetaFit, yThetaFit)
     # also apply the translations
     #xrr -= c[1]
     #yrr -= c[2]
@@ -732,6 +725,272 @@ def radialMask(x, y, z, xOffset, yOffset, radius):
     y[r > radius] = np.nan
     z[r > radius] = np.nan
     return x, y, z
+
+
+def costParabola(coef, x, y, z):
+    """
+    Cost function for a parabola.
+    """
+     
+    fl = coef[0]
+    x0 = coef[1]
+    y0 = coef[2]
+    z0 = coef[3]
+    rx = coef[4]
+    ry = coef[5]
+    
+    crx = np.cos(rx)
+    srx = np.sin(rx)
+    cry = np.cos(ry)
+    sry = np.sin(ry)
+    
+    xp = x*cry + y*srx*sry + z*crx*sry - x0
+    yp = y*crx - z*srx - y0
+    zp = -x*sry + y*srx*cry + z*crx*cry - z0
+    
+    xp2 = np.power(xp, 2.)
+    yp2 = np.power(yp, 2.)
+    
+    fp = 1./(4.*fl)*(xp2 + yp2)
+    
+    return fp - zp
+
+
+def jacParabola(coef, x, y, z):
+    """
+    Jacobian for a parabola.
+    """
+    
+    fl = coef[0]
+    x0 = coef[1]
+    y0 = coef[2]
+    z0 = coef[3]
+    rx = coef[4]
+    ry = coef[5]
+    
+    crx = np.cos(rx)
+    srx = np.sin(rx)
+    cry = np.cos(ry)
+    sry = np.sin(ry)
+    
+    xp = x*cry + y*srx*sry + z*crx*sry - x0
+    yp = y*crx - z*srx - y0
+    zp = -x*sry + y*srx*cry + z*crx*cry - z0
+    
+    xp2 = np.power(xp, 2.)
+    yp2 = np.power(yp, 2.)
+    
+    dxdrx = y*crx*sry - z*srx*sry
+    
+    dxdry = -x*sry + y*srx*cry + z*crx*cry
+    
+    dydrx = -y*srx - z*crx
+    
+    dzdrx = y*crx*cry - z*srx*cry
+    
+    dzdry = -x*cry - y*srx*sry - z*crx*sry
+    
+    # Jacobian columns.
+    dGdfl = -1/(4*fl**2)*(xp2 + yp2)
+    
+    dGdx0 = -1/(4*fl)*2*xp
+    
+    dGdy0 = -1/(4*fl)*2*yp
+    
+    dGdz0 = np.ones(len(z))
+    
+    dGdrx = 1/(4*fl)*(2*xp*dxdrx + 2*yp*dydrx) - dzdrx
+    
+    dGdry = 1/(4*fl)*(2*x*dxdry) - dzdry
+    
+    return np.array([dGdfl, dGdx0, dGdy0, dGdz0, dGdrx, dGdry]).T
+
+
+def costParabolaZ(coef, x, y, z):
+    """
+    Cost function for a parabola with Z4, Z5 and Z6 deformations.
+    """
+    
+    xm = 50
+    ym = 100
+    
+    fl = coef[0]
+    x0 = coef[1]
+    y0 = coef[2]
+    z0 = coef[3]
+    rx = coef[4]
+    ry = coef[5]
+    c4 = coef[6]
+    c5 = coef[7]
+    c6 = coef[8]
+    #c9 = coef[9]
+    xc = coef[9]
+    yc = coef[10]
+    
+    crx = np.cos(rx)
+    srx = np.sin(rx)
+    cry = np.cos(ry)
+    sry = np.sin(ry)
+    
+    xp = x*cry + y*srx*sry + z*crx*sry - x0
+    yp = y*crx - z*srx - y0
+    zp = -x*sry + y*srx*cry + z*crx*cry - z0
+    
+    xh = (xp - xc)/xm
+    yh = (yp - yc)/ym
+    
+    xp2 = np.power(xp, 2.)
+    yp2 = np.power(yp, 2.)
+    xh2 = np.power(xh, 2.)
+    yh2 = np.power(yh, 2.)
+    
+    fp = 1/(4*fl)*(xp2 + yp2)
+    z4 = c4*(xh2 - yh2)
+    z5 = c5*(2*xh2 + 2*yh2 - 1.)
+    z6 = c6*xh*yh
+    #z9 = c9*(3*xh2*yh + 3*yh2*yh - 2*yh)
+    
+    return fp + z4 + z5 + z6 - zp
+
+
+def jacParabolaZ(coef, x, y, z):
+    """
+    Jacobian for a parabola with Z4, Z5 and Z6 deformations.
+    """
+    
+    xm = 50.
+    ym = 100.
+    
+    fl = coef[0]
+    x0 = coef[1]
+    y0 = coef[2]
+    z0 = coef[3]
+    rx = coef[4]
+    ry = coef[5]
+    c4 = coef[6]
+    c5 = coef[7]
+    c6 = coef[8]
+    #c9 = coef[9]
+    xc = coef[9]
+    yc = coef[10]
+    
+    crx = np.cos(rx)
+    srx = np.sin(rx)
+    cry = np.cos(ry)
+    sry = np.sin(ry)
+    
+    xp = x*cry + y*srx*sry + z*crx*sry - x0
+    yp = y*crx - z*srx - y0
+    zp = -x*sry + y*srx*cry + z*crx*cry - z0
+    
+    dxdrx = y*crx*sry - z*srx*sry
+    
+    dxdry = -x*sry + y*srx*cry + z*crx*cry
+    
+    dydrx = -y*srx - z*crx
+    
+    dzdrx = y*crx*cry - z*srx*cry
+    
+    dzdry = -x*cry - y*srx*sry - z*crx*sry
+    
+    xh = (xp - xc)/xm
+    yh = (yp - yc)/ym
+    
+    xp2 = np.power(xp, 2.)
+    yp2 = np.power(yp, 2.)
+    xh2 = np.power(xh, 2.)
+    yh2 = np.power(yh, 2.)
+    
+    dxhdx = -1./xm # Same for dxh/dxc or dxh/dx0
+    dyhdy = -1./ym # Same for dyh/dyc or dyh/dy0
+    
+    dxhdrx = dxhdx*dxdrx
+    
+    dxhdry = dxhdx*dxdry
+    
+    dyhdrx = dyhdy*dydrx
+    
+    dyhdry = 0
+    
+    dGdfl = -1./(4.*fl**2.)*(xp2 + yp2)
+    
+    dGdx0 = -1./(4.*fl)*2.*xp + c4*2.*xh*dxhdx + c5*4.*xh*dxhdx + c6*yh*dxhdx #+ c9*6.*xh*yh*dxhdx
+    
+    dGdy0 = -1./(4.*fl)*2.*yp - c4*2.*yh*dyhdy + c5*4.*yh*dyhdy + c6*xh*dyhdy #+ c9*(3.*xh2 + 9.*yh2 - 2.)*dyhdy
+    
+    dGdz0 = np.ones(len(z))
+    
+    dGdrx = 1./(4.*fl)*(2.*xp*dxdrx + 2.*yp*dydrx) + c4*(2.*xh*dxhdrx - 2.*yh*dyhdrx) + \
+            c5*(4.*xh*dxhdrx + 4.*yh*dyhdrx) \
+            + c6*(yh*dxhdrx + xh*dyhdrx) - dzdrx #+ c9*(6.*xh*yh*dxhdrx + 3.*xh*dyhdrx + 9.*yh2*dyhdrx - 2.*dyhdrx) - dzdrx
+    
+    dGdry = 1./(4.*fl)*(2.*x*dxdry) + c4*2.*xh*dxhdry + c5*4.*xh*dxhdry + c6*yh*dxhdry - dzdry #+ c9*6.*xh*yh*dxhdry - dzdry
+    
+    dGdc4 = (xh2 - yh2)
+    
+    dGdc5 = 2*xh2 + 2*yh2 - 1
+    
+    dGdc6 = xh*yh
+    
+    #dGdc9 = 3*xh2*yh + 3*yh2*yh - 2*yh
+    
+    dGdxc = c4*2.*xh*dxhdx + c5*4.*xh*dxhdx + c6*yh*dxhdx #+ c9*6.*xh*yh*dxhdx
+    
+    dGdyc = -c4*2.*yh*dyhdy + c5*4.*yh*dyhdy + c6*xh*dyhdy #+ c9*(3.*xh2*dyhdy + 9.*yh2*dyhdy - 2.*dyhdy)
+    
+    return np.array([dGdfl, dGdx0, dGdy0, dGdz0, dGdrx, dGdry, dGdc4, dGdc5, dGdc6, dGdxc, dGdyc]).T
+
+
+def parabolaFit(x, y, z, guess, method=costParabola, jac=jacParabola, 
+                bounds=None,  max_nfev=10000, ftol=1e-12, xtol=1e-12, gtol=1e-12, 
+                loss="soft_l1", f_scale=1e-5, tr_solver=None, x_scale=None, verbose=False):
+    
+    # Set boundaries for the fit parameters.
+    if bounds is None:
+        inf = np.inf
+        pi2 = 2*np.pi
+        omin = -10
+        omax = 10
+        cmin = -1e0
+        cmax = 1e0
+        if len(guess) == 11:
+            b1 = [59, omin, omin, -55, -pi2, -pi2, cmin, cmin, cmin, -2, 45]
+            b2 = [61, omax, omax, -45,  pi2,  pi2, cmax, cmax, cmax,  2, 55]
+        else:
+            b1 = [59, -inf, -inf, -inf, -pi2, -pi2]
+            b2 = [61,  inf,  inf,  inf,  pi2,  pi2]
+            
+        bounds = (b1, b2)
+    
+    if verbose:
+        print(bounds)
+    
+    if x_scale is None:
+        xsr = np.deg2rad(0.001)
+        xsz = 5e-5
+        xso = 0.2
+        if len(guess) == 11:
+            x_scale = [1e-3, xso, xso, xso, xsr, xsr, xsz, xsz, xsz, xso/50., xso/100.]
+        else:
+            x_scale = [1e-3, xso, xso, xso, xsr, xsr]
+    
+    if jac == None:
+        jac = "3-point"
+    
+    args = (x.flatten(), y.flatten(), z.flatten())
+    
+    r = least_squares(method, guess, jac,
+                      args=args,
+                      bounds=bounds,
+                      max_nfev=max_nfev,
+                      loss=loss,
+                      f_scale=f_scale,
+                      ftol=ftol,
+                      xtol=xtol,
+                      gtol=gtol,
+                      x_scale=x_scale,
+                      tr_solver=tr_solver)
+    return r
 
 
 def main():

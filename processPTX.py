@@ -14,7 +14,8 @@ from astropy import units as u
 from astropy.coordinates import CartesianRepresentation
 from astropy.coordinates.matrix_utilities import rotation_matrix
 
-from parabolas import parabola
+from rotate import shiftRotateXYZ
+from parabolas import parabola, fitLeicaData
 from plotting import scatter3dPlot
 from utils.utils import mjd2utc, splitXYZ, aggregateXYZ
 
@@ -436,7 +437,7 @@ def ellipticalFilter(x, y, z, xOffset, yOffset, bMaj, bMin, angle, dts=None, int
     return x[mask], y[mask], z[mask], dts, intensity
 
 
-def nearFilter(x, y, z, tol=10., dts=None):
+def nearFilter(x, y, z, tol=10., dts=None, intensity=None):
     """
     Filter points that are closer than tol from the TLS.
 
@@ -445,7 +446,8 @@ def nearFilter(x, y, z, tol=10., dts=None):
     :param z: z coordinates.
     :param tol: Distance threshold for filtering.
     :param dts: Date time stamps.
-    :returns: Filtered x, y, z and dts.
+    :param intensity: Intensity values.
+    :returns: Filtered x, y, z, dts and intensity.
     """
 
     r = np.sqrt(np.power(x, 2.) + np.power(y, 2.) + np.power(z, 2.))
@@ -454,7 +456,10 @@ def nearFilter(x, y, z, tol=10., dts=None):
     if dts is not None:
         dts = dts[mask]
 
-    return x[mask], y[mask], z[mask], dts
+    if intensity is not None:
+        intensity = intensity[mask]
+
+    return x[mask], y[mask], z[mask], dts, intensity
 
 
 def zLimitFilter(x, y, z, zLimit=-80, dts=None, intensity=None):
@@ -499,7 +504,9 @@ def processNewPTXData(lines,
                       rFilter=True,
                       addOffset=False,
                       filterClose=True,
-                      ellipse=[-8., 50., 49., 49., 0.]):
+                      parabolaFilter=True,
+                      ellipse=[-8., 50., 49., 49., 0.],
+                      residual_threshold=0.008):
     "this is the processing we see works with 2019 data"
 
     if rot is None:
@@ -517,26 +524,24 @@ def processNewPTXData(lines,
 
     if lines is not None:
         # Get the actual float values from the file contents.
-        x, y, z, intensity = getRawXYZ(lines, sampleSize=sampleSize)
+        xo, yo, zo, io = getRawXYZ(lines, sampleSize=sampleSize)
     else:
-        x, y, z, intensity = xyzi
+        xo, yo, zo, io = xyzi
 
-    print("Starting with %d lines of data" % len(x))
+    print("Starting with %d lines of data" % len(xo))
 
     # First remove all the zero data.
-    mask = intensity != 0.0
-    intensity = intensity[mask]
+    mask = io != 0.0
+    intensity = io[mask]
+    x = xo[mask]
+    y = yo[mask]
+    z = zo[mask]
     if dts is not None:
         dts = dts[mask]
 
     numFilteredOut = len(x) - len(intensity)
     percent = (float(numFilteredOut) / float(len(x))) * 100.
     print("Filtered out %d points of %d (%5.2f%%) intensity equal to zero" % (numFilteredOut, len(x), percent))
-
-    x = x[mask]
-    y = y[mask]
-    z = z[mask]
-
     print("Now we have %d lines of data" % len(x))
 
     # Remove aggregious jumps in data?
@@ -557,24 +562,16 @@ def processNewPTXData(lines,
                                                                       stdI))
 
     if iFilter:    
-        #lowestI = meanI # - stdI
-        #mask = i > lowestI
-        #highest = 0.8
-        #mask = i < highest
         mask = np.logical_and(intensity > 0.75, intensity < 0.85)
         intensity = intensity[mask]
-
-        numFilteredOut = len(x) - len(intensity)
-        percent = (float(numFilteredOut) / float(len(x))) * 100.
-        print("Filtered out %d points of %d (%5.2f%%) via intensity" % (numFilteredOut, len(x), percent))
-
         x = x[mask]
         y = y[mask]
         z = z[mask]
-
         if dts is not None:
             dts = dts[mask]
-
+        numFilteredOut = len(x) - len(intensity)
+        percent = (float(numFilteredOut) / float(len(x))) * 100.
+        print("Filtered out %d points of %d (%5.2f%%) via intensity" % (numFilteredOut, len(x), percent))
         print(("Now we have %d lines of data" % len(x)))
 
     assert len(x) == len(y)
@@ -592,63 +589,105 @@ def processNewPTXData(lines,
                                                    ellipse[3], ellipse[4], 
                                                    dts=dts, intensity=intensity)
         newNum = len(x)
-        print("Filter removed {0} points outside the ellipse".format(orgNum - newNum))
+        print("Elliptical filter removed {0} points outside the ellipse".format(orgNum - newNum))
         print("The ellipse has semi-major axis {0:.2f} m, semi-minor axis {1:.2f} m and angle {2:.2f} degrees".format(ellipse[2], ellipse[3], ellipse[4]))
         print("Now we have %d lines of data" % len(x))
 
-    # TBF: why must we do this?  No idea, but this,
-    # along with a rotation of -90. gets our data to
-    # look just like the 2016 data at the same stage.
+    # The scanner is upside down.
     z = -z
 
-    # z - filter: at this point we should have the
-    # dish, but with some things the radial filter didn't
-    # get rid of above or below the dish.
+    # Filter points below the dish.
     orgNum = len(z)
     zLimit = -80    
     x, y, z, dts, intensity = zLimitFilter(x, y, z, zLimit=zLimit, dts=dts, intensity=intensity)
     newNum = len(z)
-    print("z - limit filtered out %d points below %5.2f and above -10" % ((orgNum - newNum), zLimit))
+    print("z - limit filtered out {0} points below {1:5.2f} and above -10".format((orgNum - newNum), zLimit))
+    print("Now we have {} lines of data".format(len(z)))
 
-    if simSignal is not None:
-        # just now we add a bump
-        print("Adding Center Bump")
-        z = addCenterBump(x, y, z)
-
-    xyz = np.c_[x, y, z]
-
-    if rot is not None or rot != 0.0:
-        print("Rotating about Z by %5.2f degrees" % rot)
-        rotationAboutZdegrees = rot
-        xyz = rotateXYaboutZ(xyz, rotationAboutZdegrees)
     
-    print("Now we have %d lines of data" % len(xyz))
-
     if filterClose:
         # Removes points that are closer than 10 m from the scanner.
         tooClose = 10.
-        orgNum = xyz.shape[0]
-        r = np.sqrt(np.power(xyz[:,0], 2.) + np.power(xyz[:,1], 2.) + np.power(xyz[:,2], 2.))
-        mask = r > tooClose
-        xyz = xyz[mask]
-        if dts is not None:
-            dts = dts[mask]
-        if intensity is not None:
-            intensity = intensity[mask]
-        newNum = xyz.shape[0]
+        orgNum = len(z)
+        x, y, z, dts, intensity = nearFilter(x, y, z, tol=tooClose, dts=dts, intensity=intensity)
+        newNum = len(z)
         print("Removed {0:.0f} points closer than {1:.2f} m from the scanner.".format((orgNum - newNum), tooClose))
 
-    # If we want all points to have positive x and y coordinates.
-    # This avoids the harmless distortion of the guitar pick.
-    if addOffset:
-        xmin = np.nanmin(xyz[:,0])
-        xmax = np.nanmax(xyz[:,0])
-        ymin = np.nanmin(xyz[:,1])
-        ymax = np.nanmax(xyz[:,1])
 
-        if ymin <= 0:
-            print("Translating y axis.")
-            xyz[:,1] -= ymin - 10.
+    if parabolaFilter:
+
+        sampleSize = int(len(x)*0.05)
+        lsIdx = random.sample(range(len(x)), sampleSize)
+        xs = x[lsIdx]
+        ys = y[lsIdx]
+        zs = z[lsIdx]
+
+        # Fit a parabola to the data.
+        guess = [60, 0, 0, -49, 0, 0]
+        fitresult = fitLeicaData(xs, ys, zs, guess, bounds=None, weights=None)
+        c = fitresult.x
+
+        # Start from the original data.
+        print("Reloaded {} lines of data.".format(len(xo)))
+        mask = io != 0.0
+        intensity = io[mask]
+        x = xo[mask]
+        y = yo[mask]
+        z = zo[mask]
+
+        x, y, z, mask = neighborFilter(x, y, z, 0.122)
+        intensity = intensity[mask]
+
+        z = -z
+
+        # Rotate and shift the range measurements.
+        cor = np.hstack((-1*c[1:4],c[4:6],0))
+        xr, yr, zr = shiftRotateXYZ(x, y, z, cor)
+        # Build a parabola using the best fit parameters.
+        zp = parabola(xr, yr, c[0])
+
+        # Compute the residuals between the parabola and the rotated range measurements.
+        diff = zr - zp
+        # Only keep range measurements whose residuals are less than residual_threshold.
+        print("Removing points with residuals larger than {}".format(residual_threshold))
+        mask = abs(diff) < residual_threshold
+        percent = mask.sum()/len(mask) * 100.
+        print("Parabola filter will remove {0:.2f}% of the data.".format(100. - percent))
+        print("Keeping {} out of {} points.".format(mask.sum(), len(mask)))
+
+        # Use the rotated range measurements for the last filter.
+        xr = xr[mask]
+        yr = yr[mask]
+        zr = zr[mask]
+
+        x = x[mask]
+        y = y[mask]
+        z = z[mask]
+        intensity = intensity[mask]
+
+        # Only keep range measurements within a circle of radius r.
+        r = 51 # m
+        xc = np.nanmin(xr) + r
+        yc = np.nanmin(yr) + r
+        circular_mask = (xr - xc)**2 + (yr - yc)**2 <= r**2.
+
+        x = x[circular_mask]
+        y = y[circular_mask]
+        z = z[circular_mask]
+        intensity = intensity[circular_mask]
+
+        print("Keeping {} points inside a circle of radius {} m and center ({},{}) m.".format(circular_mask.sum(), r, xc, yc))
+
+    
+    # Rotate around the z axis since the scanner coordinate system does not match the telescope's.
+    if rot is not None or rot != 0.0:
+        print("Rotating about Z by %5.2f degrees" % rot)
+        xr, yr, zr = shiftRotateXYZ(x, y, z, [0, 0, 0, 0, 0, np.deg2rad(rot)])
+
+
+    # Create a Nx3 matrix for the coordinates.
+    xyz = np.c_[xr, yr, zr]
+
 
     if plotTest:
         # we plotted stuff earlier, so let's get
@@ -675,6 +714,7 @@ def processNewPTXData(lines,
     print("Intensity output of ProcessNewPTXData has {0} lines of data.".format(len(intensity)))
 
     return xyz, dts, intensity
+
 
 def getTimeStamps(fpath):
     "Read in file of form *_times.csv and return MJDs"

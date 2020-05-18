@@ -11,15 +11,11 @@ def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False
     """
     Regrids the XYZ data to a regularly sampled cartesian grid.
 
-    :param x: Vector with the x coordinates.
-    :param y: Vector with the y coordinates.
-    :param z: Vector with the z coordinates.
-    :param n: Number of samples in the grid.
-    :param verbose: Verbose output?
-    :param xmin: Minimum x value of the grid.
-    :param xmax: Maximum x value of the grid.
-    :param ymin: Minimum y value of the grid.
-    :param ymax: Maximum y value of the grid.
+    :param x: vector with the x coordinates.
+    :param y: vector with the y coordinates.
+    :param z: vector with the z coordinates.
+    :param n: number of samples in the grid.
+    :param verbose: verbose output?
     """
 
     # Set the grid limits.
@@ -45,29 +41,20 @@ def regridXYZ(x, y, z, n=512., verbose=False, xmin=False, xmax=False, ymin=False
     if verbose:
         print("New grid shape: ", grid_xy[0].shape)
 
-    # Regrid the data.
-    reg_z = griddata(np.array([x[~np.isnan(z)].flatten(),y[~np.isnan(z)].flatten()]).T,
-                     z[~np.isnan(z)].flatten(),
-                     (grid_xy[0], grid_xy[1]), method=method, fill_value=np.nan)
+    x_ = x[~np.isnan(z)].flatten()
+    y_ = y[~np.isnan(z)].flatten()
+    points = np.vstack((x_,y_)).T
+    z_ = z[~np.isnan(z)].flatten()
 
-    # We need to flip the reggrided data in the abscisa axis 
-    # so that it has the same orientation as the input.
-    return grid_xy[0], grid_xy[1], reg_z.T
+    # Regrid the data.
+    reg_z = griddata(points, z_, (grid_xy[0], grid_xy[1]), 
+                     method=method, fill_value=np.nan)
+
+    return grid_xy[0], grid_xy[1], reg_z
 
 
 def regridXYZMasked(x, y, z, n=512, verbose=False, xmin=False, xmax=False, ymin=False, ymax=False):
     """
-    Regrids masked XYZ data to a regularly sampled cartesian grid.
-
-    :param x: Vector with the x coordinates.
-    :param y: Vector with the y coordinates.
-    :param z: Vector with the z coordinates.
-    :param n: Number of samples in the grid.
-    :param verbose: Verbose output?
-    :param xmin: Minimum x value of the grid.
-    :param xmax: Maximum x value of the grid.
-    :param ymin: Minimum y value of the grid.
-    :param ymax: Maximum y value of the grid.
     """
 
     outMask = np.ma.masked_invalid(x).mask

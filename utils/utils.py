@@ -1,12 +1,16 @@
 import csv
 import random
+import warnings
 import numpy as np
 
 from copy import copy
+from numpy.lib.stride_tricks import as_strided
 
+from skimage import morphology
+
+from astropy.time import Time
 from astropy.coordinates import cartesian_to_spherical
 from astropy.coordinates import spherical_to_cartesian
-from astropy.time import Time
 
 
 def mjd2utc(mjd):
@@ -100,35 +104,35 @@ def log10(x):
     return np.log10(np.abs(x))
 
 
-def circular_mask(shape, centre, radius, angle_range):
+def maskDiff(diff, window=(20,20), threshold=2):
     """
-    Return a boolean mask for a circular sector. The start/stop angles in  
-    `angle_range` should be given in clockwise order and in degrees.
-    Centre and radius are in pixels.
+    Generates mask for diff based on the Z scores computed using a rolling window.
     """
 
-    x,y = np.ogrid[:shape[0],:shape[1]]
-    cx,cy = centre
-    tmin,tmax = np.deg2rad(angle_range)
+    diff = np.ma.masked_invalid(diff)
 
-    # ensure stop angle > start angle
-    if tmax < tmin:
-        tmax += 2*np.pi
+    # Pad the map to avoid problems at the map edges.
+    diff_pad = np.pad(diff.filled(np.nan), (window,window), constant_values=np.nan)
+    diff_pad = np.ma.masked_invalid(diff_pad)
 
-    # convert cartesian --> polar coordinates
-    r2 = (x-cx)*(x-cx) + (y-cy)*(y-cy)
-    theta = np.arctan2(x-cx, y-cy) - tmin
+    # Compute rms and mean maps.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        diff_rms = getRollingStat(diff_pad, func=np.nanstd, window=window)
+        diff_avg = getRollingStat(diff_pad, func=np.nanmean, window=window)
+    
+    # Remove the extra padding from the rms and mean maps.
+    diff_rms = diff_rms[window[0]:-window[1],window[0]:-window[1]]
+    diff_avg = diff_avg[window[0]:-window[1],window[0]:-window[1]]
 
-    # wrap angles between 0 and 2*pi
-    theta %= (2*np.pi)
+    # Mask zero values.
+    diff_rms = np.ma.masked_where(diff_rms == 0, diff_rms)
+    diff_rms = np.ma.masked_invalid(diff_rms)
+    diff_avg = np.ma.masked_invalid(diff_avg)
 
-    # circular mask
-    circmask = r2 <= radius*radius
-
-    # angular mask
-    anglemask = theta <= (tmax-tmin)
-
-    return circmask*anglemask
+    mask = (np.ma.abs(diff - diff_avg)/diff_rms > threshold) | (diff_rms == 0)
+    
+    return mask
 
 
 def midPoint(x):
@@ -138,6 +142,38 @@ def midPoint(x):
     """
 
     return (np.nanmax(x) - np.nanmin(x))/2. + np.nanmin(x)
+
+
+def radialMask(x, y, r, xc=None, yc=None):
+    """
+    """
+
+    if xc is None:
+        xc = midPoint(x)
+    if yc is None:
+        yc = midPoint(y)
+
+    return np.sqrt( (x - xc)**2. + (y - yc)**2. ) <= r
+
+
+def ellipticalMask(x, y, xc, yc, bMaj, bMin, angle):
+    """
+    """
+
+    cos_angle = np.cos(np.radians(180. - angle))
+    sin_angle = np.sin(np.radians(180. - angle))
+
+    # Shift the points.
+    xs = x - xc
+    ys = y - yc
+
+    # Rotate the points.
+    xsr = xs * cos_angle - ys * sin_angle
+    ysr = xs * sin_angle + ys * cos_angle
+
+    mask = (xsr**2./(bMaj)**2.) + (ysr**2./(bMin)**2.) <= 1.
+
+    return mask
 
 
 def gridLimits(arr0, arr1):
@@ -205,3 +241,138 @@ def sampleXYZData(x, y, z, samplePercentage):
 
     return copy(x[idx]), copy(y[idx]), copy(z[idx])
 
+
+def makeGrid(xmin, xmax, dx, ymin, ymax, dy):
+    """
+    Creates a regularly sampled cartesian grid.
+    """
+
+    # Make grid.
+    xx,yy = np.mgrid[xmin:xmax:dx,
+                     ymin:ymax:dy]
+    zz = np.zeros((xx.shape[0],xx.shape[1]))
+
+    return xx,yy,zz
+
+
+def _check(a, r_c, subok=False):
+    """Performs the array checks necessary for stride and block.
+    : a   - Array or list.
+    : r_c - tuple/list/array of rows x cols.
+    : subok - from numpy 1.12 added, keep for now
+    :Returns:
+    :------
+    :Attempts will be made to ...
+    :  produce a shape at least (1*c).  For a scalar, the
+    :  minimum shape will be (1*r) for 1D array or (1*c) for 2D
+    :  array if r<c.  Be aware
+    """
+    if isinstance(r_c, (int, float)):
+        r_c = (1, int(r_c))
+    r, c = r_c
+    if a.ndim == 1:
+        a = np.atleast_2d(a)
+    r, c = r_c = (min(r, a.shape[0]), min(c, a.shape[1]))
+    a = np.array(a, copy=False, subok=subok)
+    return a, r, c, tuple(r_c)
+
+
+def stride(a, r_c=(3, 3)):
+    """Provide a 2D sliding/moving view of an array.
+    :  There is no edge correction for outputs.
+    :
+    :Requires:
+    :--------
+    : _check(a, r_c) ... Runs the checks on the inputs.
+    : a - array or list, usually a 2D array.  Assumes rows is >=1,
+    :     it is corrected as is the number of columns.
+    : r_c - tuple/list/array of rows x cols.  Attempts  to
+    :     produce a shape at least (1*c).  For a scalar, the
+    :     minimum shape will be (1*r) for 1D array or 2D
+    :     array if r<c.  Be aware
+    """
+    a, r, c, r_c = _check(a, r_c)
+    shape = (a.shape[0] - r + 1, a.shape[1] - c + 1) + r_c
+    strides = a.strides * 2
+    a_s = (as_strided(a, shape=shape, strides=strides)).squeeze()
+    return a_s
+
+
+def rolling_stat(a, func=np.nanstd, **kwargs):
+    """
+    Statistics on the last two dimensions of an array.
+
+    :param a: Array where to compute the statistics.
+    :param func: Function used to compute the statistics, e.g., np.nanmean.
+    """
+    a = np.asarray(a)
+    a = np.atleast_2d(a)
+    ax = None
+    if a.ndim > 1:
+        ax = tuple(np.arange(len(a.shape))[-2:])
+   
+    a_stat = func(a, axis=ax, **kwargs)
+   
+    return a_stat
+
+
+def getRollingStat(z, func=np.nanstd, window=(4,4), **kwargs):
+    """
+    Computes statistics over a 2D array using a rolling window.
+
+    :param z: 2D array.
+    :param func: Function used to compute the statistics, e.g., np.nanmean.
+    :param window: Rolling window size.
+    """
+    
+    zs = z.shape
+    
+    z_s = stride(z.filled(np.nan), r_c=window)
+    z_stat = rolling_stat(z_s, func=func, **kwargs)
+    
+    # Pad the resulting array to get the same shape as the input.
+    z_stat_pad = padArray(z_stat, zs, fill_value=np.nan)
+    
+    return z_stat_pad
+
+
+def padArray(a, target_shape, fill_value=np.nan):
+    """
+    Pads a 2D array with a fill value to match the target shape.
+
+    :param a: 2D array to pad.
+    :param target_shape: Shape of the padded array.
+    :param fill_value: Value to use on the new rows and columns.
+    """
+
+    a_shape = a.shape
+    pad = np.subtract(target_shape, a_shape)
+    pad_ = np.divide(pad, 2)
+    pad0 = list(map(int, np.ceil(pad_)))
+    padf = list(map(int, np.floor(pad_)))
+    a_pad = np.pad(a, ((pad0[0],padf[0]),(pad0[1],padf[1])),
+                        mode='constant', constant_values=fill_value)
+
+    return a_pad
+
+
+def maskEdges(a, window=(4,4)):
+    """
+    Mask the edges of an area with valid values.
+    Invalid values should be NaNs.
+    """
+
+    shape = a.shape
+
+    a_s = stride(a, r_c=window)
+    nan_s = np.isnan(a_s)
+
+    # Count the number of NaN values within the window.
+    num_nan_s = np.sum(nan_s, axis=(2,3))
+    num_nan_s_ = padArray(num_nan_s.astype(np.float), shape)
+    # Mask any pixels which are adjacent to a NaN pixel.
+    mask = num_nan_s_ > 0
+    # Remove islands from the mask.
+    mask = morphology.remove_small_holes(mask, area_threshold=64)
+
+    return np.ma.masked_where(mask, a)

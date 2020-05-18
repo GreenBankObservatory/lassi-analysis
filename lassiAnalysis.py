@@ -17,6 +17,7 @@ import settings
 import lassiTestSettings as usettings
 
 from grid import regridXYZMasked
+from rotate import shiftRotateXYZ
 from weightSmooth import weightSmooth
 from SmoothedFITS import SmoothedFITS
 from zernikies import getZernikeCoeffs
@@ -26,7 +27,7 @@ from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus,  smoothGPUPara
 from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits, splitXYZ
 from processPTX import processPTX, processNewPTX, processNewPTXData, aggregateXYZ, getRawXYZ
 from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
-                      newParabola, rotateData, parabola
+                      newParabola, parabola
 
 
 # where is the code we'll be running?
@@ -210,7 +211,7 @@ def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFit
     xs, ys, zs = sig_data['origMasked']
      
     # Rotate the signal scan.
-    xsr, ysr, zsr = rotateData(xs, ys, zs, cr[4], cr[5])
+    xsr, ysr, zsr = shiftRotateXYZ(xs, ys, zs, [0, 0, 0, cr[4], cr[5], 0])
     xsr.shape = ysr.shape = zsr.shape = (n,n)
     zsr = np.ma.masked_where(zs.mask, zsr)
 
@@ -226,6 +227,7 @@ def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFit
     xmin, xmax = gridLimits(xrr, xsr)
     ymin, ymax = gridLimits(yrr, ysr)
 
+    print("Regridding scans.")
     xrrg, yrrg, zrrg = regridXYZMasked(xrr, yrr, zrr, n=n, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
     xsrg, ysrg, zsrg = regridXYZMasked(xsr, ysr, zsr, n=n, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
 
@@ -235,7 +237,7 @@ def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFit
                       # This should not be required if we handled the data consistently throughout.
 
     # Find Zernike coefficients on the surface deformation map.
-    fitlist = getZernikeCoeffs(diff.filled(0), nZern, barChart=False, norm='active-surface')
+    fitlist = getZernikeCoeffs(diff.filled(0), nZern, norm='active-surface')
 
     return xsrg, ysrg, diff, fitlist
 
@@ -399,17 +401,20 @@ def maskXYZ(x, y, z, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radial
     yf = y[~np.isnan(x)]
     zf = z[~np.isnan(x)]
 
+    # Use masked arrays on the input data to avoid warnings.
+    x = np.ma.masked_invalid(x)
+    y = np.ma.masked_invalid(y)
+    z = np.ma.masked_invalid(z)
+
     # Fit a parabola to the data.
     fitresult = fitLeicaData(xf, yf, zf, guess, bounds=bounds, weights=None)
 
     # Subtract the fitted parabola from the data.
     # The difference should be flat.
     c = fitresult.x
-    newX, newY, newZ = newParabola(x, y, z, c[0], c[1], c[2], c[3], c[4], c[5])
-    newX.shape = newY.shape = newZ.shape = (n, n)
-    xrr, yrr, zrr = rotateData(x, y, z, c[4], c[5])
-    xrr.shape = yrr.shape = zrr.shape = (n, n)
-    diff = zrr - newZ
+    zp = parabola(x, y, c[0])
+    xrr, yrr, zrr = shiftRotateXYZ(x, y, z, [0, 0, 0, c[4], c[5], 0])
+    diff = zrr - zp
 
     if radialMask:
         xc = midPoint(xrr)
@@ -431,14 +436,12 @@ def maskXYZ(x, y, z, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radial
     zf = np.ma.masked_where(mcdiff.mask, z)
 
     masked_fitresult = fitLeicaData(xf.compressed(), yf.compressed(), zf.compressed(),
-                                       guess, bounds=bounds, weights=None)
+                                    guess, bounds=bounds, weights=None)
 
     c = masked_fitresult.x
-    newXm, newYm, newZm = newParabola(x, y, z, c[0], c[1], c[2], c[3], c[4], c[5])
-    newXm.shape = newYm.shape = newZm.shape = (n, n)
-    xrrm, yrrm, zrrm = rotateData(x, y, z, c[4], c[5])
-    xrrm.shape = yrrm.shape = zrrm.shape = (n, n)
-    masked_diff = zrrm - newZm
+    zp = parabola(x, y, c[0])
+    xrrm, yrrm, zrrm = shiftRotateXYZ(x, y, z, [0, 0, 0, c[4], c[5], 0])
+    masked_diff = zrrm - zp
 
     if radialMask:
         xc = midPoint(xrrm)
@@ -485,9 +488,9 @@ def maskXYZ(x, y, z, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radial
                    yrrm,
                    np.ma.masked_where(map_mask, zrrm))
 
-    fitResidual = np.ma.masked_where(map_mask, zrrm - newZm)
+    fitResidual = np.ma.masked_where(map_mask, zrrm - zp)
 
-    parabolaFit = (newXm, newYm, newZm)
+    parabolaFit = (xrrm, yrrm, zp)
 
     outData = {'origData': origData,
                'origMasked': origMaskedData,
