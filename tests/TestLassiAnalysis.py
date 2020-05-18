@@ -25,7 +25,7 @@ class TestLassiAnalysis(unittest.TestCase):
 
 
     def testMaskLeicaData(self):
-        "Test that we can mask out bumps in a smoothed data"
+        "Test that we can mask out bumps in the smoothed data"
 
         # TBF: where to store test data.
         # fn = "data/27mar2019/Clean9.ptx.csv"
@@ -47,7 +47,7 @@ class TestLassiAnalysis(unittest.TestCase):
         fitCoeffs = d['parabolaFitCoeffs']
 
         expCoeffs = [
-            6.00000000e+01,
+            60.037336325908356,
             2.45124145e+00,
             -8.79388591e-01,
             -4.92666730e+01,
@@ -92,6 +92,7 @@ class TestLassiAnalysis(unittest.TestCase):
             
     def testExtractZernikesLeicaScanPair(self):
 
+        print("Testing lassiAnalysis.extractZernikesLeicaScanPair")
         # fn1 = "Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
         # fn2 = "Scan-11_5100x5028_20190327_1155_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
         fn1 = lassiTestSettings.SCAN9 + ".csv"
