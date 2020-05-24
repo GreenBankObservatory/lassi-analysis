@@ -19,9 +19,9 @@ class MidpointNormalize(matplotlib.colors.Normalize):
     Normalise the colorbar so that diverging bars work 
     their way either side from a prescribed midpoint value.
 
-    e.g. im=ax1.imshow(array, norm=MidpointNormalize(midpoint=0., vmin=-100, vmax=100))
 
-    :Example:
+    Examples
+    --------
 
     >>> import pylab as plt
     >>> array = [[50,100,50],[-100,-50,-100],[50,100,50]]
@@ -52,6 +52,32 @@ class MidpointNormalize(matplotlib.colors.Normalize):
 
 def surfacePlot(x, y, z, title=None, midPoint=0, vMin=-5e-3, vMax=5e-3, colorbarLabel=None, filename=None):
     """
+    Plot a surface using `imshow`. The data should be a 2-D ndarray with square pixels.
+
+    Parameters
+    ----------
+    x : 2-D ndarray
+        Array with x coordinates of the surface.
+        Used to set the labels of the x ticks.
+        It assumes the units are meters.
+    y : 2-D ndarray
+        Array with y coordinates of the surface.
+        Used to set the labels of the y ticks.
+        It assumes the units are meters.
+    z : 2-D ndarray
+        Array with z coordinates of the surface.
+    title : string, optional
+        Text to display as plot title.
+    midPoint : float, optional
+        Value used as middle of the colorbar.
+    vMin : float, optional
+        Value used as minimum of the colorbar.
+    vMax : float, optional
+        Value used as maximum of the colorbar.
+    colorbarLabel : string, optional
+        Text for the colorbar.
+    filename : string, optional
+        Save the plot to this file.
     """
 
     cmap = plt.matplotlib.cm.coolwarm
@@ -81,26 +107,34 @@ def surfacePlot(x, y, z, title=None, midPoint=0, vMin=-5e-3, vMax=5e-3, colorbar
         plt.savefig(filename, bbox_inches='tight', pad_inches=0.06)
         
 
-def barChartPlot(index, fitlist, expected=[]):
+def barChartPlot(index, coefficients, expected=[]):
     """
-    Plots a bar chart with Zernike coefficients.
-    This is used in zernikies.getZernikeCoeffs.
-
-    :param index: List with the index of the Zernike polynomials to show.
-    :param fitlist: List with the coefficients of the Zernike polynomials.
+    Plots a bar chart with Zernike coefficients, `:math: C_{i}`.
+    
+    Parameters
+    ----------
+    index : list of ints
+        Indices of the polynomial coefficients.
+    coefficients : array
+        Coefficients of the Zernike polynomials.
+    expected : array, optional
+        Expected values of the coefficients.
     """
 
     fig = plt.figure(figsize=(9, 6), dpi=80)
     xticklist = []
     width = 0.6
+    # Prepare the labels of the  x ticks.
     for i in index:
         xticklist.append('Z'+str(i))
-    barfigure = plt.bar(index, fitlist, width, color='#2E9AFE', edgecolor='#2E9AFE', label='Measured')
+    barfigure = plt.bar(index, coefficients, width, color='#2E9AFE', edgecolor='#2E9AFE', label='Measured')
     if len(expected) > 0:
         plt.bar(index-width/3, expected, width, color='#882255', edgecolor='#882255', label='Input', alpha=0.5)
 
+    # Add a legend.
     plt.legend(loc=0, fancybox=True)
 
+    # Set the ticks and their labels.
     plt.xticks(index+width//2, xticklist, rotation=90)
     plt.xlabel('Zernike polynomials', fontsize=18)
     plt.ylabel('Coefficient', fontsize=18)
@@ -115,7 +149,6 @@ def barChartPlot(index, fitlist, expected=[]):
 def zernikeResiduals2DPlot(xx, yy, zz):
     """
     Plots the residuals of a Zernike fit.
-    This is used in zernikies.getZernikeCoeffs.
     """
 
     fig = plt.figure(figsize=(9, 6), dpi=80)
@@ -126,11 +159,11 @@ def zernikeResiduals2DPlot(xx, yy, zz):
     ax.set_aspect('equal', 'datalim')
 
 
-def linePlot(y, title):
-    fig = plt.figure()
-    ax = fig.gca()
-    ax.plot(range(len(y)), y)
-    plt.title(title)
+#def linePlot(y, title):
+#    fig = plt.figure()
+#    ax = fig.gca()
+#    ax.plot(range(len(y)), y)
+#    plt.title(title)
 
 
 def imagePlot(z, title):
@@ -146,6 +179,15 @@ def imagePlot(z, title):
 
 def surface3dPlot(x, y, z, title=None, xlim=None, ylim=None, sample=None):
     """
+    Plot a surface in 3D using a mesh.
+
+    Parameters
+    ----------
+    x : 2-D array
+    y : 2-D array
+    z : 2-D array
+    sample : float between 0 and 1, optional
+        Percentage of the data to be displayed.
     """
 
     fig = plt.figure()
@@ -172,6 +214,29 @@ def surface3dPlot(x, y, z, title=None, xlim=None, ylim=None, sample=None):
 
 def scatter3dPlot(x, y, z, title=None, xlim=None, ylim=None, sample=None, fig=None, axes=None, color=None):
     """
+    Plot a surface in 3D using points.
+
+    Parameters
+    ----------
+    x : 2-D array
+    y : 2-D array
+    z : 2-D array
+    xlim : tuple, optional
+        Limits for the display in the x coordinate.
+    ylim L tuple, optional
+        Limits for the display in the y coordinate.
+    sample : float between 0 and 1, optional
+        Percentage of the data to be displayed.
+    fig : figure object, optional
+        Display the points in this Figure.
+    axes : axes object, optional
+        Display the points in this Axes.
+    color : color, sequence, or sequence of colors, optional
+
+    Returns
+    -------
+    tuple
+        Tuple with the Figure and Axes objects used for the plot.
     """
 
     # plot all the data, or just some?
@@ -204,8 +269,15 @@ def scatter3dPlot(x, y, z, title=None, xlim=None, ylim=None, sample=None, fig=No
     
     return fig, axes
 
-def scatterPlot(x, y, z=None, title=None, xlim=None, ylim=None, sample=None):
 
+def scatterPlot(x, y, z=None, title=None, xlim=None, ylim=None, sample=None):
+    """
+    Display a surface using a scatter plot in 2D.
+
+    Parameters
+    ----------
+    
+    """
     if z is None:
         z = np.ones(x.shape, dtype=np.int)
 
@@ -236,7 +308,25 @@ def scatterPlot(x, y, z=None, title=None, xlim=None, ylim=None, sample=None):
 
 
 def sampleXYZData(x, y, z, samplePercentage, seed=None):
-    "Return a random percentage of the data"
+    """
+    Return a percentage of the data using a random sample.
+
+    Parameters
+    ----------
+    x : 1-D array
+    y : 1-D array
+    x : 1-D array
+    samplePercentage : float between 0 and 1
+        Percentage of the data to return.
+    seed : int, optional
+        Initialize the random number generator.
+        Use a fixed value for reproducible results.
+    
+    Returns
+    -------
+    tuple
+        Tuple with a random sample of x, y and z.
+    """
 
     assert len(x) == len(y)
     assert len(y) == len(z)
@@ -255,6 +345,24 @@ def sampleXYZData(x, y, z, samplePercentage, seed=None):
 
 def plotZernikes(x, y, zernCoeffs, n=512, title=None, filename=None):
     """
+    Plot Zernike polynomials with coefficients `zernCoeffs` over a square grid.
+
+    Parameters
+    ----------
+    x : array
+        Array with x coordinates.
+        Used to evaluate the Zernike polynomials.
+    y : array
+        Array with y coordinates.
+        Used to evaluate the Zernike polynomials.
+    zernCoeffs : array
+        Array with the coefficients of a Zernike polynomial.
+    n : int, optional
+        Number of pixels per side of the square grid used to
+        display the Zernike polynomial.
+    title : string, optional
+    filename : string, optional
+        Save the plot to this disk location.
     """
 
     # Create the linear combination of the Zernike polynomials.
@@ -298,9 +406,17 @@ def nicePlotDates(labels, i0=0):
     it will update the list to keep only the month and day portion when it
     changes.
 
-    :param labels: List with the text labels formatted as %m/%d %H:%M.
+    Parameters
+    ----------
+    labels : list 
+        List with the text labels formatted as %m/%d %H:%M.
+    i0 : int, optional
+        Index of the first text label to keep in full.
+        Useful when the index 0 text label does not appear in the plot
+    
+    Examples
+    --------
 
-    Example:
     >>> labels = ['06/11 15:00', '06/11 18:00']
     >>> new_labels = nicePlotDates(labels)
     >>> new_labels
