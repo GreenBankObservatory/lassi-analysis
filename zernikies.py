@@ -982,13 +982,20 @@ def zernikePolar(coefficients, rho, theta):
 
 def getZernikeCoeffs(surface, order, printReport=False, norm='sqrt', radius=1):
     """
-
     Determines the coefficients of Zernike polynomials that best describe a surface.
 
-    :param surface: The surface where Zernike coefficients will be determined.
-    :param order: How many order of Zernike polynomials you want to incorporate. Less than 37.
-    :param printReport: Print the determined Zernike coefficients?
-    :return: n-th Zernike coefficients describing a surface.
+    Parameters
+    ----------
+    surface : 2-D array
+        The surface where Zernike coefficients will be determined.
+    order : int
+        How many order of Zernike polynomials you want to incorporate. Less than 120.
+    printReport : bool, optional
+        Print the determined Zernike coefficients?
+    Returns
+    -------
+    array
+        First `order` coefficients for the Zernike polynomials that describe a deformed surface.
     """
 
     if order > nMax:
@@ -1079,6 +1086,7 @@ def getZernikeCoeffsOLS(x, y, z, nZern, xOffset=0, yOffset=0, xMax=None, yMax=No
 
 def zernikeWLS(x, y, z, nZern, weights=None):
     """
+    Use weighted least-squares to compute Zernike coefficients.
     """
 
     # Use WLS to determine the Zernike coefficients.
@@ -1099,6 +1107,7 @@ def zernikeWLS(x, y, z, nZern, weights=None):
 
 def zernikeCost(coeffs, x, y, z, w):
     """
+    Cost funtion for the least squares problem.
     """
 
     zpoly = zernikePoly(x, y, midPoint(x), midPoint(y), coeffs)
@@ -1108,6 +1117,8 @@ def zernikeCost(coeffs, x, y, z, w):
 
 def zernikeJac(coeffs, x, y, z):
     """
+    Jacobian of the cost function for the least squares problem.
+    This does not work at the moment.
     """
 
     coeffs = np.ones_like(coeffs)
@@ -1125,6 +1136,7 @@ def zernikeJac(coeffs, x, y, z):
 
 def zernikeFitLS(x, y, z, guess, weights=None, max_nfev=10000, loss="soft_l1", f_scale=1e-3, ftol=1e-10, xtol=1e-10):
     """
+    Determine the coefficients of the Zernike polynomials that describe a deformed surface using least-squares.
     """
 
     if weights is None:
@@ -1180,7 +1192,37 @@ def zernikeResidualSurfaceError(x, y, z_coef, r=50, eps=230e-6, lmbd=2.6e-3, ver
 
 def zernikePoly(x, y, xOffset, yOffset, coefficients, xMax=-1e22, yMax=-1e22, verbose=False):
     """
-    Returns a Zernike polynomial.
+    Evaluate a linear combination of Zernike polynomials with the given coefficients.
+    The Zernike polynomails will be evaluated over the unit circle by normalizing the
+    x and y coordinates.
+
+    Parameters
+    ----------
+    x : array
+        x coordinates where to evaluate the Zernike polynomial.
+    y : array
+        y coordinates where to evaluate the Zernike polynomial.
+    xOffset : float
+        Center of the Zernike polynomial in the x coordinate.
+    yOffset : float
+        Center of the Zernike polynomial in the y coordinate.
+    coefficients : array
+        Coefficients for the Zernike polynomials.
+        The first element is the coefficient for the order 0 polynomial,
+        the second element for the order 1 polynomial and so on.
+    xMax : float, optional
+        Value used to normalize the x coordinates.
+        It defaults to the maximum valid value of `x`.
+    yMax : float, optional
+        Value used to normalize the y coordinates.
+        It defaults to the maximum valid value of `y`.
+    verbose : bool, optional
+        Verbose output?
+
+    Returns
+    -------
+    array
+        Array of the same shape as x and y with the z values of the Zernike polynomial.
     """
 
     if len(coefficients) > nMax + 1:
