@@ -1,5 +1,14 @@
+#!groovy
+
 pipeline {
-  agent {label 'rhel7'}
+  agent {
+    label 'rhel7'
+  }
+
+  triggers {
+    // trigger a weekly build on the master branch
+    cron(env.BRANCH_NAME == 'master' ? '@weekly' : '')
+  }
 
  environment {
     YGOR_TELESCOPE = './data'
