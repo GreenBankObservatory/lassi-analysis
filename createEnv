@@ -81,10 +81,9 @@ safe_cmd "pip install -U setuptools"
 
 safe_cmd "pip install cffi"
 safe_cmd "pip install numpy"
+safe_cmd "pip install wheel"
 
 safe_cmd "pip install -r $script_dir/requirements.txt"
-
-safe_cmd "pip install dask distributed"
 
 safe_cmd "pip install jupyter"
 
