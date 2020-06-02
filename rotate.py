@@ -1,6 +1,44 @@
 import numpy as np
 from scipy.optimize import least_squares
 
+
+def align2Paraboloid(x, y, z, paraFit):
+    """
+    Applies the shifts and rotations that align 
+    (x,y,z) with the best fit paraboloid.
+    
+    Parameters
+    ----------
+    x : array
+        1-d array with the x coordinates.
+    y : array
+        1-d array with the y coordinates.
+    z : array
+        1-d array with the z coordinates.
+    paraFit : array
+        Shifts and rotations derived from `parabolas.paraboloidFit`.
+    
+    Returns
+    -------
+    tuple
+        Shifted and rotated (x,y,z).
+
+    Examples
+    --------
+    >>> from parabolas import paraboloidFit
+    >>> x = np.array([0.0, 1.0, 2.0, 3.0,  4.0,  5.0])
+    >>> y = np.array([0.0, 0.8, 0.9, 0.1, -0.8, -1.0])
+    >>> z = np.array([0.1, 0.5, 0.9, 0.1, -0.8, -1.0])
+    >>> fitresult = paraboloidFit(x, y, z, [60, 0, 0, -50, 0, 0])
+    >>> xr, yr, zr = align2Paraboloid(x, y, z, fitresult.x)
+    """
+
+    cor = np.hstack((-1*paraFit[1:4], paraFit[4:6], 0))
+    xr, yr, zr = shiftRotateXYZ(x, y, z, cor)
+
+    return xr, yr, zr
+
+
 def Rx(theta):
 
     x1 = [1., 0., 0.]
@@ -8,6 +46,7 @@ def Rx(theta):
     x3 = [0., np.sin(theta), np.cos(theta)]
 
     return np.array([x1, x2, x3])
+
 
 def Ry(theta):
 
@@ -17,6 +56,7 @@ def Ry(theta):
 
     return np.array([x1, x2, x3])
 
+
 def Rz(theta):
     
     x1 = [np.cos(theta), -np.sin(theta), 0.]
@@ -24,6 +64,7 @@ def Rz(theta):
     x3 = [0., 0., 1.]
 
     return np.array([x1, x2, x3])
+
 
 def invRx(theta):
     """
@@ -35,6 +76,7 @@ def invRx(theta):
 
     return np.array([x1, x2, x3])
 
+
 def invRy(theta):
 
     x1 = [np.cos(theta), 0., -np.sin(theta)]
@@ -42,6 +84,7 @@ def invRy(theta):
     x3 = [np.sin(theta), 0., np.cos(theta)]
 
     return np.array([x1, x2, x3])
+
 
 def invRz(theta):
 
@@ -51,17 +94,22 @@ def invRz(theta):
 
     return np.array([x1, x2, x3])
 
+
 def Prime(pry):
     return np.dot(Rz(pry[2]), np.dot(Ry(pry[1]), Rx(pry[0])))
+
 
 def PrimeX(pry, v):
     return np.dot(np.array([1., 0., 0.]), np.dot(Prime(pry), v))
 
+
 def PrimeY(pry, v):
     return np.dot(np.array([0., 1., 0.]), np.dot(Prime(pry), v))
 
+
 def PrimeZ(pry, v):
     return np.dot(np.array([0., 0., 1.]), np.dot(Prime(pry), v))
+
 
 def rotateXY(x, y, z, xRads, yRads):
 
@@ -78,6 +126,7 @@ def rotateXY(x, y, z, xRads, yRads):
     xr.shape = yr.shape = zr.shape = orgShape
 
     return xr, yr, zr
+
 
 def rotateXYZ(x, y, z, coeffs):
     """
@@ -143,6 +192,7 @@ def fitXYZ(coeffs, x_obs, y_obs, z_obs, x_ref, y_ref, z_ref):
     zr = np.ma.masked_invalid(zr)
     
     return np.hstack(((xr - x_ref).compressed(), (yr - y_ref).compressed(), (zr - z_ref).compressed()))
+
 
 def alignXYZ(obs, ref, guess=[0.,0.,0.,0.,0.,0.], bounds=None):
     """
