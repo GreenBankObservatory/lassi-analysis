@@ -1,23 +1,23 @@
+"""
+Functions to process the PTX files written by the Leica ScanStation P40.
+"""
+
 import sys
 import os
 import random
 import warnings
+import numpy as np
 from copy import copy
 
-# import matplotlib
-# matplotlib.use("agg")
-
 import matplotlib.pylab as plt
-from mpl_toolkits.mplot3d import axes3d, Axes3D
-import numpy as np
-from astropy import units as u
-from astropy.coordinates import CartesianRepresentation
-from astropy.coordinates.matrix_utilities import rotation_matrix
+from mpl_toolkits.mplot3d import Axes3D
 
-from rotate import shiftRotateXYZ
-from parabolas import parabola, fitLeicaData
+from astropy.stats import sigma_clip
+
+from rotate import shiftRotateXYZ, align2Paraboloid
 from plotting import scatter3dPlot
-from utils.utils import mjd2utc, splitXYZ, aggregateXYZ
+from utils.utils import mjd2utc, splitXYZ, radialMask
+from parabolas import paraboloid, fitLeicaData, paraboloidFit, jacParaboloidZ, costParaboloidZ
 
 
 def previewData(ptxFile, sample=None):
@@ -52,149 +52,7 @@ def previewEllipticalFilter(PTXFile, ellipse):
         ls = f.readlines()
 
     tryEllipticalOffsets(ls, ellipse)
-
-
-def rotateXYaboutZ(xyz, rotDegrees):
-
-    # define it as cartesian
-    rep = CartesianRepresentation(xyz[:, 0], xyz[:, 1], xyz[:, 2])
-
-    # define our rotation about z
-    # TBF: why must we negate this to match Mathematica results?
-    rot = rotation_matrix(-rotDegrees * u.deg, axis='z')
-
-    # apply the rotation
-    new_rep = rep.transform(rot)
-
-    new_xyz = new_rep.get_xyz().value
-
-    xyzNew = np.c_[new_xyz[0], new_xyz[1], new_xyz[2]]
-
-    return xyzNew 
-        
-    
-def processPTX(fpath, rotationAboutZdegrees=None, searchRadius=None, rFilter=True):
-
-
-    # import ipdb; ipdb.set_trace() 
-    if rotationAboutZdegrees is None:
-        rotationAboutZdegrees = 150.
-    if searchRadius is None:    
-        searchRadius = 47
-   
-    with open(fpath, 'r') as f:
-        ls = f.readlines()
-    
-    xyz = processPTXdata(ls, rotationAboutZdegrees, searchRadius)
-
-    # write to CSV file
-    outf = fpath + ".csv"
-    np.savetxt(outf, xyz, delimiter=",")
-
-
-def processPTXdata(lines, rotationAboutZdegrees, searchRadius, quiet=True, sampleSize=None, preview=True):
-
-    ls = lines
-
-    if not quiet:
-        print("Original file num lines: ", len(ls))
-
-    #badLine = '0 0 0 0.500000\r\n'
-    badLine = '0 0 0 0.500000\n'
-    # reject the '0 0 0 0.500000' lines - TBF: what are those?
-    ls = [l for l in ls if l != badLine]
-    #for l in ls:
-    #    print "'%s' vs '%s'" % (l, badLine)
-
-    if not quiet:
-        print("File minus '0 0 0 0.50000' lines: ", len(ls))
-
-    #print "beginning of file: "
-    #print ls[:12]
-
-    # remove the header
-    # ls = ls[10:]
-    ls = ls[11:]
-    # import ipdb; ipdb.set_trace()
-    #print "now beginning of file w/ out header: "
-    #print ls[:12]
-
-    # parse strings so we can ignore the fourth value
-    sample = 1000
-    xyz = []
-    for i, l in enumerate(ls):
-        # print i, l
-        if "Line" in l:
-            # print l
-            continue
-        ll = l.split(' ')
-        x = float(ll[0])
-        y = float(ll[1])
-        z = float(ll[2])
-        xyz.append((x, y, z))
-
-    xyz = np.array(xyz)    
-
-    # print "Skipping rotation and filtering!"
-    # return xyz
-
-    # rotation!  This takes a long time.  TBF: why? *)
-    #rot=AffineTransform[{RotationMatrix[150Degree,{0,0,1}],{0,0,0}}];
-    #lall=Map[rot,lall];
-    xyz = rotateXYaboutZ(xyz, rotationAboutZdegrees)
-
-    # and we only use those parts that are within this radius TBF? *)
-    # ls=Select[ls,Norm[Take[#,2]-{-54,0}]<47&]
-    # Here's what's going on:
-    # Select will go through and apply the predicat # < 47 to each element of 'ls'
-    # but, in this case each element, #, is passed to Norm[Take[#,2]-{-54, 0}]
-    # What's happening there is that the x, y from each element in xyz above is taken,
-    # and 54 is added to each x.  Norm == Sqrt(x**2 + y**2); that looks like a radius to me.
-    # so, if the radius is less the 47, this data element is kept.
-
-
-    if preview:
-        # a preview of what our processed data looks like
-        sampleSize = 10000
-        if len(xyz) < sampleSize:
-            sampleSize = len(xyz)
-        lsIdx = random.sample(range(len(xyz)), sampleSize)
-        xyzr = xyz[lsIdx]
-        xr, yr, zr = splitXYZ(xyzr)
-        xlim = (-100, 100)
-        ylim = (-100, 100)
-        scatter3dPlot(xr, yr, zr, "Sampling of processed data", xlim=xlim, ylim=ylim)
-        f = plt.figure()
-        ax = f.gca()
-        # take a look at the x y orientation
-        ax.plot(xr, yr, 'bo', [0], [0], '*')
-        plt.xlabel("x")
-        plt.ylabel("y")
-        plt.title("X Y orientation of data")
-
-    return filterOutRadius(xyz, searchRadius=searchRadius)
-
-    
-def filterOutRadius(xyz, searchRadius=None, mysteryX=None):
-    "return only those xyz points where sqrt(x**2 + y**2) is within a limit"
-
-    if mysteryX is None:
-        mysteryX = 54
-    if searchRadius is None:    
-        searchRadius = 47
-
-    xyzInside = []
-    for x, y, z in xyz:
-        x2 = x + mysteryX
-        r = np.sqrt(x2**2 + y**2)
-        # if r < searchRadius and r > 20:
-        if r < searchRadius:
-        #if z > 0. and z < 60.:
-            xyzInside.append((x, y, z))
-    xyzInside = np.array(xyzInside)
-
-    return xyzInside
-
+ 
 
 def getRawXYZsample(fn, sampleRate):
     with open(fn, 'r') as f:
@@ -234,9 +92,17 @@ def getRawXYZ(ls, sampleSize=None):
     """
     Given the lines of a PTX file it extracts x, y, z and intensity values.
     
-    :param ls: Lines of the PTX file.
-    :param sampleSize: Use a random sample of the lines of this length.
-    :returns: x, y, z and intensity values read from the lines of the PTX file.
+    Parameters
+    ----------
+    ls :  
+        Lines of the PTX file.
+    sampleSize : int, optional
+        Use a random sample of the lines of this length.
+    
+    Returns
+    -------
+    tuple
+        x, y, z and intensity values read from the lines of the PTX file.
     """
 
     # Skip the header.
@@ -289,7 +155,11 @@ def getRawXYZ(ls, sampleSize=None):
 
 
 def tryOffsets(lines, xOffset, yOffset, radius):
-    "creates plots to make sure we are centered"
+    """
+    Creates plots of the scan and the location of the circular filter.
+    This is used to determine if the circular filter captures the primary
+    reflector.
+    """
 
     sampleSize = 10000
     x, y, z, _ = getRawXYZ(lines, sampleSize=sampleSize)
@@ -338,10 +208,14 @@ def tryOffsets(lines, xOffset, yOffset, radius):
     ax.plot(xr, yr, 'o', xro, yro, 'ro', [0], [0], 'r*')
     plt.xlabel("x")
     plt.ylabel("y")
-    plt.title("XY centered and below radus: %5.2f" % radius)
+    plt.title("XY centered and below radius: %5.2f" % radius)
+
 
 def tryEllipticalOffsets(lines, ellipse):
     """
+    Creates plots of the scan and the location of the circular filter.
+    This is used to determine if the circular filter captures the primary
+    reflector.
     """
 
     sampleSize = 10000
@@ -361,7 +235,7 @@ def tryEllipticalOffsets(lines, ellipse):
     ax.plot(x, y, 'bo', [0], [0], '*')
     plt.xlabel("x")
     plt.ylabel("y")
-    plt.title("X Y orientation of data")
+    plt.title("Data in the XY plane")
 
     xin, yin, zin, _, _ = ellipticalFilter(x, y, z, ellipse[0], ellipse[1], ellipse[2], ellipse[3], ellipse[4])
 
@@ -372,7 +246,7 @@ def tryEllipticalOffsets(lines, ellipse):
     ax.plot([0], [0], 'y*')
     plt.xlabel("x")
     plt.ylabel("y")
-    plt.title("XY inside ellipse")
+    plt.title("Data inside the ellipse")
 
 
 def radialFilter(x, y, z, xOffset, yOffset, radius, dts=None):
@@ -441,17 +315,31 @@ def nearFilter(x, y, z, tol=10., dts=None, intensity=None):
     """
     Filter points that are closer than tol from the TLS.
 
-    :param x: x coordinates.
-    :param y: y coordinates.
-    :param z: z coordinates.
-    :param tol: Distance threshold for filtering.
-    :param dts: Date time stamps.
-    :param intensity: Intensity values.
-    :returns: Filtered x, y, z, dts and intensity.
+    Parameters
+    ----------
+    x : array
+        x coordinates.
+    y : array
+        y coordinates.
+    z : array
+        z coordinates.
+    tol : float, optional
+        Distance threshold for filtering.
+    dts : array
+        Date time stamps.
+    intensity : array, optional
+        Intensity values.
+
+    Returns
+    -------
+    tuple
+        Filtered x, y, z, dts and intensity.
     """
 
     r = np.sqrt(np.power(x, 2.) + np.power(y, 2.) + np.power(z, 2.))
     mask = r > tol
+
+    printMaskStats(mask)
 
     if dts is not None:
         dts = dts[mask]
@@ -462,23 +350,84 @@ def nearFilter(x, y, z, tol=10., dts=None, intensity=None):
     return x[mask], y[mask], z[mask], dts, intensity
 
 
+def paraboloidMask(x, y, z, paraFit, threshold=3):
+    """
+    Given a best fit paraboloid it creates a mask where the elements 
+    that are within threshold sigmas from the best fit paraboloid are True.
+    Sigma is the standard deviation of the residuals.
+    
+    Parameters
+    ----------
+    
+    """
+
+    # Rotate and shift the range measurements.
+    #cor = np.hstack((-1*paraFit[1:4],paraFit[4:6],0))
+    #xsr, ysr, zsr = shiftRotateXYZ(x, y, z, cor)
+    xr, yr, zr = align2Paraboloid(x, y, z, paraFit)
+    # Build a paraboloid using the best fit parameters.
+    zp = paraboloid(xr, yr, paraFit[0])
+    # Compute the residuals between the paraboloid and the rotated range measurements.
+    diff = zr - zp
+    # Mask residuals larger than 1 cm.
+    #mask = abs(diff) < 0.01
+    # Mask residuals outside threshold sigmas.
+    mdiff = sigma_clip(diff, threshold)
+    mask = ~mdiff.mask
+
+    return mask
+
+
+def paraboloidFilter(x, y, z, threshold=3, guess=[60, 0, 0, -49, 0, 0, 0, 0, 0, 0, 50]):
+    """
+    Fits a deformed paraboloid to the (x,y,z) point cloud and returns an array of booleans 
+    with True for elements that are within threshold sigmas from the best fit paraboloid.
+    Sigma is the standard deviation of the residuals.
+    """
+    
+    # Fit a paraboloid to the data.
+    fitresult = paraboloidFit(x, y, z, guess,
+                              method=costParaboloidZ, jac=jacParaboloidZ,
+                              ftol=1e-12, xtol=1e-15, f_scale=1e-2)
+    paraFit = fitresult.x
+
+    # Create the mask.
+    mask = paraboloidMask(x, y, z, paraFit, threshold=threshold)  
+    # Tell the user how much data is kept.
+    printMaskStats(mask)
+ 
+    return mask, paraFit
+
+
 def zLimitFilter(x, y, z, zLimit=-80, dts=None, intensity=None):
     """
     Filter points whose z coordinate is larger than zLimit.
 
-    :param x: x coordinates.
-    :param y: y coordinates.
-    :param z: z coordinates.
-    :param zLimit: Filter values larger than this.
-    :param dts: Date time stamps.
-    :param intensity: Intensity values.
-    :returns: The filtered x, y, z, dts and intensity.
+    Parameters
+    ----------
+    x : array
+        x coordinates.
+    y : array
+        y coordinates.
+    z : array
+        z coordinates.
+    zLimit : float, optional
+        Filter values larger than this.
+    dts : array, optional
+        Date time stamps.
+    intensity : array, optional
+        Intensity values.
+
+    Returns
+    -------
+    tuple
+        The filtered x, y, z, dts and intensity.
     """
 
-    # z - filter: at this point we should have the
-    # dish, but with some things the radial filter didn't
-    # get rid of above or below the dish
     mask = np.logical_and(z > zLimit, z < -10)
+
+    printMaskStats(mask)
+
     x = x[mask]
     y = y[mask]
     z = z[mask]
@@ -492,21 +441,40 @@ def zLimitFilter(x, y, z, zLimit=-80, dts=None, intensity=None):
     return x, y, z, dts, intensity
 
 
+def printMaskStats(mask):
+    """
+    Prints what percentage of the data will be discarded 
+    and how many elements are kep for a given mask.
+
+    Parameters
+    ----------
+    mask: array of bools
+        Array with the mask to be applied, where the 
+        elements to be kept are True.
+    """
+
+    percent = mask.sum()/len(mask) * 100.
+    print("Filter will remove {0:.2f}% of the data.".format(100. - percent))
+    print("Keeping {} out of {} points.".format(mask.sum(), len(mask)))
+
+
 def processNewPTXData(lines,
                       xyzi=None,
                       dts=None,
                       plotTest=True,
                       rot=None,
                       sampleSize=None,
-                      simSignal=None,
                       iFilter=False,
                       nFilter=True,
                       rFilter=True,
-                      addOffset=False,
                       filterClose=True,
-                      parabolaFilter=True,
+                      filterParaboloid=True,
                       ellipse=[-8., 50., 49., 49., 0.],
                       residual_threshold=0.008):
+    """
+    
+    """
+
     "this is the processing we see works with 2019 data"
 
     if rot is None:
@@ -524,28 +492,28 @@ def processNewPTXData(lines,
 
     if lines is not None:
         # Get the actual float values from the file contents.
-        xo, yo, zo, io = getRawXYZ(lines, sampleSize=sampleSize)
+        x, y, z, i = getRawXYZ(lines, sampleSize=sampleSize)
     else:
-        xo, yo, zo, io = xyzi
+        x, y, z, i = xyzi
 
-    print("Starting with %d lines of data" % len(xo))
+    print("Starting with %d lines of data" % len(x))
 
     # First remove all the zero data.
-    mask = io != 0.0
-    intensity = io[mask]
-    x = xo[mask]
-    y = yo[mask]
-    z = zo[mask]
+    print("Filtering measurements with zero intensity.")
+    mask = i != 0.0
+    intensity = i[mask]
+    x = x[mask]
+    y = y[mask]
+    z = z[mask]
     if dts is not None:
         dts = dts[mask]
 
-    numFilteredOut = len(x) - len(intensity)
-    percent = (float(numFilteredOut) / float(len(x))) * 100.
-    print("Filtered out %d points of %d (%5.2f%%) intensity equal to zero" % (numFilteredOut, len(x), percent))
-    print("Now we have %d lines of data" % len(x))
+    printMaskStats(mask)
+
 
     # Remove aggregious jumps in data?
     if nFilter:
+        print("Neighbor filter.")
         # TBF: document where our tolerance comes from
         x, y, z, mask = neighborFilter(x, y, z, 0.122)
         intensity = intensity[mask]
@@ -553,7 +521,8 @@ def processNewPTXData(lines,
         if dts is not None:
             dts = dts[mask]
 
-    # We only want the data that has a decent intesity.
+    
+    # We only want data that has a decent intesity.
     meanI = np.mean(intensity)
     stdI = np.std(intensity)
     print("Intensity: max=%5.2f, min=%5.2f, mean=%5.2f, std=%5.2f" % (np.max(intensity),
@@ -561,7 +530,7 @@ def processNewPTXData(lines,
                                                                       meanI,
                                                                       stdI))
 
-    if iFilter:    
+    if False: # iFilter    
         mask = np.logical_and(intensity > 0.75, intensity < 0.85)
         intensity = intensity[mask]
         x = x[mask]
@@ -578,133 +547,173 @@ def processNewPTXData(lines,
     assert len(y) == len(z)
     assert len(z) == len(intensity)
 
+    # Save the point cloud thus far for the paraboloid filter.
+    x_p = copy(x)
+    y_p = copy(y)
+    z_p = copy(z)
+    i_p = copy(intensity)
+
     # We want as much as possible of the dish.
     # Since the dish will be rotated, it will look like an ellipse to the TLS.
+    # This filter is later superseded by the paraboloid filter, but it is
+    # necessary to find a best fit paraboloid.
     if rFilter:
         orgNum = len(x)
-        print('Elliptical fitler parameters:')
-        print(ellipse)
+        print('Elliptical filter.')
+        print("The ellipse has semi-major axis {0:.2f} m, semi-minor axis {1:.2f} m and angle {2:.2f} degrees".format(ellipse[2], ellipse[3], ellipse[4]))
         x, y, z, dts, intensity = ellipticalFilter(x, y, z, 
                                                    ellipse[0], ellipse[1], ellipse[2], 
                                                    ellipse[3], ellipse[4], 
                                                    dts=dts, intensity=intensity)
         newNum = len(x)
         print("Elliptical filter removed {0} points outside the ellipse".format(orgNum - newNum))
-        print("The ellipse has semi-major axis {0:.2f} m, semi-minor axis {1:.2f} m and angle {2:.2f} degrees".format(ellipse[2], ellipse[3], ellipse[4]))
         print("Now we have %d lines of data" % len(x))
 
     # The scanner is upside down.
     z = -z
 
     # Filter points below the dish.
-    orgNum = len(z)
+    print("z filter.")
     zLimit = -80    
     x, y, z, dts, intensity = zLimitFilter(x, y, z, zLimit=zLimit, dts=dts, intensity=intensity)
-    newNum = len(z)
-    print("z - limit filtered out {0} points below {1:5.2f} and above -10".format((orgNum - newNum), zLimit))
-    print("Now we have {} lines of data".format(len(z)))
 
     
     if filterClose:
-        # Removes points that are closer than 10 m from the scanner.
         tooClose = 10.
-        orgNum = len(z)
+        print("Removing points closer than {0:.2f} m from the scanner.".format(tooClose))
+        # Removes points that are closer than 10 m from the scanner.
         x, y, z, dts, intensity = nearFilter(x, y, z, tol=tooClose, dts=dts, intensity=intensity)
-        newNum = len(z)
-        print("Removed {0:.0f} points closer than {1:.2f} m from the scanner.".format((orgNum - newNum), tooClose))
+
+    
+    # Rotate the data for the paraboloid filter.
+    print("Rotating about z by {0:5.2f} degrees.".format(rot))
+    xr, yr, zr = shiftRotateXYZ(x, y, z, [0, 0, 0, 0, 0, np.deg2rad(rot)])
 
 
-    if parabolaFilter:
+    if filterParaboloid:
 
-        sampleSize = int(len(x)*0.05)
-        lsIdx = random.sample(range(len(x)), sampleSize)
-        xs = x[lsIdx]
-        ys = y[lsIdx]
-        zs = z[lsIdx]
+        print("Paraboloid filter.")
+
+        perc = 0.01
+        print("Fitting a paraboloid to {}% of the data.".format(perc*100.))
+        sampleSize = int(len(xr)*perc)
+        lsIdx = random.sample(range(len(xr)), sampleSize)
+        xs = xr[lsIdx]
+        ys = yr[lsIdx]
+        zs = zr[lsIdx]
 
         # Fit a parabola to the data.
-        guess = [60, 0, 0, -49, 0, 0]
-        fitresult = fitLeicaData(xs, ys, zs, guess, bounds=None, weights=None)
-        c = fitresult.x
+        pMask, _ = paraboloidFilter(xs, ys, zs, threshold=3)
 
-        # Start from the original data.
-        print("Reloaded {} lines of data.".format(len(xo)))
-        mask = io != 0.0
-        intensity = io[mask]
-        x = xo[mask]
-        y = yo[mask]
-        z = zo[mask]
+        # Fit the paraboloid again, discarding the already filtered values.
+        print("Fitting paraboloid again to the un-filtered values.")
+        xs = xs[pMask]
+        ys = ys[pMask]
+        zs = zs[pMask]
+        pMask, paraFit = paraboloidFilter(xs, ys, zs, threshold=3)
 
-        x, y, z, mask = neighborFilter(x, y, z, 0.122)
-        intensity = intensity[mask]
-
+        print("Applying paraboloid filter to the data before the elliptical filter.")
+        x = x_p
+        y = y_p
+        z = z_p
+        i = i_p
         z = -z
+        x, y, z = shiftRotateXYZ(x, y, z, [0, 0, 0, 0, 0, np.deg2rad(rot)])
+        print("Number of data points: {}".format(len(z)))
+
+        pMask = paraboloidMask(x, y, z, paraFit, threshold=2)
+
+        print("Applying paraboloid filter to the data.")
+        printMaskStats(pMask)
+
+        x = x[pMask]
+        y = y[pMask]
+        z = z[pMask]
+        i = i[pMask]
 
         # Rotate and shift the range measurements.
-        cor = np.hstack((-1*c[1:4],c[4:6],0))
-        xr, yr, zr = shiftRotateXYZ(x, y, z, cor)
-        # Build a parabola using the best fit parameters.
-        zp = parabola(xr, yr, c[0])
+        #cor = np.hstack((-1*paraFit[1:4],paraFit[4:6],0))
+        #xrp, yrp, zrp = shiftRotateXYZ(x, y, z, cor)
+        xrp, yrp, zrp = align2Paraboloid(x, y, z, paraFit)
 
-        # Compute the residuals between the parabola and the rotated range measurements.
-        diff = zr - zp
-        # Only keep range measurements whose residuals are less than residual_threshold.
-        print("Removing points with residuals larger than {}".format(residual_threshold))
-        mask = abs(diff) < residual_threshold
-        percent = mask.sum()/len(mask) * 100.
-        print("Parabola filter will remove {0:.2f}% of the data.".format(100. - percent))
-        print("Keeping {} out of {} points.".format(mask.sum(), len(mask)))
+        # Use a circle to mask data outside of the primary reflector.
+        r = 51
+        xc = np.mean((np.nanmax(xrp) - r, np.nanmin(xrp) + r))
+        yc = np.nanmax(yrp) - r
+        rMask = radialMask(xrp, yrp, r, xc=xc, yc=yc)
+        
+        x = x[rMask]
+        y = y[rMask]
+        z = z[rMask]
+        i = i[rMask]
 
-        # Use the rotated range measurements for the last filter.
-        xr = xr[mask]
-        yr = yr[mask]
-        zr = zr[mask]
+        print("Applying circular mask to the paraboloid filtered data.")
+        printMaskStats(rMask)
 
-        x = x[mask]
-        y = y[mask]
-        z = z[mask]
-        intensity = intensity[mask]
+        #cor = np.hstack((-1*paraFit[1:4],paraFit[4:6],0))
+        #xr, yr, zr = shiftRotateXYZ(x, y, z, cor)
+        
+        ## Rotate and shift the range measurements.
+        #cor = np.hstack((-1*c[1:4],c[4:6],0))
+        #xr, yr, zr = shiftRotateXYZ(x, y, z, cor)
+        ## Build a parabola using the best fit parameters.
+        #zp = paraboloid(xr, yr, c[0])
 
-        # Only keep range measurements within a circle of radius r.
-        r = 51 # m
-        xc = np.nanmin(xr) + r
-        yc = np.nanmin(yr) + r
-        circular_mask = (xr - xc)**2 + (yr - yc)**2 <= r**2.
+        ## Compute the residuals between the parabola and the rotated range measurements.
+        #diff = zr - zp
+        ## Only keep range measurements whose residuals are less than residual_threshold.
+        ##print("Removing points with residuals larger than {}".format(residual_threshold))
+        ##mask = abs(diff) < residual_threshold
+        #mdiff = sigma_clip(diff, 3)
+        #mask = ~mdiff.mask
+        #percent = mask.sum()/len(mask) * 100.
+        #print("Parabola filter will remove {0:.2f}% of the data.".format(100. - percent))
+        #print("Keeping {} out of {} points.".format(mask.sum(), len(mask)))
 
-        x = x[circular_mask]
-        y = y[circular_mask]
-        z = z[circular_mask]
-        intensity = intensity[circular_mask]
+        ## Use the rotated range measurements for the last filter.
+        #xr = xr[mask]
+        #yr = yr[mask]
+        #zr = zr[mask]
 
-        print("Keeping {} points inside a circle of radius {} m and center ({},{}) m.".format(circular_mask.sum(), r, xc, yc))
+        #x = x[mask]
+        #y = y[mask]
+        #z = z[mask]
+        #intensity = intensity[mask]
+
+        ## Only keep range measurements within a circle of radius r.
+        #r = 51 # m
+        #xc = np.nanmin(xr) + r
+        #yc = np.nanmin(yr) + r
+        #circular_mask = (xr - xc)**2 + (yr - yc)**2 <= r**2.
+
+        #x = x[circular_mask]
+        #y = y[circular_mask]
+        #z = z[circular_mask]
+        #intensity = intensity[circular_mask]
+
+        #print("Keeping {} points inside a circle of radius {} m and center ({},{}) m.".format(circular_mask.sum(), r, xc, yc))
 
     
     # Rotate around the z axis since the scanner coordinate system does not match the telescope's.
-    if rot is not None or rot != 0.0:
-        print("Rotating about Z by %5.2f degrees" % rot)
-        xr, yr, zr = shiftRotateXYZ(x, y, z, [0, 0, 0, 0, 0, np.deg2rad(rot)])
+    #if rot is not None or rot != 0.0:
+    #    print("Rotating about z by %5.2f degrees" % rot)
+    #    xr, yr, zr = shiftRotateXYZ(x, y, z, [0, 0, 0, 0, 0, np.deg2rad(rot)])
 
 
     # Create a Nx3 matrix for the coordinates.
-    xyz = np.c_[xr, yr, zr]
+    xyz = np.c_[x, y, z]
 
 
     if plotTest:
-        # we plotted stuff earlier, so let's get
-        # a preview of what our processed data looks like
-        if sampleSize is None:
-            sampleSize = 10000
-            lsIdx = random.sample(range(len(xyz)), sampleSize)
-            xyzr = xyz[lsIdx]
-            xr, yr, zr = splitXYZ(xyzr)
-        else:
-            xr, yr, zr = splitXYZ(xyz)    
+        print("Plotting.")
+
         xlim = (-100, 100)
         ylim = (-100, 100)
-        scatter3dPlot(xr, yr, zr, "Sampling of processed data", xlim=xlim, ylim=ylim)
+        fig, ax = scatter3dPlot(xr, yr, zr, "Sampling of processed data", xlim=xlim, ylim=ylim, sample=1)
+        
+        # take a look at the x y orientation
         f = plt.figure()
         ax = f.gca()
-        # take a look at the x y orientation
         ax.plot(xr, yr, 'bo', [0], [0], '*')
         plt.xlabel("x")
         plt.ylabel("y")
@@ -713,7 +722,7 @@ def processNewPTXData(lines,
     print("XYZ output of ProcessNewPTXData has {0} lines of data.".format(len(xyz)))
     print("Intensity output of ProcessNewPTXData has {0} lines of data.".format(len(intensity)))
 
-    return xyz, dts, intensity
+    return xyz, dts, i
 
 
 def getTimeStamps(fpath):
@@ -749,10 +758,9 @@ def processNewPTX(fpath,
                   sampleSize=None,
                   iFilter=False,
                   rFilter=True,
-                  addOffset=False,
                   filterClose=True,
-                  simSignal=None,
-                  ellipse=[-8., 50., 49., 49., 0.]):
+                  ellipse=[-8., 50., 49., 49., 0.],
+                  plotTest=True):
 
     # Is there associated time data?
     if useTimestamps:
@@ -767,12 +775,11 @@ def processNewPTX(fpath,
                                             dts=dts,
                                             rot=rot,
                                             sampleSize=sampleSize,
-                                            simSignal=simSignal,
                                             iFilter=iFilter,
                                             rFilter=rFilter,
-                                            addOffset=addOffset,
                                             filterClose=filterClose,
-                                            ellipse=ellipse)
+                                            ellipse=ellipse,
+                                            plotTest=plotTest)
 
     # Write to CSV file.
     outf = fpath + ".csv"
