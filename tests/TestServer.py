@@ -2,6 +2,9 @@ import os
 import unittest
 from multiprocessing import Value
 
+# I do not know where to put this so the tests do not fail when running locally.
+os.environ['YGOR_TELESCOPE'] = "./data"
+
 from processPTX import getRawXYZ
 from server import getMissingFiles, getGpuOutputPaths
 from server import processLeicaDataStream, getRefScanFileName

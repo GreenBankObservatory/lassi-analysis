@@ -5,6 +5,7 @@ import numpy as np
 
 from plotting import scatter3dPlot
 
+from lassiAnalysis import maskScan
 from lassiAnalysis import maskLeicaData
 from lassiAnalysis import extractZernikesLeicaScanPair
 import lassiTestSettings
@@ -23,85 +24,48 @@ class TestLassiAnalysis(unittest.TestCase):
         # unittest.main(argv=[''], verbosity=2, exit=False)
         self.plots = False
 
+    
+    def testMaskScan(self):
+        """
+        """
 
-    def testMaskLeicaData(self):
-        "Test that we can mask out bumps in the smoothed data"
+        expected = np.array([[False, False, False, False, False, False, False, False],
+                             [False, False, False, False, False, False, False, False],
+                             [False, False, False, False, False, False, False, False],
+                             [False, False, False,  True, False, False, False, False],
+                             [False, False, False,  True,  True, False, False, False],
+                             [False, False, False,  True,  True, False, False, False],
+                             [False, False, False, False, False, False, False, False],
+                             [False, False, False, False, False, False, False, False]])
 
-        # TBF: where to store test data.
-        # fn = "data/27mar2019/Clean9.ptx.csv"
-        # fn = "Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
+        n = 512
         fn = lassiTestSettings.SCAN9 + ".csv"
-        # path = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
-        # path = lassiTestSettings.DATA_UNIT_TESTS
         path = settings.UNIT_TEST_PATH
         fpath = os.path.join(path, '27mar2019/gpus', fn)
 
-        maskGuess=[60., 0., 0., -50., 0., 0.]
-        d = maskLeicaData(fpath, radialMask=True, guess=maskGuess)
+        xr, yr, zr = maskScan(fpath, n=n, rot=0)
 
-        origData = d['origData']
-        origMaskedData = d['origMasked']
-        rotatedData = d['rotated']
-        fitResidual = d['fitResidual']
-        parabolaFit = d['parabolaFit']
-        fitCoeffs = d['parabolaFitCoeffs']
-
-        expCoeffs = [
-            60.037336325908356,
-            2.45124145e+00,
-            -8.79388591e-01,
-            -4.92666730e+01,
-            1.94525728e-02,
-            -2.86261922e-04
-        ]
-        for exp, act in zip(expCoeffs, fitCoeffs):
-            self.assertAlmostEquals(exp, act, 3)
-
-        N = 512
-        orgX = origData[0]
-        self.assertEquals(orgX.shape, (N, N))
-
-        orgMX = origMaskedData[0]
-        self.assertEquals(orgMX.shape, (N, N))
-
-        mask = orgMX.mask
-        self.assertEquals(mask.shape, (N, N))
-
-        fm = mask[mask == False]
-        tm = mask[mask == True]
-        
-        fmLen = 143061
-        tmLen = 119083
-
-        # sanity check our expected values
-        self.assertEquals(fmLen + tmLen, N*N)
-
-        self.assertEquals(fm.shape, (fmLen,))
-        self.assertEquals(tm.shape, (tmLen,))
-        self.assertEqual(fitResidual.shape, (N,N))
-
-        mask = fitResidual.mask
-        self.assertEquals(mask.shape, (N, N))
-
-        fm = mask[mask == False]
-        tm = mask[mask == True]
-        
-        self.assertEquals(fm.shape, (fmLen,))
-        self.assertEquals(tm.shape, (tmLen,))
+        np.testing.assert_array_equal(zr[n//2-4:n//2+4,n//2-4:n//2+4].mask, expected)
         
             
     def testExtractZernikesLeicaScanPair(self):
 
-        print("Testing lassiAnalysis.extractZernikesLeicaScanPair")
-        # fn1 = "Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
-        # fn2 = "Scan-11_5100x5028_20190327_1155_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
         fn1 = lassiTestSettings.SCAN9 + ".csv"
         fn2 = lassiTestSettings.SCAN11 + ".csv"
-        # path = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
-        # path = lassiTestSettings.DATA_UNIT_TESTS
         path = settings.UNIT_TEST_PATH
         fpath1 = os.path.join(path, '27mar2019/gpus', fn1)
         fpath2 = os.path.join(path, '27mar2019/gpus', fn2)
+
+        expected  = np.array([ 0.00000000e+00,  3.62084426e-06, -2.09326848e-06,  2.00161270e-05,
+                              -1.95328477e-03, -7.55799017e-04, -7.26745615e-04,  1.39954039e-04,
+                               6.76198828e-06,  3.42735429e-06, -2.37041694e-04,  3.73330598e-05,
+                               7.46538852e-04,  2.31084957e-04,  3.07554384e-04, -8.47019848e-06,
+                               1.78253932e-04,  3.18025410e-05, -7.75638977e-05, -1.82476190e-06,
+                              -6.44858533e-05, -1.98739178e-04,  2.92033128e-05,  3.04666280e-05,
+                               6.17212713e-04,  2.04950281e-04,  2.63346578e-04,  1.08807675e-04,
+                               2.68525819e-05,  6.83855791e-05, -1.13836213e-04, -7.44452014e-05,
+                               1.96018181e-05,  4.85993401e-05,  1.09020282e-05,  3.67054789e-05,
+                              -8.91468101e-05])
 
         N = 512
         nZern = 36
@@ -110,8 +74,7 @@ class TestLassiAnalysis(unittest.TestCase):
                                                            n=N,
                                                            nZern=nZern)
 
-        # TBF: all the diffs data looks masked. how to check that?
         
         self.assertEquals(diff.shape, (N, N))
         self.assertEquals(len(fitlist), nZern + 1)
-        self.assertEquals(fitlist, [0.0]*(nZern + 1))
+        np.testing.assert_allclose(fitlist, expected, rtol=1e-05, atol=2e-5)        
