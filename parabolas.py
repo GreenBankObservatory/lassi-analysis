@@ -6,111 +6,53 @@ import numpy as np
 from copy import copy
 from scipy.optimize import least_squares
 
-from rotate import *
+from rotate import PrimeX, PrimeY, PrimeZ, align2Paraboloid
 from SmoothedFITS import SmoothedFITS
-from utils.utils import sph2cart, cart2sph, sampleXYZData
+from utils.utils import sampleXYZData
 from plotting import scatter3dPlot, surface3dPlot, imagePlot
 
-"""
-TODO: 
-- move plotting methods to the plotting module.
-- clean up unused methods.
-- devise a method that can fit for the parabola focus
-  while producing accurate rotation parameters (robust).
-"""
 
 
-def parabola(xdata, ydata, focus, v1x=0, v1y=0, v2=0, heavy=False):
-    if heavy:
-        return parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2)
-    else:
-        return parabolaSimple(xdata, ydata, focus, v1x, v1y, v2)
-
-
-def parabolaSimple(xdata, ydata, focus, v1x, v1y, v2):
+def paraboloid(xdata, ydata, focus, v1x=0, v1y=0, v2=0):
     """
-    Simply the equation for a 2-D parabola.
+    General function for computing a paraboloid.
     """
 
-    return (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 + v2
+    return _paraboloidSimple(xdata, ydata, focus, v1x, v1y, v2)
 
 
-def parabolaSimple_(xdata, ydata, focus):
-    "simply the equation for a 2-D parabola"
-    return (1./(4.*focus))*(xdata)**2 + (1./(4.*focus))*(ydata)**2
-
-
-def parabolaHeavy(xdata, ydata, focus, v1x, v1y, v2): #, hr=104.):
-    "Reject everything outside the circle our data shows up in"
-    #return (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 + v2
-    #r2 = (1 / (4.*focus))*(xdata - v1x)**2 + (1 / (4.*focus))*(ydata - v1y)**2 
-    #return (r2 * (hr**2 > r2)) + v2
-
-    # caluclate the parabola normally
-    z = parabolaSimple(xdata, ydata, focus, v1x, v1y, v2)
-
-    # now return only those values within our cynlinder
-    xoffset = 0. #54.
-    yoffset = 54. #0.
-    radius = 50.
-    mask = heavySide(xdata, ydata, v1x, v1y, xoffset, yoffset, radius)
-    print("Of %d elements, %d masked by heavyside" % (len(z), np.sum(mask)))
-    #assert np.all(mask)
-    #return z[mask]
-    # z[mask] = 0.0
-    return z
-    
-
-def heavySide(x, y, v1x, v1y, xoffset, yoffset, radius):
-    return ((x - v1x - xoffset)**2 + (y - v1y - yoffset)**2) > radius**2    
-
-
-def rotate(x, y, z, aroundXrads, aroundYrads):
-    # first, around x
-    # x = x
-    yRot = y*np.cos(aroundXrads) - z*np.sin(aroundXrads)
-    zRot = y*np.sin(aroundXrads) + z*np.cos(aroundXrads)
-    
-    # then around y
-    xRot = x*np.cos(aroundYrads) + zRot*np.sin(aroundYrads);
-    # y = y;
-    zRot = zRot*np.cos(aroundYrads) - x*np.sin(aroundYrads);
-    return xRot, yRot, zRot
-
-
-def parabolaRot(xdata, ydata, focus, v1x, v1y, v2, rotX, rotY):
-    zdata = parabola(xdata, ydata, focus, v1x, v1y, v2)
-    #zdata = np.zeros(xdata.shape)
-    #_, _, zdataRot = rotate(xdata, ydata, zdata, rotX, rotY)
-
-    L = np.array([xdata.flatten(), ydata.flatten(), zdata.flatten()])
-    pry = (rotX, rotY, 0.)
-    xr = PrimeX(pry, L)
-    yr = PrimeY(pry, L)
-    zr = PrimeZ(pry, L)
-    return xr, yr, zr
-
-
-def fitParabolaNew(L, f, v1x, v1y, v2, xTheta, yTheta):
-    coeffs = [f, v1x, v1y, v2, xTheta, yTheta]
-    return fitParabola(coeffs, L[0], L[1], L[2])
-
-
-def fitParabolaWithWeights(coeffs, x, y, z, weights):
-    
-    z = fitParabola(coeffs, x, y, z)
-    return z*weights
-
-
-def fitParabola(coeffs, x, y, z):
+def _paraboloidSimple(xdata, ydata, focus, vx, vy, vz):
     """
-    Computes the residuals between a paraboloid and a 3D vector.
-    coeffs[0] is the focus, 
-    coeffs[1] the offset in the x coordinate, 
-    coeffs[2] the offset in the y coordinate,
-    coeffs[3] the offset in the z coordinate,
-    coeffs[4] a rotation along the x axis,
-    coeffs[5] a rotation along the y axis.
+    Simply the equation for a 2-D parabola, a paraboloid.
+
+    Parameters
+    ----------
+    xdata: array
+        x coordinates where to evaluate the paraboloid.
+    ydata : array
+        y coordinates where to evaluate the paraboloid.
+    focus : float
+        Focal length of the paraboloid.
+    vx : float
+        Location of the paraboloid's vertex in the x coordinate.
+    vy : float
+        Location of the paraboloid's vertex in the y coordinate.
+    vz : float
+        Location of the paraboloid's vertex in the z coordinate.
+    """
+
+    return (1 / (4.*focus))*(xdata - vx)**2 + (1 / (4.*focus))*(ydata - vy)**2 + vz
+
+
+def fitParaboloid(coeffs, x, y, z, w):
+    """
+    Computes the residuals between a paraboloid and a vector in 3D.
+    coeffs[0] is the focal length, 
+    coeffs[1] the position of the vertex in the x coordinate, 
+    coeffs[2] the position of the vertex in the y coordinate,
+    coeffs[3] the position of the vertex in the z coordinate,
+    coeffs[4] a rotation around the x axis in radians,
+    coeffs[5] a rotation around the y axis in radians.
     """
     
     L = np.array([x.flatten(), y.flatten(), z.flatten()])
@@ -119,161 +61,30 @@ def fitParabola(coeffs, x, y, z):
     yr = PrimeY(pry, L)
     zr = PrimeZ(pry, L)
     
-    zdata = parabola(xr, yr, coeffs[0], coeffs[1], coeffs[2], coeffs[3])
+    zdata = paraboloid(xr, yr, coeffs[0], coeffs[1], coeffs[2], coeffs[3])
 
-    return zr - zdata
-
-
-def newParabola(xdata, ydata, zdata, focus, v1x, v1y, v2, rotX, rotY):
-
-    L = np.array([xdata.flatten(), ydata.flatten(), zdata.flatten()])
-    pry = (rotX, rotY, 0.)
-    xr = PrimeX(pry, L)
-    yr = PrimeY(pry, L)
-    #zr = PrimeZ(pry, L)
-    
-    new_zdata = parabola(xr, yr, focus, v1x, v1y, v2)
-
-    return xr, yr, new_zdata
+    return (zr - zdata)*w
 
 
-def fun(coeffs, xdata, ydata):
-    focus = coeffs[0]
-    v1x = coeffs[1]
-    v1y = coeffs[2]
-    v2 = coeffs[3]
-    return parabola(xdata, ydata, focus, v1x, v1y, v2)
+def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=fitParaboloid, max_nfev=10000, ftol=1e-12, xtol=1e-12, verbose=False):
+    """
+    Fits a paraboloid to a scan of the primary reflector.
 
-
-def errfun(coeffs, xdata, ydata, zdata):
-    return fun(coeffs, xdata, ydata) - zdata
-
-
-def findTheBumps():
-
-    fn = "data/BumpScan.csv.smoothed.sig.001.all.npz"
-    bumpScan = fitLeicaScan(fn)
-    fn = "data/Baseline_STA10_HIGH_METERS.csv.smoothed.sig.001.all.npz"
-    refScan = fitLeicaScan(fn)
-
-    bumps = bumpScan - refScan
-
-    bumpDiff = np.log(np.abs(bumps))
-    imagePlot(bumpDiff, "Bumps!")
-
-    return bumps
-
-
-def fitLeicaScan(fn,
-                 numpy=True,
-                 N=None,
-                 rFilter=False,
-                 xyz=None,
-                 inSpherical=False,
-                 weights=None,
-                 plot=True,
-                 guess=None):
-
-    # TBF: ignore weights for now!
-
-    if N is None:
-        N = 512
-
-    # load the data: it might be two different formats, depending
-    # on whether it was done in python (numpy) or with GPUs
-    if xyz is None:
-        orgData, cleanData = loadLeicaData(fn, n=N, numpy=numpy)
-        x0, y0, z0 = orgData
-        x, y, z = cleanData
-        if inSpherical:
-            # we need to convert this data to cartesian:
-            # x0, y0, z0 == r, az, el
-            print("converting inputs from spherical to cartesian")
-            x0, y0, z0 = sph2cart(y0, z0, x0)
-            x, y, z = sph2cart(y, z, x)
-
-    else:
-        x0, y0, z0 = xyz
-        print("passed in data of shape", x0.shape, y0.shape, z0.shape)
-        x = x0[np.logical_not(np.isnan(x0))];
-        y = y0[np.logical_not(np.isnan(y0))];
-        z = z0[np.logical_not(np.isnan(z0))];
-
-
-    if plot:
-        scatter3dPlot(x, y, z, "Sample of Leica Data", sample=10.0)
-
-    print("x range:", np.min(x), np.max(x))
-    print("y range:", np.min(y), np.max(y))
-
-
-    if np.all(np.isnan(x)) or np.all(np.isnan(y)) or np.all(np.isnan(z)):
-        print("fitLeicaScan cannot work on data with all NANs")
-        return None, None, None
-
-    if rFilter:
-        xOffset = -8.0
-        yOffset = 50.0
-        radius = 47.
-        x, y, z = radialFilter(x, y, z, xOffset, yOffset, radius)
-        if plot:
-            scatter3dPlot(x, y, z, "Leica Data Radial Filtered")
-
-    # assemble initial guess
-    if guess is None:
-        f = 60.
-        v1x = v1y = v2 = 0
-        xTheta = 0. #-np.pi / 2.
-        yTheta = 0.
-        guess = [f, v1x, v1y, v2, 0., 0.]
-
-    if weights is not None:
-        print("Weights: ", weights.shape, weights)
-        print("z0: ", z0.shape, z0)
-        # asure correct dimensions
-        z0.shape = (N, N)
-        weights.shape = (N, N)
-        print("filtering out nans in xyz data from weights")
-        # this will flatten the weights
-        weights = weights[np.logical_not(np.isnan(z0))];
-        print("replacing nans in weights by zeros")
-        weights[np.isnan(weights)] = 0.
-
-    print("fitLeicaData xyz.shape: ", x.shape, y.shape, z.shape)
-
-    r = fitLeicaData(x, y, z, guess, weights=weights, verbose=True)
-
-    # plot fitted data
-    c = r.x
-    print("cleaned data fitted with coefficients: ", c)
-    newX, newY, newZ = newParabola(x0, y0, z0, c[0], c[1], c[2], c[3], c[4], c[5])
-    newX.shape = newY.shape = newZ.shape = (N, N)
-    if plot:
-        surface3dPlot(newX, newY, newZ, "Fitted Data")
-
-    # Rotate original data using fitted coefficients.
-    xThetaFit = r.x[4]
-    yThetaFit = r.x[5]
-    xrr, yrr, zrr = shiftRotateXYZ(x0, y0, z0, [0, 0, 0, xThetaFit, yThetaFit, 0]) # Slightly faster.
-    #xrr, yrr, zrr = rotateData(x0, y0, z0, xThetaFit, yThetaFit)
-    # also apply the translations
-    #xrr -= c[1]
-    #yrr -= c[2]
-    #zrr -= c[3]
-    xrr.shape = yrr.shape = zrr.shape = (N, N)
-    if plot:
-        surface3dPlot(xrr, yrr, zrr, "Original Data (Rotated)")
-
-    # return difference between fitted data and rotated original data
-    diff = zrr - newZ
-    diff2 = np.log(np.abs(np.diff(diff)))
-    if plot:
-        imagePlot(diff2, "Fit - Org (Rotated)")
-
-    return diff, newX, newY
-
-
-def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfev=10000, ftol=1e-12, xtol=1e-12, verbose=False):
+    Parameters
+    ----------
+    x : array
+        Array with the x coordinates.
+    y : array
+        Array with the y coordinates.
+    z : array
+        Array with the z coordinates.
+    guess : list
+        List with the initial guess for the least squares fit.
+        [focal length, x coordinate of the vertex, 
+        y coordinate of the vertex, z coordinate of the vertex, 
+        rotation around x, rotation around y]
+        The rotations are in radians.
+    """
 
     if verbose:
         print("fit leica boss!")
@@ -288,29 +99,18 @@ def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfe
 
     # Robust fit: weights outliers outside of f_scale less
     loss = "soft_l1"
-    # 0.05 is a good educated guess from Andrew
-    # f_scale = .05
-    # f_scale = .01
     f_scale = 1.0
     if verbose:
         print("fitLeicaData with robust, soft_l1, f_scale %f" % f_scale)
 
-    if method is None:
-        if weights is None:
-            if verbose:
-                print ("Using method fitParabola")
+    if weights is None:
+        weights = np.ones(len(x.flatten()), dtype=np.float)
 
-            method = fitParabola
-            args = (x.flatten(), y.flatten(), z.flatten())
-        else:
-            if verbose:
-                print("Using weights for fit!")
-            method = fitParabolaWithWeights
-            args = (x.flatten(), y.flatten(), z.flatten(), weights.flatten())
-    else:
-        if verbose:
-            print("Using user supplied method for fit.")
-        args = (x.flatten(), y.flatten(), z.flatten())
+    args = (x.flatten(), y.flatten(), z.flatten(), weights.flatten())
+
+    if verbose:
+        print("Using this method for the fit:")
+        print(method)
 
     r = least_squares(method,
                       guess,
@@ -321,13 +121,14 @@ def fitLeicaData(x, y, z, guess, bounds=None, weights=None, method=None, max_nfe
                       f_scale=f_scale,
                       ftol=ftol,
                       xtol=xtol)
+    
     return r
 
 
 def loadLeicaDataFromNumpy(fn):
     """
-    Loads Leica data stored by numpy's save at 
-    the end of lassiAnalysis.processLeicaData.
+    Loads Leica data stored by `numpy.save` at 
+    the end of `lassiAnalysis.processLeicaData`.
     """
     
     data = np.load(fn)
@@ -351,7 +152,7 @@ def loadSmoothedFits(fn):
 
 def loadLeicaDataFromGpus(fn):
     """
-    Crudely loads x, y, z csv files into numpy arrays
+    Crudely loads (x,y,z) csv files into numpy arrays.
     """
 
     # kluge:
@@ -381,7 +182,7 @@ def loadLeicaDataFromGpus(fn):
 
 def loadLeicaData(fn, n=None, numpy=True):
     """
-    Loads data processed by lassiAnalysis.processLeicaScan.
+    Loads data processed by `lassiAnalysis.processLeicaScan`.
     """
 
     if numpy:
@@ -403,333 +204,28 @@ def loadLeicaData(fn, n=None, numpy=True):
     return (x, y, z), (xxn, yyn, zzn)
 
 
-def radialReplace(x, y, z, xOffset, yOffset, radius, replacement):
-    "Replace z values outside of given radius with a new value"
-
-    cnt = 0
-    for i in range(len(x)):
-        r = np.sqrt((x[i]-xOffset)**2 + (y[i]-yOffset)**2)
-        if r > radius:
-            cnt += 1
-            z[i] = replacement
-
-    print("radialReplace replaced %d points with %s" % (cnt, replacement))
-    # only z gets changed
-    return z
-
-
-def fitNoRot():
-
-    n = 20
-    n2 = 50
-    x = np.linspace(-n, n)
-    y = np.linspace(-n, n)
-
-    x2d, y2d = np.meshgrid(x, y)
-
-    focus = 6.
-    v1x = 5.
-    v1y = 4.
-    v2 = 3.
-    fakedata = parabola(x2d, y2d, focus, v1x, v1y, v2) + np.random.rand(n2, n2)
-
-    #coeffs = [focus, v1x, v1y, v2]
-    coeffs = [1., 0., 0., 0.]
-    r = least_squares(errfun, coeffs, args=(x2d.flatten(), y2d.flatten(), fakedata.flatten()))
-    print(r)
-
-
-def fun2(coeffs, xdata, ydata):
-    focus = coeffs[0]
-    v1x = coeffs[1]
-    v1y = coeffs[2]
-    v2 = coeffs[3]
-    aroundX = coeffs[4]
-    aroundY = coeffs[5]
-    # rotate the data
-    # then call the parabola 
-    #xrot, yrot, z = parabolaRot(xdata, ydata, focus, v1x, v1y, v2, aroundX, aroundY)
-    return z
-
-
-def errfun2(coeffs, xdata, ydata, zdata):
-    # rotate zdatar using given coeffs
-    zdatar = zdata
-    return fun2(coeffs, xdata, ydata) - zdata
-
-
-def fun3(coeffs, xdata, ydata, zdata):
-    focus = coeffs[0]
-    v1x = coeffs[1]
-    v1y = coeffs[2]
-    v2 = coeffs[3]
-    aroundX = coeffs[4]
-    aroundY = coeffs[5]
-
-    # rotate the data
-    L = np.array([xdata.flatten(), ydata.flatten(), zdata.flatten()])
-    pry = (aroundX, aroundY, 0.)
-    xr = PrimeX(pry, L)
-    yr = PrimeY(pry, L)
-    zr = PrimeZ(pry, L)
-
-    # now find parabola
-    z3 = parabola(xr, yr, focus, v1x, v1y, v2)
-    z4 = zr - z3
-
-    return z4
-
-
-def fitRot():
-
-    
-    n = 20
-    n2 = 50
-    x = np.linspace(-n, n)
-    y = np.linspace(-n, n)
-
-    x2d, y2d = np.meshgrid(x, y)
-
-    focus = 1.
-    v1x = 0.
-    v1y = 0.
-    v2 = 0.
-    #rotX = np.pi/2. 
-    rotX = np.pi
-    rotY = 0. #np.pi/2.
-    #rotZ = -np.pi/4.
-    actuals = [focus, v1x, v1y, v2, rotX, rotY]
-    xrot, yrot, fakedata = parabolaRot(x2d, y2d, focus, v1x, v1y, v2, rotX, rotY)
-    fakedata.shape = xrot.shape = yrot.shape = (n2, n2)
-    fakedata = fakedata + np.random.rand(n2, n2)
-
-    #coeffs = [focus, v1x, v1y, v2, rotX, rotY]
-    #coeffs = [5., 4., 3., 2., 0., 0.]
-    coeffs = [1.0, 0., 0., 0., np.pi, 0.0]
-    #r = least_squares(errfun2,
-    pi2 = 2*np.pi
-    inf = np.inf
-    infb = (-inf, inf)
-    #bounds = [infb, infb, infb, infb, (-pi2, pi2), (-pi2, pi2)]
-    b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
-    b2 = [inf, inf, inf, inf, pi2, pi2]
-    bounds = (b1, b2)
-    r = least_squares(fun3,
-                      coeffs,
-                      args=(x2d.flatten(), y2d.flatten(), fakedata.flatten()),
-                      #args=(xrot.flatten(), yrot.flatten(), fakedata.flatten()),
-                      bounds=bounds,
-                      max_nfev=1e4,
-                      ftol=1e-10,
-                      xtol=1e-10)
-    print(r)
-    print("real:", focus, v1x, v1y, v2, rotX, rotY)
-    print("guessed:", coeffs)
-    print("vs:", r.x)
-    #print "vs:", r[0]
-    c = r.x
-
-    z4 = fun3(c, x2d.flatten(), y2d.flatten(), fakedata.flatten())
-
-    xrot, yrot, fittedData = parabolaRot(x2d.flatten(), y2d.flatten(), c[0], c[1], c[2], c[3], c[4], c[5])
-    #xrot, yrot, fittedData = parabolaRot(xrot.flatten(), yrot.flatten(), c[0], c[1], c[2], c[3], c[4], c[5])
-    fittedData.shape = xrot.shape = yrot.shape = (n2, n2)
-
-
-    residuals = fittedData - fakedata
-    print("max residual: ", np.max(residuals))
-    print("mean residual: ", np.mean(residuals))
-
-    return x2d, y2d, xrot, yrot, fakedata, fittedData, actuals, coeffs, c, z4
-
-
-def funFinal(coeffs, xdata, ydata):
-    "function for forming a parabola - no rotations"
-    f = coeffs[0]
-    v1x = coeffs[1]
-    v1y = coeffs[2]
-    v2 = coeffs[3]
-    # optional Heavy Side
-    hr = 30.
-    return parabola(xdata, ydata, f, v1x, v1y, v2) 
-
-
-def errfunFinal(coeffs, xdata, ydata, zdata):
-    "Error function handles rotation properly"
-    
-    # rotate the original data first!
-    xr, yr, zr = rotateXY(xdata, ydata, zdata, coeffs[4], coeffs[5])
-    z = funFinal(coeffs, xr, yr)
-    return zr - z
-
-
-def simData(xs2d, ys2d, f, v1x, v1y, v2, xRot, yRot):
-    "Returns a rotated parabola based off inputs"
-
-    zs2d = parabola(xs2d, ys2d, f, v1x, v1y, v2)
-    xdata, ydata, zdata = rotateXY(xs2d, ys2d, zs2d, xRot, yRot)
-    return xdata, ydata, zdata
-
-
-def lsqFit(xdata, ydata, zdata, coeffs):
-    "least squares fit"
-
-    # bound the fit
-    inf = np.inf
-    pi2 = 2*np.pi
-    b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
-    b2 = [inf, inf, inf, inf, pi2, pi2]
-    bounds = (b1, b2)
-
-    r = least_squares(errfunFinal, coeffs, args=(xdata.flatten(), ydata.flatten(), zdata.flatten()),
-                          bounds=bounds,
-                          method='trf',
-                          max_nfev=100000,
-                          gtol=1e-15,
-                          ftol=1e-15,
-                          xtol=1e-15)
-    return r 
-
-
-def tryFit(answer, guess=None):
-    "simulate a parabola, and see if we can try and fit it."
-
-    f, v1x, v1y, v2, xRot, yRot = answer
-
-    # angles!
-    expAnswer = [f, v1x, v1y, v2, -xRot, -yRot]
-
-    ##########################
-    #     Create  Data       #
-    ##########################
-    xs = np.linspace(-20, 20)
-    ys = np.linspace(-20, 20)
-    
-    xs2d, ys2d = np.meshgrid(xs, ys)
-    
-    #answer = [f, v1x, v1y, v2, -xRot, -yRot]
-
-    xdata, ydata, zdata = simData(xs2d, ys2d, f, v1x, v1y, v2, xRot, yRot)
-
-    # did we supply a guess?
-    if guess is None:
-        # then cheat!
-        coeffs = [f, v1x, v1y, v2, -xRot, -yRot]
-    else:
-        coeffs = guess
-
-    ##########################
-    #     Create  Fit        #
-    ##########################
-    # bound the fitting
-    #inf = np.inf
-    #pi2 = 2*np.pi
-    #b1 = [-inf, -inf, -inf, -inf, -pi2, -pi2]
-    #b2 = [inf, inf, inf, inf, pi2, pi2]
-    #bounds = (b1, b2)
-
-    #r = least_squares(errfunFinal, coeffs, args=(xdata.flatten(), ydata.flatten(), zdata.flatten()),
-    #                      bounds=bounds,
-    #                      method='trf',
-    #                      max_nfev=100000,
-    #                      gtol=1e-15,
-    #                      ftol=1e-15,
-    #                      xtol=1e-15)
-    r = lsqFit(xdata, ydata, zdata, coeffs)
-    return expAnswer, coeffs, r.x, np.abs(expAnswer - r.x)
-
-
-def tryFits():
-    "A sequence of manual tests"
-
-    f = 5.0
-    v1x = 0.0
-    v1y = 0.0
-    v2 = 10.0
-    xRot = np.pi/2
-    yRot = 0. 
-    data = [f, v1x, v1y, v2, xRot, yRot]
-
-    # pass
-    answer, guess, fit, diff = tryFit(data)
-    checkFit(answer, guess, fit, diff)
-
-    # pass
-    data[5] = 0.1
-    #answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, 0.1)
-    answer, guess, fit, diff = tryFit(data)
-    checkFit(answer, guess, fit, diff)
-
-    # pass
-    data[5] = np.pi/10 
-    #answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, np.pi/10)
-    answer, guess, fit, diff = tryFit(data)
-    checkFit(answer, guess, fit, diff)
-
-    # fail!
-    data[5] = np.pi/2 
-    #answer, guess, fit, diff = testFit(f, v1x, v1y, v2, xRot, np.pi/2)
-    answer, guess, fit, diff = tryFit(data)
-    checkFit(answer, guess, fit, diff)
-
-    # pass!
-    data[4] = np.pi/10 
-    data[5] = np.pi/10 
-    #answer, guess, fit, diff = testFit(f, v1x, v1y, v2, np.pi/10, np.pi/10)
-    answer, guess, fit, diff = tryFit(data)
-    checkFit(answer, guess, fit, diff)
-
-    # now see how far off the guesses can be
-    # pass!
-    guess = data
-    answer, guess, fit, diff = tryFit(data, guess)
-    checkFit(answer, guess, fit, diff)
-
-    guess = [1., 0., 0., 0., 0., 0.]
-    answer, guess, fit, diff = tryFit(data, guess)
-    checkFit(answer, guess, fit, diff)
-
-
-def checkFit(answer, guess, fit, diff):
-    tol = 1e-1
-    for i, d in enumerate(diff):
-        #print i, answer[i], fit[i]
-        #assert d < tol
-        if d > tol:
-            print("fit failed with diff: ", answer, diff)
-            return False
-    print("fit passed with diff: ", answer, diff)
-    return True
-
-
-def radialFilter(x, y, z, xOffset, yOffset, radius):
-    "returns only those points within the radius"
-    xr = []
-    yr = []
-    zr = []
-    for i in range(len(x)):
-        r = np.sqrt((x[i]-xOffset)**2 + (y[i]-yOffset)**2)
-        if r < radius:
-            xr.append(x[i])
-            yr.append(y[i])
-            zr.append(z[i])
-    xr = np.array(xr)        
-    yr = np.array(yr)        
-    zr = np.array(zr)        
-    return xr, yr, zr
-
-
-def radialMask(x, y, z, xOffset, yOffset, radius):
-    r = np.sqrt((x-xOffset)**2 + (y-yOffset)**2)
-    x[r > radius] = np.nan
-    y[r > radius] = np.nan
-    z[r > radius] = np.nan
-    return x, y, z
-
-
-def costParabola(coef, x, y, z):
+def costParaboloid(coef, x, y, z):
     """
-    Cost function for a parabola.
+    Cost function for a paraboloid.
+
+
+    Parameters
+    ----------
+    coef : list
+        List with the coefficients describing a shifted rotated paraboloid.
+        [focal length, shift in x, shift in y, shift in z, rotation around x, rotation around y]
+    x : array
+        1-d array with the x coordinates where to evaluate the parabolid.
+    y : array
+        1-d array with the y coordinates where to evaluate the parabolid.
+    z : array
+        1-d array with the z coordinates of the data to be compared with the paraboloid.
+
+    Returns
+    -------
+    result : array
+        1-d array with the difference between the paraboloid 
+        described by coefs and the z coordinates.
     """
      
     fl = coef[0]
@@ -756,9 +252,26 @@ def costParabola(coef, x, y, z):
     return fp - zp
 
 
-def jacParabola(coef, x, y, z):
+def jacParaboloid(coef, x, y, z):
     """
-    Jacobian for a parabola.
+    Jacobian for a shifted rotated paraboloid.
+
+    Parameters
+    ----------
+    coef : list
+        List with the coefficients describing a shifted rotated paraboloid.
+        [focal length, shift in x, shift in y, shift in z, rotation around x, rotation around y]
+    x : array
+        1-d array with the x coordinates where to evaluate the parabolid.
+    y : array
+        1-d array with the y coordinates where to evaluate the parabolid.
+    z : array
+        1-d array with the z coordinates of the data to be compared with the paraboloid.
+
+    Returns
+    -------
+    result : array
+        6xN array with the Jacobian.
     """
     
     fl = coef[0]
@@ -806,9 +319,31 @@ def jacParabola(coef, x, y, z):
     return np.array([dGdfl, dGdx0, dGdy0, dGdz0, dGdrx, dGdry]).T
 
 
-def costParabolaZ(coef, x, y, z):
+def costParaboloidZ(coef, x, y, z):
     """
-    Cost function for a parabola with Z4, Z5 and Z6 deformations.
+    Cost function for a shifted rotated paraboloid with Z4, Z5 and Z6 deformations.
+    It assumes that the projection of the paraboloid into the XY plane is a circle
+    of radius 50 m.
+
+    Parameters
+    ----------
+    coef : list
+        List with the coefficients describing a shifted rotated paraboloid.
+        [focal length, shift in x, shift in y, shift in z, 
+         rotation around x, rotation around y, C4, C5, C6, 
+         center of the deformation in x, center of the deformation in y]
+    x : array
+        1-d array with the x coordinates where to evaluate the parabolid.
+    y : array
+        1-d array with the y coordinates where to evaluate the parabolid.
+    z : array
+        1-d array with the z coordinates of the data to be compared with the paraboloid.
+
+    Returns
+    -------
+    result : array
+        1-d array with the difference between the paraboloid 
+        described by coefs and the z coordinates.
     """
     
     xm = 50
@@ -853,11 +388,39 @@ def costParabolaZ(coef, x, y, z):
     return fp + z4 + z5 + z6 - zp
 
 
-def jacParabolaZ(coef, x, y, z):
+def jacParaboloidZ(coef, x, y, z):
     """
-    Jacobian for a parabola with Z4, Z5 and Z6 deformations.
+    Jacobian for a shifted rotated paraboloid with Z4, Z5 and Z6 deformations.
+    It assumes that the projection of the paraboloid into the XY plane is a circle
+    of radius 50 m.
+
+    Parameters
+    ----------
+    coef : list
+        List with the coefficients describing a shifted rotated paraboloid.
+        [focal length, shift in x, shift in y, shift in z, 
+         rotation around x, rotation around y, C4, C5, C6, 
+         center of the deformation in x, center of the deformation in y]
+    x : array
+        1-d array with the x coordinates where to evaluate the parabolid.
+    y : array
+        1-d array with the y coordinates where to evaluate the parabolid.
+    z : array
+        1-d array with the z coordinates of the data to be compared with the paraboloid.
+
+    Returns
+    -------
+    result : array
+        11xN array with the Jacobian.
+
+    See Also
+    --------
+    costParaboloidZ : Compute the cost function of the deformed paraboloid.
+    costParaboloid : Compute the cost function of an ideal paraboloid.
+    jacParaboloid : Compute the Jacobian of an ideal paraboloid.
+
     """
-    
+
     xm = 50.
     ym = 100.
     
@@ -873,7 +436,7 @@ def jacParabolaZ(coef, x, y, z):
     #c9 = coef[9]
     xc = coef[9]
     yc = coef[10]
-    
+   
     crx = np.cos(rx)
     srx = np.sin(rx)
     cry = np.cos(ry)
@@ -941,10 +504,64 @@ def jacParabolaZ(coef, x, y, z):
     return np.array([dGdfl, dGdx0, dGdy0, dGdz0, dGdrx, dGdry, dGdc4, dGdc5, dGdc6, dGdxc, dGdyc]).T
 
 
-def parabolaFit(x, y, z, guess, method=costParabola, jac=jacParabola, 
-                bounds=None,  max_nfev=10000, ftol=1e-12, xtol=1e-12, gtol=1e-12, 
-                loss="soft_l1", f_scale=1e-5, tr_solver=None, x_scale=None, verbose=False):
+def paraboloidFitter(x, y, z, guess, method=costParaboloid, jac=jacParaboloid, 
+                     bounds=None,  max_nfev=10000, ftol=1e-12, xtol=1e-12, gtol=1e-12, 
+                     loss="soft_l1", f_scale=1e-5, tr_solver=None, x_scale=None, verbose=False):
+    """
+    Fits a paraboloid to the (x,y,z) data. This is a wrapper around `scipy.optimize.least_squares`.
+
+    Parameters
+    ----------
+    x : array
+        1-d array with the x coordinates where to evaluate the parabolid.
+    y : array
+        1-d array with the y coordinates where to evaluate the parabolid.
+    z : array
+        1-d array with the z coordinates of the data to be compared with the paraboloid.
+    guess : list
+        Starting values for the least-squares minimization.
+        If using `method` = `costParaboloid` then `guess` = [focal length, 
+        shift in x, shift in y, shift in z, rotation around x, rotation around y].
+    method : callable
+        Method used to compute the vector of residuals.
+    jac : {'2-point', '3-point', callable}, optional
+        Method used to compute the Jacobian matrix. See `scipy.optimize.least_squares`
+        for details.
+    bounds : 2-tuple of array_like, optional
+        Lower and upper bounds on independent variables. See `scipy.optimize.least_squares`
+        for details.
+    max_nfev : None or int, optional
+        Maximum number of function evaluations before the termination. See 
+        `scipy.optimize.least_squares` for details.
+    ftol : float or None, optional
+        Tolerance for termination by the change of the cost function. See 
+        `scipy.optimize.least_squares` for details.
+    xtol : float or None, optional
+        Tolerance for termination by the change of the independent variables.
+        See `scipy.optimize.least_squares` for details.
+    gtol : float or None, optional
+        Tolerance for termination by the norm of the gradient.
+        See `scipy.optimize.least_squares` for details.
+    loss : str or callable, optional
+        Determines the loss function. See `scipy.optimize.least_squares` for details.
+    f_scale : float, optional
+        Value of soft margin between inlier and outlier residuals.
+        See `scipy.optimize.least_squares` for details.
+    tr_solver : {None, 'exact', 'lsmr'}, optional
+        Method for solving trust-region subproblems.
+        See `scipy.optimize.least_squares` for details.
+    x_scale : array_like or 'jac', optional
+        Characteristic scale of each variable.
+        See `scipy.optimize.least_squares` for details.
+    verbose : bool, optional
+        Print additional information during method call. Defaults to False.
+
+    Returns
+    -------
+    `OptimizeResult` with the field defined in `scipy.optimize.least_squares`.
     
+    """
+
     # Set boundaries for the fit parameters.
     if bounds is None:
         inf = np.inf
@@ -963,6 +580,7 @@ def parabolaFit(x, y, z, guess, method=costParabola, jac=jacParabola,
         bounds = (b1, b2)
     
     if verbose:
+        print("Using bounds:")
         print(bounds)
     
     if x_scale is None:
@@ -974,9 +592,10 @@ def parabolaFit(x, y, z, guess, method=costParabola, jac=jacParabola,
         else:
             x_scale = [1e-3, xso, xso, xso, xsr, xsr]
     
-    if jac == None:
-        jac = "3-point"
-    
+    if verbose:
+        print("Using x_scale:")
+        print(x_scale)
+
     args = (x.flatten(), y.flatten(), z.flatten())
     
     r = least_squares(method, guess, jac,
@@ -993,14 +612,105 @@ def parabolaFit(x, y, z, guess, method=costParabola, jac=jacParabola,
     return r
 
 
-def main():
-    #tryFits()
-    fn = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing/randomSampleScan10.csv"
-    x, y, z = loadLeicaDataFromGpus(fn)
-    print(x, x[np.logical_not(np.isnan(x))])
-    print(y)
-    print(z)
+def subtractParaboloid(x, y, z, guess=[60, 0, 0, -50, 0, 0, 0, 0, 0, 0, 50],
+                       method=costParaboloidZ, jac=jacParaboloidZ, tr_solver=None,
+                       bounds=None, max_nfev=100000, ftol=1e-12, xtol=1e-15, 
+                       f_scale=1e-2, verbose=False):
+    """
+    Fits a paraboloid to the data and subtracts it.
+    
+    Parameters
+    ----------
+    x : array
+        1-d array with the x coordinates.
+    y : array
+        1-d array with the y coordinates.
+    z : array
+        1-d array with the z coordinates.
+    guess : list, optional
+        Initial guess for the least-squares problem.
+    method : callable, optional
+        Cost funtion for the least-squares problem.
+    jac : callable, optional
+        Function to compute the Jacobian.
+    tr_solver : {'',None}, optional
+    bounds : tuple, optional
+        Bounds for the parameters.
+    max_nfev : int, optional
+    ftol : float, optional
+    xtol : float, optional
+    f_scale : float, optional
+    verbose : bool, optional
+        Verbose output?
+
+    Returns
+    -------
+    tuple
+        Residuals of the paraboloid fit and the 
+        results for the best-fit paraboloid.
+    """
+
+    fit = paraboloidFit(x, y, z, guess, method=method, jac=jac, 
+                        bounds=bounds, tr_solver=tr_solver, 
+                        max_nfev=max_nfev, ftol=ftol, xtol=xtol,
+                        f_scale=f_scale, verbose=verbose)
+
+    if verbose:
+        print("Results from the fit:")
+        print(fit)
+
+    # Align the scan with the paraboloid.    
+    xr, yr, zr = align2Paraboloid(x, y, z, fit.x)
+    # Subtract the paraboloid.
+    diff = zr - paraboloid(xr, yr, fit.x[0])
+
+    return diff, fit
 
 
-if __name__=='__main__':
-    main()
+def paraboloidFit(x, y, z, guess=[60, 0, 0, -50, 0, 0, 0, 0, 0, 0, 50],
+                  method=costParaboloidZ, jac=jacParaboloidZ, tr_solver=None,
+                  bounds=None, max_nfev=100000, ftol=1e-12, xtol=1e-15,
+                  f_scale=1e-2, verbose=False):
+    """
+    Parameters
+    ----------
+    x : array
+        1-d array with the x coordinates.
+    y : array
+        1-d array with the y coordinates.
+    z : array
+        1-d array with the z coordinates.
+    guess : list, optional
+        Initial guess for the least-squares problem.
+    method : callable, optional
+        Cost funtion for the least-squares problem.
+    jac : callable, optional
+        Function to compute the Jacobian.
+    tr_solver : {'',None}, optional
+    bounds : tuple, optional
+        Bounds for the parameters.
+    max_nfev : int, optional
+    ftol : float, optional
+    xtol : float, optional
+    f_scale : float, optional
+    verbose : bool, optional
+        Verbose output?
+
+    Returns
+    -------
+    tuple
+        Results for the best-fit paraboloid.
+    """
+
+    zm = np.ma.masked_invalid(z)
+    xm = np.ma.masked_where(zm.mask, x)
+    ym = np.ma.masked_where(zm.mask, y)
+
+    fit = paraboloidFitter(xm.compressed(), ym.compressed(), zm.compressed(),
+                           guess, method=method, jac=jac, tr_solver=tr_solver,
+                           bounds=bounds, max_nfev=max_nfev, ftol=ftol, xtol=xtol,
+                           f_scale=f_scale, verbose=verbose)
+
+    return fit
+
+

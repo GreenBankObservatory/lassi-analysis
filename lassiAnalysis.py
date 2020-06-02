@@ -8,54 +8,26 @@ import time
 import numpy as np
 from copy import copy
 from shutil import copyfile
-# import matplotlib
-# matplotlib.use('agg')
 
 from astropy.stats import sigma_clip
 
 import settings
 import lassiTestSettings as usettings
 
-from grid import regridXYZMasked
-from rotate import shiftRotateXYZ
-from weightSmooth import weightSmooth
+from grid import regridXYZ, regridXYZMasked
+from rotate import shiftRotateXYZ, align2Paraboloid
 from SmoothedFITS import SmoothedFITS
-from zernikies import getZernikeCoeffs
-from simulateSignal import addCenterBump, gaussian
+from zernikies import getZernikeCoeffs, getZernikeCoeffsCycle
 from plotting import sampleXYZData, scatter3dPlot, surfacePlot
+from utils.utils import midPoint, gridLimits, polyFitRANSAC
+from processPTX import processNewPTX, processNewPTXData, getRawXYZ
+from parabolas import loadLeicaData, paraboloid, fitLeicaData, subtractParaboloid, paraboloidFit
 from gpus import smoothGPUs, smoothXYZGpu, loadLeicaDataFromGpus,  smoothGPUParallel, loadParallelGPUFiles
-from utils.utils import sph2cart, cart2sph, log, difflog, midPoint, gridLimits, splitXYZ
-from processPTX import processPTX, processNewPTX, processNewPTXData, aggregateXYZ, getRawXYZ
-from parabolas import fitLeicaScan, imagePlot, surface3dPlot, radialReplace, loadLeicaData, fitLeicaData, \
-                      newParabola, parabola
-
 
 # where is the code we'll be running?
 GPU_PATH = settings.GPU_PATH
 # where should we save the results from the GPU smoothing?
 GPU_OUTPUT_PATH = settings.GPU_OUTPUT_PATH
-
-
-def tryFit():
-
-    N = 512
-    
-    # path = "/home/sandboxes/pmargani/LASSI/gpus/versions/devenv-hpc1"
-    path = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
-    
-    # file = "Scan-9_5100x5028_20190327_1145_ReIoNo_ReMxNo_ColorNo_.ptx.csv"
-    file = "452_2019-10-11_04:26:55.ptx.csv"
-    x, y, z = loadParallelGPUFiles(file, [path])
-
-    diff, x, y = fitLeicaScan(None, 
-                              xyz=(x, y, z),
-                              N=N,
-                              rFilter=False,
-                              weights=None)
-
-   
-    xr, yr, zr = regridXYZMasked(x, y, diff, N)
-    print("done")
 
 
 def tryProcessLeicaDataStream():
@@ -181,65 +153,45 @@ def processLeicaDataStream(x,
     # and save it off for use in GFM later
 
 
-def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36, pFitGuess=[60., 0., 0., -50., 0., 0.], rMaskRadius=49.):
+def extractZernikesLeicaScanPair(refScanFile, sigScanFile, n=512, nZern=36):
     """
-    Takes two smoothed Leica scans and extracts Zernike coefficients from their difference, reference - signal.
+    Takes two smoothed Leica scans and extracts Zernike coefficients from their difference.
 
-    :param refScanFile: File with the smoothed reference scan. <scan_name>.ptx.csv
-    :param sigScanFile: File with the smoothed signal scan. <scan_name>.ptx.csv
-    :param n: Number of elements per side in the smoothed data.
-    :param nZern: Number of Zernike polynomials to include in the fit. Can be up to 120.
-    :param pFitGuess: Initial guess for ther parabola fit.
-    :param rMaskRadius: Radius of the radial mask.
+    Parameters
+    ----------
+    refScanFile : str
+        File with the smoothed reference scan. <scan_name>.ptx.csv
+    sigScanFile : str
+        File with the smoothed signal scan. <scan_name>.ptx.csv
+    n : int, optional
+        Number of elements per side in the smoothed data.
+    nZern : int, optional
+        Number of Zernike polynomials to include in the fit. Can be up to 120.
     """
-
-    if rMaskRadius <= 0.:
-        radialMask = False
-    else:
-        radialMask = True
 
     print('Masking file: {}'.format(refScanFile))
-    ref_data = maskLeicaData(refScanFile, n=n, guess=pFitGuess, radialMask=radialMask, maskRadius=rMaskRadius)
-
-    # Extract the data we will use.
-    xrr, yrr, zrr = ref_data['rotated']
-    cr = ref_data['parabolaFitCoeffs']
-
-    print('Masking file: {}'.format(sigScanFile))
-    sig_data = maskLeicaData(sigScanFile, n=n, guess=pFitGuess, radialMask=radialMask, maskRadius=rMaskRadius)
+    xra, yra, zra = maskScan(refScanFile, n=n)
     
-    xs, ys, zs = sig_data['origMasked']
-     
-    # Rotate the signal scan.
-    xsr, ysr, zsr = shiftRotateXYZ(xs, ys, zs, [0, 0, 0, cr[4], cr[5], 0])
-    xsr.shape = ysr.shape = zsr.shape = (n,n)
-    zsr = np.ma.masked_where(zs.mask, zsr)
+    print('Masking file: {}'.format(sigScanFile))
+    xsa, ysa, zsa = maskScan(sigScanFile, n=n)    
 
-    # The data has been rotated, but we haven't applied the shifts.
-    xrr = xrr - cr[1]
-    yrr = yrr - cr[2]
-    zrr = zrr - cr[3]
-    xsr = xsr - cr[1]
-    ysr = ysr - cr[2]
-    zsr = zsr - cr[3]
-
+    
     # Find the grid limits for the reference and signal scans.
-    xmin, xmax = gridLimits(xrr, xsr)
-    ymin, ymax = gridLimits(yrr, ysr)
-
+    xmin, xmax = gridLimits(xsa, xra)
+    ymin, ymax = gridLimits(ysa, yra)
     print("Regridding scans.")
-    xrrg, yrrg, zrrg = regridXYZMasked(xrr, yrr, zrr, n=n, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
-    xsrg, ysrg, zsrg = regridXYZMasked(xsr, ysr, zsr, n=n, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
+    xrag, yrag, zrag = regridXYZMasked(xra, yra, zra, n=n, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)
+    xsag, ysag, zsag = regridXYZMasked(xsa, ysa, zsa, n=n, xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax)    
 
-    # Surface deformation map: reference - signal
-    diff = zrrg - zsrg
-    diff = diff[::-1] # Flip the signal scan. Required to conform with the way we handle the data.
-                      # This should not be required if we handled the data consistently throughout.
+    # Surface deformation map: signal - difference
+    diff = np.ma.masked_invalid(zsag - zrag)
+    diff = sigma_clip(diff, 5)
+    diff = np.ma.masked_invalid(diff)
 
     # Find Zernike coefficients on the surface deformation map.
-    fitlist = getZernikeCoeffs(diff.filled(0), nZern, norm='active-surface')
+    fitlist, diff_sub = getZernikeCoeffsCycle(xrag, yrag, diff, nZern=nZern, fill=0)
 
-    return xsrg, ysrg, diff, fitlist
+    return xrag, yrag, diff_sub, fitlist
 
 
 def smooth(fpath, N=512, spherical=False):
@@ -291,13 +243,33 @@ def processLeicaScan(fpath,
                      rot=None,
                      ellipse=[-8., 50., 49., 49., 0.],
                      sampleSize=None,
-                     addOffset=False,
                      plot=True):
     """
     High level function for processing leica data:
-       * processes PTX file
-       * smoothes it by calling gpu code
-    Smoothed scan has to be masked and reggrided. 
+       * Processes PTX file: removes bad data and isolates the primary reflector.
+       * Smooths it by calling GPU code.
+    The output is a smoothed scan which is evenly sampled in spherical coordinates.
+    Smoothed scan has to be masked and reggrided to Cartesian coordinates.
+    
+    Parameters
+    ----------
+    fpath : str
+        Path to the .ptx file containing the scan data.
+    N : int, optional
+        Number of samples in the azimuth and elevation directions
+        to use when smoothing.
+    rot : float, optional
+        Rotate the scan by this angle, in degrees, along the z axis after
+        isolating the primary reflector.
+    ellipse : list, optional
+        Parameters of the ellipse used for the initial dish segmentation.
+        The parameters are given as [center in x, center in y, major axis, 
+        minor axis, rotation angle]
+    sampleSize : int, optional
+        Number of lines to use from the PTX file. A random sample of this 
+        length will be selected. Defaults to the the whole PTX file.
+    plot : bool, optional
+        Display plots?
     """
     
     assert os.path.isfile(fpath)
@@ -319,8 +291,7 @@ def processLeicaScan(fpath,
                                         ellipse=ellipse,
                                         rFilter=True,
                                         iFilter=False,
-                                        sampleSize=sampleSize,
-                                        addOffset=addOffset)
+                                        sampleSize=sampleSize)
 
     e = time.time()
     print("Elapsed minutes: %5.2f" % ((e - s) / 60.))
@@ -342,13 +313,6 @@ def processLeicaScan(fpath,
     
     if plot:
         imageSmoothedData(x, y, z, N)
-        # x.shape = (N,N)
-        # y.shape = (N,N)
-        # z.shape = (N,N)
-        # masked = maskXYZ(x, y, z, n=N, guess=[60., 0., 0., -49., 0., 0.], bounds=None, radialMask=True, maskRadius=49.)
-        # xx, yy, zz = regridXYZ(x, y, masked['fitResidual'], n=N)
-        # surfacePlot(xx, yy, np.log10(abs(np.diff(zz.T))), title="Pixel by pixel difference", vMin=-5, vMax=0, colorbarLabel="Log10[m]")
-        # print("RMS on parabola subtracted scan: {} m".format(np.ma.std(zz)))
 
 
 def loadProcessedData(filename):
@@ -393,13 +357,13 @@ def imageSmoothedData(x, y, z, N, filename=None):
     print("RMS on parabola subtracted scan: {} m".format(np.ma.std(zz)))
 
 
-def maskXYZ(x, y, z, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radialMask=True, maskRadius=40., **kwargs):
+def maskXYZ(x, y, z, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radialMask=True, maskRadius=40., poly_order=2, **kwargs):
     """
     """
     
-    xf = x[~np.isnan(x)]
-    yf = y[~np.isnan(x)]
-    zf = z[~np.isnan(x)]
+    xf = x[~np.isnan(z)]
+    yf = y[~np.isnan(z)]
+    zf = z[~np.isnan(z)]
 
     # Use masked arrays on the input data to avoid warnings.
     x = np.ma.masked_invalid(x)
@@ -412,8 +376,9 @@ def maskXYZ(x, y, z, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radial
     # Subtract the fitted parabola from the data.
     # The difference should be flat.
     c = fitresult.x
-    zp = parabola(x, y, c[0])
-    xrr, yrr, zrr = shiftRotateXYZ(x, y, z, [0, 0, 0, c[4], c[5], 0])
+    zp = paraboloid(x, y, c[0])
+    cor = np.hstack((-1*c[1:4],c[4:6],0))
+    xrr, yrr, zrr = shiftRotateXYZ(x, y, z, cor)
     diff = zrr - zp
 
     if radialMask:
@@ -439,17 +404,11 @@ def maskXYZ(x, y, z, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radial
                                     guess, bounds=bounds, weights=None)
 
     c = masked_fitresult.x
-    zp = parabola(x, y, c[0])
-    xrrm, yrrm, zrrm = shiftRotateXYZ(x, y, z, [0, 0, 0, c[4], c[5], 0])
+    zp = paraboloid(x, y, c[0])
+    cor = np.hstack((-1*c[1:4],c[4:6],0))
+    xrrm, yrrm, zrrm = shiftRotateXYZ(x, y, z, cor)
     masked_diff = zrrm - zp
 
-    if radialMask:
-        xc = midPoint(xrrm)
-        yc = midPoint(yrrm)
-        mask = (((xrrm - xc)**2. + (yrrm - yc)**2.) < maskRadius**2.)
-        masked_diff = np.ma.masked_where(~mask, masked_diff)
-    else:
-        masked_diff = np.ma.masked_invalid(masked_diff)
 
     mcdiff2 = masked_diff
 
@@ -465,7 +424,7 @@ def maskXYZ(x, y, z, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None, radial
 
         if len(xl[~yl.mask]) > 3:
 
-            poly_c = np.polyfit(xl[~yl.mask], yl[~yl.mask], 2)
+            poly_c = np.polyfit(xl[~yl.mask], yl[~yl.mask], poly_order)
             poly_f = np.poly1d(poly_c)
 
             res = np.ma.masked_invalid(yl - poly_f(xl))
@@ -523,141 +482,82 @@ def maskLeicaData(filename, n=512, guess=[60., 0., 0., 0., 0., 0.], bounds=None,
     return outData 
 
 
-def simulateSignal(sigFn,
-                   refFn,
-                   sigType,
-                   rScale=10., # for use with bump
-                   zScale=1.0, # for use with bump
-                   xOffset=-8., # for use with z's and guassian
-                   yOffset=53., # for use with z's and guassian
-                   zAmplitude=None, # for use with zernikes
-                   gAmplitude=.0017, # for use with gaussian
-                   gWidth=0.2, # for use with guassian
-                   ):
+def maskRow(x, y, order=3, threshold=5):
     """
-    Like processLeicaScanPair, but instead we are 
-    injecting a simulated signal into the signal
-    file data after the smoothing stage.
-    The reference scan we will use processed already.
+    Removes a polynomial from the 2D data and 
+    applies sigma clipping to the residuals.
+
+    
     """
 
-    N = 512
-
-    # use the name of the signal scan to determine
-    # where to find the smoothed results
-    # GPU_PATH = "/home/sandboxes/pmargani/LASSI/gpus/versions/gpu_smoothing"
-    sigFn2 = "%s.ptx.csv" % sigFn
-    sigPath = os.path.join(GPU_PATH, sigFn2)
-
-    # and fit them
-    diffSig, xSig, ySig = fitLeicaScan(sigPath,
-                                       numpy=False,
-                                       N=N,
-                                       rFilter=False)
-
-    # add a simulated signal
-    if sigType == 'bump':
-        from copy import copy
-        diffSigorg = copy(diffSig)
-        #from processPTX import addCenterBump
-        diffSigS = addCenterBump(xSig.flatten(),
-                                 ySig.flatten(),
-                                 diffSig.flatten(),
-                                 rScale=rScale,
-                                 zScale=zScale)
-        # print x18.shape, y18.shape, diff18.shape, diff18b1.shape
-        diffSigS.shape = diffSig.shape
-
-        imagePlot(diffSigS, 'diffSigsS (added bump)')
-        imagePlot(np.log(np.abs(np.diff(diffSigS))), 'diffSigS log (added bump)')
-        # scatter3dPlot(x18, y18, diff18b1, 'diff18b1', sample=10.)        
-    elif sigType == 'z5':
-
-        z5 = zernikeFive(xSig,
-                         ySig,
-                         -xOffset, #0., #-8,
-                         -yOffset, #0., #53.,
-                         amplitude=1e-4,
-                         scale=1.)
-        imagePlot(z5, 'z5')
-        surface3dPlot(xSig, ySig, z5, 'z5')
-        
-        diffSigS = diffSig + z5
-
-        imagePlot(diffSigS, 'diffSigsS (added z5)')
-        imagePlot(np.log(np.abs(np.diff(diffSigS))), 'diffSigS log (added z5)')
-
-    elif sigType == 'z4':
-
-        z4 = zernikeFour(xSig,
-                         ySig,
-                         -xOffset, #0., #-8,
-                         -yOffset,
-                         amplitude=zAmplitude)
-        imagePlot(z4, 'z4')
-        surface3dPlot(xSig, ySig, z4, 'z4')
-        
-        diffSigS = diffSig + z4
-
-        imagePlot(diffSigS, 'diffSigsS (added z4)')
-        imagePlot(np.log(np.abs(np.diff(diffSigS))), 'diffSigS log (added z4)')
-
-    elif sigType == 'gaussian':
-
-        zg = gaussian(xSig,
-                      ySig,
-                      gAmplitude,
-                      xOffset,
-                      yOffset,
-                      gWidth)
-
-        imagePlot(zg, 'gaussian')
-        surface3dPlot(xSig, ySig, zg, 'gaussian')
-
-        # add it to the signal
-        diffSigS = diffSig + zg
-
-        imagePlot(diffSigS, 'diffSigsS (added gaussian)')
-        imagePlot(np.log(np.abs(np.diff(diffSigS))), 'diffSigS log (added gaussian)')
-
-    else:
-        print("sigType not recognized: ", sigType)
-        diffSigS = diffSig
-
-    # regrid to get into evenly spaced x y
-    regridFn = "%s.%s.regridded" % (sigFn, sigType)
-    xSigr, ySigr, diffsSigS = smoothXYZGpu(xSig,
-                                           ySig,
-                                           diffSigS,
-                                           N,
-                                           filename=regridFn)
-
-    diffsSigS.shape = (N, N)
-    imagePlot(difflog(diffsSigS), 'sig + sim regridded')
-
+    y_m = sigma_clip(y)
+    yp = polyFitRANSAC(x, y_m, order)
+    res = y - yp
+    resm = sigma_clip(res, sigma=threshold)
     
-    # now load the reference scan
-    from lassiAnalysis import loadProcessedData
-    refFn2 = "%s.ptx.processed.npz" % refFn
-    xsRef, ysRef, diffsRef = loadProcessedData(refFn2)
-    imagePlot(difflog(diffsRef), "%s: ref scan" % refFn)
+    return resm
+
+
+def maskDiff(diff, n=512, threshold=3):
+    """
+    Mask the first n rows of diff.
+    Each row is masked using `maskRow`.
+
+    Parameters
+    ----------
     
-    diffsRef.shape = (N, N)
-    diffData = diffsSigS - diffsRef
-    diffDataLog = np.log(np.abs(diffData))
-    imagePlot(diffData, "Surface Deformations")    
-    imagePlot(diffDataLog, "Surface Deformations Log")
-
-    print("Mean: ", np.nanmean(diffData))
-    print("Std; ", np.nanstd(diffData))
+    """
     
-    return diffData
+    x = np.linspace(0,n,n)
 
-def main():
-    fpath = "data/Baseline_STA10_HIGH_METERS.ptx"
-    #processLeicaScan(fpath)
-    tryProcessLeicaDataStream()
-    #tryFit()
+    #with warnings.catch_warnings():
+    #    warnings.simplefilter("ignore")
+    for i in range(n):
+        if diff[i].mask.sum() < n-10:
+            diff[i] = maskRow(x, diff[i], order=3, threshold=threshold)
+                
+    return diff
 
-if __name__ == "__main__":
-    main()
+
+def maskScanXYZ(x, y, z, n=512, outMaskThreshold=4, inMaskThreshold=3, inMaskClip=5):
+    """
+    """
+
+    xg, yg, zg = regridXYZ(x, y, z, n=n)
+
+    # Subtract the paraboloid from the primary reflector.
+    diff, _ = subtractParaboloid(xg, yg, zg)
+
+    # Mask points outside of the primary reflector.
+    diff_m = sigma_clip(diff, outMaskThreshold)
+
+    # Mask points on the primary reflector.
+    diff_m = maskDiff(diff_m, n, threshold=inMaskThreshold)
+    diff_m = sigma_clip(diff_m, inMaskClip)
+    
+    # Apply the masks to the original data.
+    zg_4_pfit = np.ma.masked_where(diff_m.mask, zg)
+
+    # Fit a paraboloid to the masked data.
+    fit = paraboloidFit(xg, yg, zg_4_pfit)
+    xga, yga, zga = align2Paraboloid(xg, yg, zg, fit.x)
+
+    # Apply mask to the registered scan.
+    zga = np.ma.masked_where(zg_4_pfit.mask, zga)
+
+    return xga, yga, zga
+
+
+def maskScan(fn, n=512, rot=0):
+    """
+    """
+
+    orgData, cleanData = loadLeicaData(fn, n=None, numpy=False)
+    x = orgData[0]
+    y = orgData[1]
+    z = orgData[2]
+    xr, yr, zr = shiftRotateXYZ(x, y, z, [0, 0, 0, 0, 0, np.deg2rad(rot)])
+
+    xga, yga, zga = maskScanXYZ(xr, yr, zr, n=512, outMaskThreshold=4, inMaskThreshold=3, inMaskClip=5)
+
+    return xga, yga, zga

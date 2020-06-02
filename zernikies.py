@@ -1039,6 +1039,25 @@ def getZernikeCoeffs(surface, order, printReport=False, norm='sqrt', radius=1):
     return coeffs
 
 
+def getZernikeCoeffsCycle(x, y, diff, nZern=36, fill=0):
+    """
+    """
+
+    fl_fs = getZernikeCoeffs(diff.filled(fill)[::-1].T, 36, norm='active-surface')
+
+    diff_sub = np.ma.copy(diff)
+    fl_fs_sub = np.copy(fl_fs)
+    it = 0
+    while np.any(abs(fl_fs_sub[2:4]) > 50e-6):
+        fl_fs_sub[2] *= -1.
+        zpoly_ = zernikePoly(x, y, midPoint(x), midPoint(y), fl_fs_sub[0:4])
+        diff_sub = diff_sub - zpoly_
+        fl_fs_sub = getZernikeCoeffs(diff_sub.filled(fill)[::-1].T, 36, norm='active-surface')
+        it += 1
+
+    return fl_fs_sub, diff_sub
+
+
 def getZernikeCoeffsOLS(x, y, z, nZern, xOffset=0, yOffset=0, xMax=None, yMax=None, weights=None):
     """
     Determines the coefficients of the Zernike polynomials in z using weighted least squares.

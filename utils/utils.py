@@ -7,10 +7,36 @@ from copy import copy
 from numpy.lib.stride_tricks import as_strided
 
 from skimage import morphology
+from sklearn.pipeline import make_pipeline
+from sklearn.linear_model import RANSACRegressor
+from sklearn.preprocessing import PolynomialFeatures
 
 from astropy.time import Time
 #from astropy.coordinates import cartesian_to_spherical
 #from astropy.coordinates import spherical_to_cartesian
+
+
+def polyFitRANSAC(x, y, order):
+    """
+    Uses the RANSAC algorithm to fit a polynomial.
+
+    Parameters
+    ----------
+    x : array
+        x coordinates.
+    y : array
+        y coordinates.
+    order : int
+        Polynomial order.
+    """
+
+    y = np.ma.masked_invalid(y)
+
+    model = make_pipeline(PolynomialFeatures(order), RANSACRegressor(min_samples=0.5))
+    model.fit(x[~y.mask,np.newaxis], y[~y.mask,np.newaxis])
+    yp = model.predict(x[:,np.newaxis])
+
+    return yp[:,0]
 
 
 def mjd2utc(mjd):
